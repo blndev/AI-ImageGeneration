@@ -24,12 +24,15 @@ class GradioUI():
             # This is a placeholder - implement your actual image generation logic here
             # For now, returning an empty list
             try:
+                #TODO: setps, guidance, etc auch in config
                 generation_details = FluxParameters(
                     prompt=prompt,
-                    num_inference_steps=50 if self.generator.is_dev() else 4,
-                    guidance_scale=7.5 if self.generator.is_dev() else 0.,
-                    width=512,
-                    height=768
+                    negative_prompt="unrealistic, ugly", # TODO: in ui
+                    num_inference_steps=int(os.getenv("GENERATION_STEPS", 30 if self.generator.is_dev() else 4)),
+                    guidance_scale=float(os.getenv("GENERATION_GUIDANCE", 7.5 if self.generator.is_dev() else 0)),
+                    num_images_per_prompt=2,
+                    width=512, #TODO: aspect ratio in dialog
+                    height=512
                 )
 
                 images = self.generator.generate_images(params=generation_details)
@@ -48,6 +51,7 @@ class GradioUI():
                 prompt = gr.Textbox(
                     label="Enter your prompt",
                     placeholder="Describe the image you want to generate...",
+                    value="A cinematic shot of a baby cat wearing an intricate egypt priest robe.",
                     scale=4
                 )
                 

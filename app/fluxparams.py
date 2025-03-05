@@ -153,7 +153,22 @@ class FluxParameters:
             warnings.warn(f"FLUX-DEV typically works better with guidance_scale >= 7.0. "
                         f"Current setting: {params.guidance_scale}")
         
-        if params.guidance_scale <= 0:
-            params.guidance_scale=5.0
-                        
+
+    def prepare_sdxl(self) -> 'FluxParameters':
+        """
+        Adjusts parameters specifically for FLUX-DEV model.
+        Returns a new FluxParameters instance with optimized settings.
+        """
+        params = FluxParameters(**self.__dict__)  # Create a copy
+        
+        # Warn if inference steps are too low for good quality
+        if params.num_inference_steps < 10:
+            warnings.warn(f"SDXL typically needs 30+ inference steps for good results. "
+                        f"Current setting: {params.num_inference_steps}")
+            
+        # Adjust guidance scale if too low
+        # if params.guidance_scale < 7.0:
+        #     warnings.warn(f"SDXL typically works better with guidance_scale >= 7.0. "
+        #                 f"Current setting: {params.guidance_scale}")
+        
         return params

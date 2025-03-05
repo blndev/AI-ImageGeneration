@@ -9,7 +9,7 @@ from app import FluxParameters
 
 #AI STuff
 import torch
-from diffusers import FluxPipeline
+from diffusers import FluxPipeline, StableDiffusionXLPipeline
 # for manual offline pipeline loading
 from diffusers import FluxTransformer2DModel, AutoencoderKL
 from transformers import CLIPTextModel, CLIPTokenizer, T5EncoderModel, T5Tokenizer
@@ -20,26 +20,34 @@ logger = logging.getLogger(__name__)
 
 @singleton
 class FluxGenerator():
-    def __init__(self, model: str = "black-forest-labs/FLUX.1-schnell", model_directory: str = "./models"):
+    def __init__(self, sdxl: bool = False):
         logger.info("Initialize FluxGenerator")
         #black-forest-labs/FLUX.1-dev
-        self.model = model
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
         self.torch_dtype=torch.float16 if self.device == "cuda" else torch.float32
 
         self._cached_generation_pipeline = None
         self._generation_lock = threading.Lock()
-        self.model_directory = model_directory
-        try:
-            os.makedirs(model_directory, exist_ok=True)
-        except Exception as e:
-            logger.warning(f"failed to create the model directory {e}")
 
         #TODO: make sure all files exists
         #TODO use path.join with model folder path
-        self.model = os.getenv("FLUX_MODEL", "black-forest-labs/FLUX.1-schnell")
+        if sdxl or os.getenv("USE_SDXL", False):
+            self.pipelinetemplate = StableDiffusionXLPipeline
+            logger.info("using SDXL")
+            self.SDXL = True
+        else:
+            logger.info("using FLUX")
+            self.pipelinetemplate = FluxPipeline
+            self.SDXL=False
+
+        self.model_directory = os.getenv("MODEL_DIRECTORY", "./models/")
+        try:
+            os.makedirs(self.model_directory , exist_ok=True)
+        except Exception as e:
+            logger.warning(f"failed to create the model directory {e}")
+
+        self.model = os.getenv("GENERATION_MODEL", "black-forest-labs/FLUX.1-dev")
         self._hftoken = os.getenv("HUGGINGFACE_TOKEN", None)
-        #TODO: support huggingface login if token is access provided
 
     def __del__(self):
         logger.info("free memory used for FluxGenerator pipeline")
@@ -71,7 +79,7 @@ class FluxGenerator():
             
             if self.model.endswith("safetensors"):
                 logger.info(f"Using 'from_single_file' to load model {self.model} from local folder")
-                pipeline = FluxPipeline.from_single_file(
+                pipeline = self.pipelinetemplate.from_single_file(
                     self.model,
                     token = self._hftoken,
                     local_files_only=True,
@@ -85,7 +93,7 @@ class FluxGenerator():
                 )
             else:
                 logger.info(f"Using 'from_pretrained' option to load model {self.model} from hugging face or local cache")
-                pipeline = FluxPipeline.from_pretrained(
+                pipeline = self.pipelinetemplate.from_pretrained(
                     self.model,
                     token=self._hftoken,
                     cache_dir = self.model_directory,
@@ -177,6 +185,8 @@ class FluxGenerator():
                     params = params.prepare_flux_schnell()
                 elif self.is_dev():
                     params = params.prepare_flux_dev()
+                elif self.SDXL:
+                    params = params.prepare_sdxl()
 
                 logger.debug("Strength: %f, Steps: %d", params.strength, params.num_inference_steps)
                 result_images = model(**params.to_dict()).images
