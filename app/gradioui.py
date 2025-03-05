@@ -27,7 +27,9 @@ class GradioUI():
                 generation_details = FluxParameters(
                     prompt=prompt,
                     num_inference_steps=50 if self.generator.is_dev() else 4,
-                    guidance_scale=7.5 if self.generator.is_dev() else 0.
+                    guidance_scale=7.5 if self.generator.is_dev() else 0.,
+                    width=512,
+                    height=768
                 )
 
                 images = self.generator.generate_images(params=generation_details)

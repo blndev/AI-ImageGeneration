@@ -80,7 +80,8 @@ class FluxGenerator():
                     #safety_checker=None,
                     #requires_safety_checker=False,
                     use_safetensors=True,
-                    device_map="auto"
+                    device_map="auto",
+                    strict=False
                 )
             else:
                 logger.info(f"Using 'from_pretrained' option to load model {self.model} from hugging face or local cache")
@@ -100,18 +101,22 @@ class FluxGenerator():
             #TODO: all optimizations must be enabled via config
             
             #cpu offload will not work with pipeline.to(cuda)
-            if os.environ.get("GPU_ALLOW_MEMORY_OFFLOAD", None):
-                pipeline.enable_model_cpu_offload()
-
             if os.environ.get("GPU_ALLOW_ATTENTION_SLICING", None):
+                logger.info("attention slicing activated")
                 pipeline.enable_attention_slicing(slice_size="auto")
 
-            if os.environ.get("GPU_ALLOW_XFORMERS", None): 
+            if os.environ.get("GPU_ALLOW_XFORMERS", None):
+                logger.info("xformers activated") 
                 pipeline.enable_xformers_memory_efficient_attention()
 
             if self.device=="cuda":
                 torch.cuda.empty_cache()
-            pipeline.to(self.device)
+
+            if os.environ.get("GPU_ALLOW_MEMORY_OFFLOAD", None):
+                logger.warning("gpu offload activated")
+                pipeline.enable_model_cpu_offload()
+            else:
+                pipeline.to(self.device)
 
             #pipeline.enable_attention_slicing("auto")
             #
