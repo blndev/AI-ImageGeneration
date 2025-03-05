@@ -37,7 +37,7 @@ class FluxGenerator():
 
         #TODO: make sure all files exists
         #TODO use path.join with model folder path
-        self.model_path = os.getenv("FLUX_MODEL", "flux1-dev.safetensors")
+        self.model = os.getenv("FLUX_MODEL", "black-forest-labs/FLUX.1-schnell")
         self._hftoken = os.getenv("HUGGINGFACE_TOKEN", None)
         #TODO: support huggingface login if token is access provided
 
@@ -47,15 +47,20 @@ class FluxGenerator():
 
     def _download_model():
         """will download missing parts of the model if huggingface token is not provided"""
-        #TOPDO: implement
+        #TODO: implement
         pass
-        #https://huggingface.co/lovis93/testllm/resolve/ed9cf1af7465cebca4649157f118e331cf2a084f/ae.safetensors?download=true
+        #https://huggingface.co/Kijai/flux-fp8/resolve/main/flux1-dev-fp8.safetensors?download=true
+        #https://huggingface.co/Kijai/flux-fp8/resolve/main/flux1-dev-fp8-e5m2.safetensors?download=true
 
     def check_safety(self, x_image):
         """Support function to check if the image is NSFW."""
         return x_image, False
 
-    def _get_generation_pipeline(self, use_cached_model=True):
+    def warmup(self):
+        """prepares the execution and load the model from storage or internet to the GPU"""
+        self._load_model()
+
+    def _load_model(self, use_cached_model=True):
         """Load and return the Stable Diffusion model to generate images"""
         if self._cached_generation_pipeline and use_cached_model:
             return self._cached_generation_pipeline
@@ -72,8 +77,8 @@ class FluxGenerator():
                     local_files_only=True,
                     cache_dir = self.model_directory,
                     torch_dtype=self.torch_dtype,
-                    safety_checker=None,
-                    requires_safety_checker=False,
+                    #safety_checker=None,
+                    #requires_safety_checker=False,
                     use_safetensors=True,
                     device_map="auto"
                 )
@@ -83,10 +88,9 @@ class FluxGenerator():
                     self.model,
                     token=self._hftoken,
                     cache_dir = self.model_directory,
-                    local_files_only=False,#TODO: set to false (on dev avoid loading from internet=
                     torch_dtype=self.torch_dtype,
-                    safety_checker=None,
-                    requires_safety_checker=False
+                    #safety_checker=None,
+                    #requires_safety_checker=False
                 )
 
             logger.debug("diffuser initiated")
@@ -96,14 +100,21 @@ class FluxGenerator():
             #TODO: all optimizations must be enabled via config
             
             #cpu offload will not work with pipeline.to(cuda)
-            pipeline.enable_model_cpu_offload()
+            if os.environ.get("GPU_ALLOW_MEMORY_OFFLOAD", None):
+                pipeline.enable_model_cpu_offload()
 
-            if False : #always this combi
+            if os.environ.get("GPU_ALLOW_ATTENTION_SLICING", None):
+                pipeline.enable_attention_slicing(slice_size="auto")
+
+            if os.environ.get("GPU_ALLOW_XFORMERS", None): 
                 pipeline.enable_xformers_memory_efficient_attention()
-                pipeline.to(self.device)
+
+            if self.device=="cuda":
+                torch.cuda.empty_cache()
+            pipeline.to(self.device)
 
             #pipeline.enable_attention_slicing("auto")
-            #pipeline.enable_attention_slicing(slice_size="auto")
+            #
             logger.debug("FluxGenerator-Pipeline created")
             self._cached_generation_pipeline = pipeline
             return pipeline
@@ -129,7 +140,7 @@ class FluxGenerator():
         try:
             self.default_model = model
             self.unload_model()
-            self._get_generation_pipeline(model=model, use_cached_model=False)
+            self._load_model(model=model, use_cached_model=False)
         except Exception as e:
             logger.error("Error while changing text2img model: %s", str(e))
             logger.debug("Exception details: {e}")
@@ -151,10 +162,10 @@ class FluxGenerator():
 
         with self._generation_lock:
             try:
-                model = self._get_generation_pipeline()
+                model = self._load_model()
                 if not model:
                     logger.error("No model loaded")
-                    raise Exception(message="No model loaded. Generation not available")
+                    raise Exception("No model loaded. Generation not available")
 
                 #https://huggingface.co/docs/diffusers/main/api/pipelines/flux
                 if self.is_schnell():
