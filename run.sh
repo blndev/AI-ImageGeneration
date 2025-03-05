@@ -103,9 +103,9 @@ start_both() {
 # Show menu and get user choice
 echo "Please select what to start:"
 echo "1) AI App"
-echo "2) Analytics Dashboard"
-echo "3) Both"
-read -p "Enter your choice (1-3): " choice
+#echo "2) Analytics Dashboard"
+#echo "3) Both"
+read -p "Enter your choice (1): " choice
 
 case $choice in
     1)
