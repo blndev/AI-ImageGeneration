@@ -18,3 +18,5 @@ transformers>=4.49      # for image generation
 accelerate              #for low cpu
 torch>=2.6              # for gpu support and ai operations
 xformers                # memory optimization
+protobuf                # required by pipeline
+sentencepiece           # required by tokenizer

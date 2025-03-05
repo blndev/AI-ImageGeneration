@@ -4,8 +4,10 @@ from typing import List
 from PIL import Image
 import logging
 from app.utils.singleton import singleton
+from app.utils.fileIO import save_image_with_timestamp
 from app.fluxparams import FluxParameters
 from app.fluxgenerator import FluxGenerator
+
 # Set up module logger
 logger = logging.getLogger(__name__)
 # 
@@ -14,21 +16,27 @@ logger = logging.getLogger(__name__)
 class GradioUI():
     def __init__(self):
         self.interface = None
-        self.model_name = os.getenv('FLUX_MODEL', 'default')
-        if self.model_name != 'default':
-            self.generator = FluxGenerator(self.model_name)          
-        else:
-            self.generator = FluxGenerator()
+        self.generator = FluxGenerator()
 
     def create_interface(self):
         # Define the generate function that will be called when the button is clicked
-        def generate_images(prompt):
+        def uiaction_generate_images(prompt):
             # This is a placeholder - implement your actual image generation logic here
             # For now, returning an empty list
             try:
-                generation_details = FluxParameters(prompt=prompt)
-                return self.generator.generate_images(params=generation_details)
+                generation_details = FluxParameters(
+                    prompt=prompt,
+                    num_inference_steps=50 if self.generator.is_dev() else 4,
+                    guidance_scale=7.5 if self.generator.is_dev() else 0.
+                )
+
+                images = self.generator.generate_images(params=generation_details)
+                logger.info(f"received {len(images)} image(s) from generator")
+                for image in images:
+                    save_image_with_timestamp(image=image, folder_path="./output", ignore_errors=True)
+                return images
             except Exception as e:
+                logger.error(f"image generation failed: {e}")
                 gr.Warning(f"Error while generating the image: {e}")
 
         # Create the interface components
@@ -74,7 +82,7 @@ class GradioUI():
 
             # Connect the generate button to the generate function
             generate_btn.click(
-                fn=generate_images,
+                fn=uiaction_generate_images,
                 inputs=[prompt],
                 outputs=[gallery]
             )

@@ -45,7 +45,10 @@ def setup_logging():
     logging.getLogger('python_multipart').setLevel(logging.WARNING)
     logging.getLogger('asyncio').setLevel(logging.WARNING)
     logging.getLogger('matplotlib').setLevel(logging.WARNING)
-    
+    logging.getLogger('filelock').setLevel(logging.WARNING)
+    logging.getLogger('urllib').setLevel(logging.WARNING)
+
+
     log_directory = "logs"
     if not os.path.exists(log_directory):
         os.makedirs(log_directory)

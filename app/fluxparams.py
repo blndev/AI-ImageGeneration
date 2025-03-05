@@ -3,6 +3,8 @@ from typing import Optional, List, Union
 from PIL import Image
 import warnings
 
+import torch
+
 @dataclass
 class FluxParameters:
     """
@@ -36,14 +38,15 @@ class FluxParameters:
     height: int = 1024
     num_images_per_prompt: int = 1
     seed: Optional[int] = None
-    
+    output_format: str = "jpg"
+    output_quality: int = 80
     # Image-to-Image specific parameters
     image: Optional[Union[Image.Image, List[Image.Image]]] = None
     strength: float = 0.8
     mask_image: Optional[Image.Image] = None
     
     # Advanced parameters
-    guidance_rescale: float = 0.7
+    guidance_scale: float = 0.7
     clip_skip: Optional[int] = None
     
     def validate(self):
@@ -54,7 +57,7 @@ class FluxParameters:
         if self.num_inference_steps < 1:
             raise ValueError("num_inference_steps must be >= 1")
             
-        if not (0.0 <= self.guidance_scale):
+        if not (self.guidance_scale>=0):
             raise ValueError("guidance_scale must be >= 0.0")
             
         if not (0.0 < self.strength <= 1.0) and self.image is not None:
@@ -66,8 +69,8 @@ class FluxParameters:
         if self.clip_skip is not None and self.clip_skip < 1:
             raise ValueError("clip_skip must be >= 1")
             
-        if self.guidance_rescale <= 0.0:
-            raise ValueError("guidance_rescale must be > 0.0")
+        if self.guidance_scale < 0.0:
+            raise ValueError("guidance_scale must be > 0.0")
             
         # Validate image dimensions if provided
         if isinstance(self.image, Image.Image):
@@ -91,7 +94,7 @@ class FluxParameters:
             "width": self.width,
             "height": self.height,
             "num_images_per_prompt": self.num_images_per_prompt,
-            "guidance_rescale": self.guidance_rescale,
+            "guidance_scale": self.guidance_scale,
         }
         
         if self.negative_prompt:
@@ -149,5 +152,8 @@ class FluxParameters:
         if params.guidance_scale < 7.0:
             warnings.warn(f"FLUX-DEV typically works better with guidance_scale >= 7.0. "
                         f"Current setting: {params.guidance_scale}")
-            
+        
+        if params.guidance_scale <= 0:
+            params.guidance_scale=5.0
+                        
         return params
