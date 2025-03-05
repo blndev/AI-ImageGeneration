@@ -3,22 +3,25 @@ from typing import List
 from PIL import Image
 import logging
 from app.utils.singleton import singleton
+from app.fluxparams import FluxParameters
 from app.fluxgenerator import FluxGenerator
 # Set up module logger
 logger = logging.getLogger(__name__)
-# self.generator = FluxGenerator()
+# 
 
 @singleton
 class GradioUI():
     def __init__(self):
         self.interface = None
+        self.generator = FluxGenerator()
 
     def create_interface(self):
         # Define the generate function that will be called when the button is clicked
         def generate_images(prompt):
             # This is a placeholder - implement your actual image generation logic here
             # For now, returning an empty list
-            return []
+            generation_details = FluxParameters(prompt=prompt)
+            return self.generator.generate_images(params=generation_details)
 
         # Create the interface components
         with gr.Blocks() as self.interface:
@@ -46,10 +49,20 @@ class GradioUI():
 
             # Make button interactive only when prompt has text
             prompt.change(
-                fn=lambda x: len(x.strip()) > 0,
+                fn=lambda x: gr.Button(interactive=len(x.strip()) > 0),
                 inputs=[prompt],
                 outputs=[generate_btn]
             )
+
+            # def update_button(text):
+            #     return gr.Button.update(interactive=len(text.strip()) > 0)
+
+
+            # prompt.change(
+            #     fn=update_button,
+            #     inputs=[prompt],
+            #     outputs=[generate_btn]
+            # )
 
             # Connect the generate button to the generate function
             generate_btn.click(
