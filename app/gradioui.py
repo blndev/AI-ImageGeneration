@@ -25,8 +25,11 @@ class GradioUI():
         def generate_images(prompt):
             # This is a placeholder - implement your actual image generation logic here
             # For now, returning an empty list
-            generation_details = FluxParameters(prompt=prompt)
-            return self.generator.generate_images(params=generation_details)
+            try:
+                generation_details = FluxParameters(prompt=prompt)
+                return self.generator.generate_images(params=generation_details)
+            except Exception as e:
+                gr.Warning(f"Error while generating the image: {e}")
 
         # Create the interface components
         with gr.Blocks() as self.interface:
