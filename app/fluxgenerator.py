@@ -20,7 +20,7 @@ class FluxGenerator():
         logger.info("Initialize FluxGenerator")
 
         self.model = model
-        self.device = "cuda" if self.torch.cuda.is_available() else "cpu"
+        self.device = "cuda" if torch.cuda.is_available() else "cpu"
         self._cached_generation_pipeline = None
         self._generation_lock = threading.Lock()
         self.model_directory = model_directory
@@ -51,7 +51,7 @@ class FluxGenerator():
                 pipeline = FluxPipeline.from_single_file(
                     self.model,
                     cache_dir = self.model_directory,
-                    torch_dtype=self.torch.float16 if self.device == "cuda" else self.torch.float32,
+                    torch_dtype=torch.float16 if self.device == "cuda" else torch.float32,
                     safety_checker=None,
                     requires_safety_checker=False,
                     use_safetensors=True
@@ -61,8 +61,8 @@ class FluxGenerator():
                 pipeline = FluxPipeline.from_pretrained(
                     self.model,
                     cache_dir = self.model_directory,
-                    local_files_only=True,#TODO: set to false (on dev avoid loading from internet=
-                    torch_dtype=self.torch.float16 if self.device == "cuda" else self.torch.float32,
+                    local_files_only=False,#TODO: set to false (on dev avoid loading from internet=
+                    torch_dtype=torch.float16 if self.device == "cuda" else torch.float32,
                     safety_checker=None,
                     requires_safety_checker=False
                 )
@@ -78,7 +78,7 @@ class FluxGenerator():
         except Exception as e:
             logger.error("Generator Pipeline could not be created. Error in load_model: %s", str(e))
             logger.debug("Exception details:", e)
-            raise Exception(message="Error while loading the pipeline for image conversion.\nSee logfile for details.")
+            raise Exception("Error while loading the pipeline for image conversion.\nSee logfile for details.")
 
     def unload_model(self):
         try:
@@ -87,7 +87,7 @@ class FluxGenerator():
                 del self._cached_generation_pipeline
                 self._cached_generation_pipeline = None
             gc.collect()
-            self.torch.cuda.empty_cache()
+            torch.cuda.empty_cache()
         except Exception:
             logger.error("Error while unloading Iimage generation model")
 
