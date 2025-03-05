@@ -1,0 +1,19 @@
+###############################################################
+# Main App
+gradio>=5.2     # main UI
+colorlog        # Colored logging output
+Pillow          # PIL images
+numpy           # Image Manipulation (SKIP_AI)
+
+###############################################################
+# Analytics
+geoip2          # for analytics to determine country and city
+user-agents     # to parse user agents and split into 
+
+###############################################################
+# AI
+diffusers>=0.32         # for stable diffusion general
+transformers>=4.49      # for image generation
+accelerate              #for low cpu
+torch>=2.6              # for gpu support and ai operations
+xformers                # memory optimization
