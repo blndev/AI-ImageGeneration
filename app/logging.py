@@ -46,7 +46,7 @@ def setup_logging():
     logging.getLogger('asyncio').setLevel(logging.WARNING)
     logging.getLogger('matplotlib').setLevel(logging.WARNING)
     logging.getLogger('filelock').setLevel(logging.WARNING)
-    logging.getLogger('urllib').setLevel(logging.WARNING)
+    logging.getLogger('urllib3.connectionpool').setLevel(logging.WARNING)
 
 
     log_directory = "logs"
