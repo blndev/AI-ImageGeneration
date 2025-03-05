@@ -4,6 +4,7 @@ gradio>=5.2     # main UI
 colorlog        # Colored logging output
 Pillow          # PIL images
 numpy           # Image Manipulation (SKIP_AI)
+dotenv          # Load environment variables for config from file
 
 ###############################################################
 # Analytics

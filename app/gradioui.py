@@ -1,3 +1,4 @@
+import os
 import gradio as gr
 from typing import List
 from PIL import Image
@@ -13,7 +14,11 @@ logger = logging.getLogger(__name__)
 class GradioUI():
     def __init__(self):
         self.interface = None
-        self.generator = FluxGenerator()
+        self.model_name = os.getenv('FLUX_MODEL', 'default')
+        if self.model_name != 'default':
+            self.generator = FluxGenerator(self.model_name)          
+        else:
+            self.generator = FluxGenerator()
 
     def create_interface(self):
         # Define the generate function that will be called when the button is clicked
