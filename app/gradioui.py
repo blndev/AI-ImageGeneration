@@ -142,10 +142,14 @@ class GradioUI():
                 # Gallery for displaying generated images
                 gallery = gr.Gallery(
                     label="Generated Images",
+                    show_share_button=False,
+                    show_download_button=True,
                     format="jpeg",
-                    columns=2,
+                    columns=4,
                     rows=1,
                     height="auto",
+                    object_fit="cover",
+                    preview=True
                 )
             with gr.Row():
                 download_btn = gr.DownloadButton("Download", visible=False)
