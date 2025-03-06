@@ -161,6 +161,39 @@ class FluxGenerator():
             logger.debug("Exception details: {e}")
             raise (f"Loading new img2img model '{model}' failed", e)
 
+    def _create_debug_image(self, params: FluxParameters) -> Image.Image:
+        """Creates a debug image with white background and black text showing the parameters"""
+        # Create a new white image
+        img = Image.new('RGB', (params.width, params.height), 'white')
+        
+        # Import here to avoid circular imports
+        from PIL import ImageDraw
+        
+        # Create draw object
+        draw = ImageDraw.Draw(img)
+        
+        # Convert parameters to text
+        param_dict = params.to_dict()
+        text_lines = []
+        text_lines.append(f"Prompt: {param_dict['prompt']}")
+        text_lines.append(f"Steps: {param_dict['num_inference_steps']}")
+        text_lines.append(f"Guidance Scale: {param_dict['guidance_scale']}")
+        text_lines.append(f"Size: {param_dict['width']}x{param_dict['height']}")
+        if 'negative_prompt' in param_dict:
+            text_lines.append(f"Negative Prompt: {param_dict['negative_prompt']}")
+        if 'generator' in param_dict:
+            text_lines.append(f"Seed: {params.seed}")
+        if 'image' in param_dict:
+            text_lines.append(f"Strength: {param_dict['strength']}")
+        
+        # Draw text
+        y_position = 20
+        for line in text_lines:
+            draw.text((20, y_position), line, fill='black')
+            y_position += 30
+            
+        return img
+
     def is_schnell(self):
         """true if a schnell model is used (requires different generation parameters than dev)"""
         return "schnell" in self.model.lower()
@@ -176,8 +209,7 @@ class FluxGenerator():
         params.validate()
         if os.getenv("NO_AI", False):
             logger.warning("no ai option is activated")
-            #TODO: generate a picture with all the params written on it
-            return [params.image]
+            return [self._create_debug_image(params)]
         
         with self._generation_lock:
             try:
