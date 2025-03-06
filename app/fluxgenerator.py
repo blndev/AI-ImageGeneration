@@ -8,20 +8,21 @@ import threading
 from app.utils.singleton import singleton
 from app import FluxParameters
 
-#AI STuff
+# AI STuff
 import torch
 from diffusers import FluxPipeline, StableDiffusionXLPipeline
 
 # Set up module logger
 logger = logging.getLogger(__name__)
 
+
 @singleton
 class FluxGenerator():
     def __init__(self, sdxl: bool = False):
         logger.info("Initialize FluxGenerator")
-        #black-forest-labs/FLUX.1-dev
+        # black-forest-labs/FLUX.1-dev
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
-        self.torch_dtype=torch.float16 if self.device == "cuda" else torch.float32
+        self.torch_dtype = torch.float16 if self.device == "cuda" else torch.float32
         logger.info(f"Set device for generation to {self.device}")
 
         self._cached_generation_pipeline = None
@@ -34,12 +35,12 @@ class FluxGenerator():
         else:
             logger.info("using FLUX")
             self.pipelinetemplate = FluxPipeline
-            self.SDXL=False
+            self.SDXL = False
 
         self.model_directory = os.getenv("MODEL_DIRECTORY", "./models/")
         logger.info(f"using cache directory '{self.model_directory}'")
         try:
-            os.makedirs(self.model_directory , exist_ok=True)
+            os.makedirs(self.model_directory, exist_ok=True)
         except Exception as e:
             logger.warning(f"failed to create the model directory {e}")
 
@@ -52,10 +53,10 @@ class FluxGenerator():
 
     def _download_model():
         """will download missing parts of the model if huggingface token is not provided"""
-        #TODO: implement
+        # TODO: implement
         pass
-        #https://huggingface.co/Kijai/flux-fp8/resolve/main/flux1-dev-fp8.safetensors?download=true
-        #https://huggingface.co/Kijai/flux-fp8/resolve/main/flux1-dev-fp8-e5m2.safetensors?download=true
+        # https://huggingface.co/Kijai/flux-fp8/resolve/main/flux1-dev-fp8.safetensors?download=true
+        # https://huggingface.co/Kijai/flux-fp8/resolve/main/flux1-dev-fp8-e5m2.safetensors?download=true
 
     def check_safety(self, x_image):
         """Support function to check if the image is NSFW."""
@@ -73,44 +74,45 @@ class FluxGenerator():
         try:
             logger.debug(f"Loading model {self.model}, using cache  '{self.model_directory}'")
             pipeline = None
-            
+
             if self.model.endswith("safetensors"):
                 logger.info(f"Using 'from_single_file' to load model {self.model} from local folder")
                 pipeline = self.pipelinetemplate.from_single_file(
                     self.model,
-                    token = self._hftoken,
+                    token=self._hftoken,
                     local_files_only=True,
-                    cache_dir = self.model_directory,
+                    cache_dir=self.model_directory,
                     torch_dtype=self.torch_dtype,
-                    #safety_checker=None,
-                    #requires_safety_checker=False,
+                    # safety_checker=None,
+                    # requires_safety_checker=False,
                     use_safetensors=True,
                     device_map="auto",
                     strict=False
                 )
             else:
-                logger.info(f"Using 'from_pretrained' option to load model {self.model} from hugging face or local cache")
+                logger.info(
+                    f"Using 'from_pretrained' option to load model {self.model} from hugging face or local cache")
                 pipeline = self.pipelinetemplate.from_pretrained(
                     self.model,
                     token=self._hftoken,
-                    cache_dir = self.model_directory,
+                    cache_dir=self.model_directory,
                     torch_dtype=self.torch_dtype,
-                    #safety_checker=None,
-                    #requires_safety_checker=False
+                    # safety_checker=None,
+                    # requires_safety_checker=False
                 )
 
             logger.debug("diffuser initiated")
-            
-            #cpu offload will not work with pipeline.to(cuda)
+
+            # cpu offload will not work with pipeline.to(cuda)
             if bool(strtobool(os.getenv("GPU_ALLOW_ATTENTION_SLICING", "False"))):
                 logger.info("attention slicing activated")
                 pipeline.enable_attention_slicing(slice_size="auto")
 
             if bool(strtobool(os.getenv("GPU_ALLOW_XFORMERS", "False"))):
-                logger.info("xformers activated") 
+                logger.info("xformers activated")
                 pipeline.enable_xformers_memory_efficient_attention()
 
-            if self.device=="cuda":
+            if self.device == "cuda":
                 torch.cuda.empty_cache()
 
             if bool(strtobool(os.getenv("GPU_ALLOW_MEMORY_OFFLOAD", "False"))):
@@ -119,16 +121,16 @@ class FluxGenerator():
             else:
                 pipeline.to(self.device)
 
-            #pipeline.enable_attention_slicing("auto")
+            # pipeline.enable_attention_slicing("auto")
             #
             logger.debug("FluxGenerator-Pipeline created")
             self._cached_generation_pipeline = pipeline
             return pipeline
         except Exception as e:
             logger.error(f"Load Model failed. Error: {e}")
-            #logger.debug("Exception details:", e)
+            # logger.debug("Exception details:", e)
             return None
-            #raise Exception("Error while loading the pipeline for image conversion.\nSee logfile for details.")
+            # raise Exception("Error while loading the pipeline for image conversion.\nSee logfile for details.")
 
     def unload_model(self):
         try:
@@ -155,11 +157,11 @@ class FluxGenerator():
     def is_flux_schnell(self):
         """true if a schnell model is used (requires different generation parameters than dev)"""
         return "schnell" in self.model.lower()
-    
+
     def is_flux_dev(self):
         """true if a dev model is used"""
         return "dev" in self.model.lower()
-    
+
     def generate_images(self, params: FluxParameters) -> List[Image.Image]:
         """Generate a list of images."""
         logger.debug("starting image generation")
@@ -168,7 +170,7 @@ class FluxGenerator():
         if os.getenv("NO_AI", False):
             logger.warning("'no ai' - option is activated")
             return self._create_debug_image(params)
-        
+
         with self._generation_lock:
             try:
                 model = self._load_model()
@@ -176,7 +178,7 @@ class FluxGenerator():
                     logger.error("No model loaded")
                     raise Exception("No model loaded. Generation not available")
 
-                #https://huggingface.co/docs/diffusers/main/api/pipelines/flux
+                # https://huggingface.co/docs/diffusers/main/api/pipelines/flux
                 if self.is_flux_schnell():
                     params = params.prepare_flux_schnell()
                 elif self.is_flux_dev():
@@ -191,11 +193,10 @@ class FluxGenerator():
             except RuntimeError as e:
                 logger.error(f"Error while generating Images: {e}")
                 try:
-                    pass#self.unload_model()
+                    pass  # self.unload_model()
                 except:
                     pass
                 raise Exception(f"Internal error while creating the image.")
-
 
     def _create_debug_image(self, params: FluxParameters) -> Image.Image:
         """Creates a debug image with white background and black text showing the parameters"""
@@ -212,14 +213,14 @@ class FluxGenerator():
             "ghostwhite",
             "floralwhite"
         ]
-        
+
         for i in range(params.num_images_per_prompt):
             # Create a new white image
-            img = Image.new('RGB', (params.width, params.height), color=bg_colors[i] if len (bg_colors)>i else "white")
+            img = Image.new('RGB', (params.width, params.height), color=bg_colors[i] if len(bg_colors) > i else "white")
 
             # Create draw object
             draw = ImageDraw.Draw(img)
-            
+
             # Convert parameters to text
             param_dict = params.to_dict()
             text_lines = []
@@ -233,12 +234,11 @@ class FluxGenerator():
                 text_lines.append(f"Seed: {params.seed}")
             if 'image' in param_dict:
                 text_lines.append(f"Strength: {param_dict['strength']}")
-            
+
             # Draw text
             y_position = 20
             for line in text_lines:
                 draw.text((20, y_position), line, fill='black')
                 y_position += 30
-            images.append(img)            
+            images.append(img)
         return images
-

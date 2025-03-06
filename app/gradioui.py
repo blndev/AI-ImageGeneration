@@ -1,3 +1,4 @@
+from datetime import datetime
 import io
 import os
 import gradio as gr
@@ -11,7 +12,8 @@ from app.fluxgenerator import FluxGenerator
 
 # Set up module logger
 logger = logging.getLogger(__name__)
-# 
+#
+
 
 @singleton
 class GradioUI():
@@ -21,22 +23,27 @@ class GradioUI():
 
     def create_interface(self):
         # Define the generate function that will be called when the button is clicked
-        def uiaction_generate_images(prompt, aspect_ratio):
+        def uiaction_generate_images(prompt, aspect_ratio, request: gr.Request):
             try:
                 logger.info(f"generating image with prompt: {prompt} and aspect ratio: {aspect_ratio}")
-                
+
+                url = request.url
+                logger.debug(f"Request URL: {url}")
+                # preparation for ?share=CODE
+                share_value = request.query_params.get("share")
+                logger.debug(f"Share parameter: {share_value}")  # Would print "55342"
+
                 # Map aspect ratio selection to dimensions
-                width, height = 1024, 1024 #"□ Square (1:1)"
-                if "landscape" in aspect_ratio.lower():#  == "▯ Landscape (16:9)"
+                width, height = 1024, 1024  # "□ Square (1:1)"
+                if "landscape" in aspect_ratio.lower():  # == "▯ Landscape (16:9)"
                     width, height = 1344, 768
-                elif "portrait" in aspect_ratio.lower(): # == "▤ Portrait (2:3)"
+                elif "portrait" in aspect_ratio.lower():  # == "▤ Portrait (2:3)"
                     width, height = 832, 1248
-                   
-                
+
                 generation_details = FluxParameters(
                     prompt=prompt,
-                    #negative_prompt="unrealistic, ugly", # TODO: in ui
-                    #TODO: from config
+                    # negative_prompt="unrealistic, ugly", # TODO: in ui
+                    # TODO: from config
                     num_inference_steps=int(os.getenv("GENERATION_STEPS", 30 if self.generator.is_flux_dev() else 4)),
                     guidance_scale=float(os.getenv("GENERATION_GUIDANCE", 7.5 if self.generator.is_flux_dev() else 0)),
                     num_images_per_prompt=2,
@@ -47,13 +54,12 @@ class GradioUI():
                 images = self.generator.generate_images(params=generation_details)
                 logger.info(f"received {len(images)} image(s) from generator")
                 for image in images:
-                    #TODO: path via env
+                    # TODO: path via env
                     save_image_with_timestamp(image=image, folder_path="./output", ignore_errors=True)
                 return images
             except Exception as e:
                 logger.error(f"image generation failed: {e}")
                 gr.Warning(f"Error while generating the image: {e}")
-
 
         # Create the interface components
         with gr.Blocks() as self.interface:
@@ -65,9 +71,9 @@ class GradioUI():
                     value="",
                     scale=4,
                     lines=4
-                    #max_lines=4
+                    # max_lines=4
                 )
-                
+
                 # Aspect ratio selection
                 aspect_ratio = gr.Radio(
                     choices=["□ Square (1:1)", "▤ Landscape (16:9)", "▯ Portrait (2:3)"],
@@ -75,7 +81,7 @@ class GradioUI():
                     label="Aspect Ratio",
                     scale=1
                 )
-                
+
                 # Generate button that's interactive only when prompt has text
                 generate_btn = gr.Button(
                     "Generate",
@@ -83,7 +89,7 @@ class GradioUI():
                 )
             with gr.Row():
                 with gr.Accordion("Examples", open=False):
-                # Examples
+                    # Examples
                     gr.Examples(
                         examples=[
                             ["A majestic mountain landscape at sunset with snow-capped peaks", "▤ Landscape (16:9)"],
@@ -93,7 +99,7 @@ class GradioUI():
                         inputs=[prompt, aspect_ratio],
                         label="Click an example to load it"
                     )
-            with gr.Row():        
+            with gr.Row():
                 # Gallery for displaying generated images
                 gallery = gr.Gallery(
                     label="Generated Images",
@@ -120,17 +126,18 @@ class GradioUI():
             )
 
             def prepare_download(selection: gr.SelectData):
-                #gr.Warning(f"Your choice is #{selection.index}, with image: {selection.value['image']['path']}!")
-                return gr.DownloadButton(label=f"Download", value=selection.value['image']['path'], visible=True)
+                # gr.Warning(f"Your choice is #{selection.index}, with image: {selection.value['image']['path']}!")
+                # Create a custom filename (for example, using timestamp)
+                file_path = selection.value['image']['path']
+                # timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                # custom_filename = f"generated_image_{timestamp}.png"
+                return gr.DownloadButton(label=f"Download", value=file_path, visible=True)
 
             gallery.select(
                 fn=prepare_download,
                 inputs=None,
                 outputs=[download_btn]
             )
-            # download_btn.click(
-            #     inputs=[gallery]
-            # )
 
     def launch(self, **kwargs):
         if self.interface is None:

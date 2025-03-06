@@ -9,6 +9,7 @@ import logging
 # Set up module logger
 logger = logging.getLogger(__name__)
 
+
 def get_all_local_models(model_folder: str, extension: str = ".safetensors"):
     """find all local flux models"""
     safetensors_files = []
@@ -61,7 +62,7 @@ def save_image_as_file(image: Image.Image, dir: str):
         image_bytes = image.tobytes()
         hash = sha1(image_bytes).hexdigest()
         filetype = "jpg"
-        filename_hash = hash + "."+filetype
+        filename_hash = hash + "." + filetype
         file_path = os.path.join(dir, filename_hash)
 
         if not os.path.exists(file_path):
@@ -86,7 +87,7 @@ def save_image_with_timestamp(image, folder_path, ignore_errors=False, reference
 
         # Generate a timestamp
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S.%f")[:-3]
-        sleep(0.2)#make sure we have unique filenames
+        sleep(0.2)  # make sure we have unique filenames
         separator = "" if reference == "" else "-"
         # Create the filename with the timestamp
         filename = f"{reference}{separator}{timestamp}.png"  # Change the extension as needed

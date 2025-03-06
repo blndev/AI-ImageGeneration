@@ -4,6 +4,7 @@ import os
 import colorlog
 from distutils.util import strtobool
 
+
 def setup_logging():
     """Configure logging with color support and proper formatting."""
     # Create a color formatter
@@ -60,7 +61,6 @@ def setup_logging():
     logging.getLogger('matplotlib').setLevel(logging.WARNING)
     logging.getLogger('filelock').setLevel(logging.WARNING)
     logging.getLogger('urllib3.connectionpool').setLevel(logging.WARNING)
-
 
     log_directory = "logs"
     if not os.path.exists(log_directory):
