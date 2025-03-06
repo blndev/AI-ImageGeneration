@@ -153,6 +153,10 @@ class GradioUI():
                 )
             with gr.Row():
                 download_btn = gr.DownloadButton("Download", visible=False)
+                timer = gr.Timer(60)
+                timer.tick(
+                    fn=lambda: (gr.Info("Check for Token!")),
+                )
 
             # Make button interactive only when prompt has text
             prompt.change(
@@ -186,3 +190,5 @@ class GradioUI():
         if self.interface is None:
             self.create_interface()
         self.interface.launch(**kwargs)
+        # self.generator.warmup()
+        # gr.Interface.from_pipeline(self.generator._cached_generation_pipeline).launch()
