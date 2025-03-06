@@ -27,7 +27,7 @@ class GradioUI():
                 
                 # Map aspect ratio selection to dimensions
                 width, height = 1024, 1024 #"□ Square (1:1)"
-                if "landscape" in aspect_ratio.lowwer():#  == "▯ Landscape (16:9)"
+                if "landscape" in aspect_ratio.lower():#  == "▯ Landscape (16:9)"
                     width, height = 1344, 768
                 elif "portrait" in aspect_ratio.lower(): # == "▤ Portrait (2:3)"
                     width, height = 832, 1248
@@ -46,14 +46,15 @@ class GradioUI():
 
                 images = self.generator.generate_images(params=generation_details)
                 logger.info(f"received {len(images)} image(s) from generator")
-                # for image in images:
-                #     save_image_with_timestamp(image=image, folder_path="./output", ignore_errors=True)
+                for image in images:
+                    #TODO: path via env
+                    save_image_with_timestamp(image=image, folder_path="./output", ignore_errors=True)
                 return images
             except Exception as e:
                 logger.error(f"image generation failed: {e}")
                 gr.Warning(f"Error while generating the image: {e}")
 
-            
+
         # Create the interface components
         with gr.Blocks() as self.interface:
             with gr.Row():
@@ -85,8 +86,8 @@ class GradioUI():
                 # Examples
                     gr.Examples(
                         examples=[
-                            ["A majestic mountain landscape at sunset with snow-capped peaks", "▯ Landscape (16:9)"],
-                            ["A professional portrait of a business person in a modern office", "▤ Portrait (9:16)"],
+                            ["A majestic mountain landscape at sunset with snow-capped peaks", "▤ Landscape (16:9)"],
+                            ["A professional portrait of a business person in a modern office", "▯ Portrait (2:3)"],
                             ["A top-down view of a colorful mandala pattern", "□ Square (1:1)"]
                         ],
                         inputs=[prompt, aspect_ratio],
@@ -96,6 +97,7 @@ class GradioUI():
                 # Gallery for displaying generated images
                 gallery = gr.Gallery(
                     label="Generated Images",
+                    format="jpeg",
                     columns=2,
                     rows=1,
                     height="auto",

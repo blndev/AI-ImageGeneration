@@ -1,4 +1,5 @@
 import os
+from time import sleep
 import requests                 # for downloads of files
 from datetime import datetime   # for timestamp
 from PIL import Image           # for image handling
@@ -84,8 +85,8 @@ def save_image_with_timestamp(image, folder_path, ignore_errors=False, reference
         os.makedirs(folder_path, exist_ok=True)
 
         # Generate a timestamp
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S.%f")[:-3]
+        sleep(0.2)#make sure we have unique filenames
         separator = "" if reference == "" else "-"
         # Create the filename with the timestamp
         filename = f"{reference}{separator}{timestamp}.png"  # Change the extension as needed
