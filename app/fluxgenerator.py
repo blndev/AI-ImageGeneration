@@ -25,6 +25,7 @@ class FluxGenerator():
         #black-forest-labs/FLUX.1-dev
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
         self.torch_dtype=torch.float16 if self.device == "cuda" else torch.float32
+        logger.info(f"Set device for generation to {self.device}")
 
         self._cached_generation_pipeline = None
         self._generation_lock = threading.Lock()
@@ -41,6 +42,7 @@ class FluxGenerator():
             self.SDXL=False
 
         self.model_directory = os.getenv("MODEL_DIRECTORY", "./models/")
+        logger.info(f"using cache directory '{self.model_directory}'")
         try:
             os.makedirs(self.model_directory , exist_ok=True)
         except Exception as e:
@@ -74,7 +76,7 @@ class FluxGenerator():
             return self._cached_generation_pipeline
 
         try:
-            logger.debug(f"Loading flux model {self.model}")
+            logger.debug(f"Loading model {self.model}, using cache  '{self.model_directory}'")
             pipeline = None
             
             if self.model.endswith("safetensors"):
@@ -172,7 +174,11 @@ class FluxGenerator():
         logger.debug("starting image generation")
         # Validate parameters and throw exceptions
         params.validate()
-
+        if os.getenv("NO_AI", False):
+            logger.warning("no ai option is activated")
+            #TODO: generate a picture with all the params written on it
+            return [params.image]
+        
         with self._generation_lock:
             try:
                 model = self._load_model()
