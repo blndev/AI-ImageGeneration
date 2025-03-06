@@ -1,5 +1,6 @@
 import gc
 import os
+from time import sleep
 from typing import List
 from distutils.util import strtobool
 from PIL import Image, ImageDraw
@@ -215,6 +216,7 @@ class FluxGenerator():
         ]
 
         for i in range(params.num_images_per_prompt):
+            sleep(5)
             # Create a new white image
             img = Image.new('RGB', (params.width, params.height), color=bg_colors[i] if len(bg_colors) > i else "white")
 
