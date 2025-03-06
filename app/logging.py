@@ -2,6 +2,7 @@ import logging
 from logging.handlers import TimedRotatingFileHandler
 import os
 import colorlog
+from distutils.util import strtobool
 
 def setup_logging():
     """Configure logging with color support and proper formatting."""
@@ -33,9 +34,21 @@ def setup_logging():
     # Add the handler to the root logger
     root_logger.addHandler(handler)
 
+    log_level_str = os.getenv("LOG_LEVEL", "INFO").upper()
+
+    # Convert string to logging level
+    valid_levels = {
+        "DEBUG": logging.DEBUG,
+        "INFO": logging.INFO,
+        "WARNING": logging.WARNING,
+        "ERROR": logging.ERROR,
+        "CRITICAL": logging.CRITICAL
+    }
+
+    # Use the specified level if valid, otherwise fall back to INFO
+    log_level = valid_levels.get(log_level_str, logging.INFO)
     # Set the log level based on DEBUG setting
-    # TODO read from config or command line params
-    root_logger.setLevel(logging.DEBUG)
+    root_logger.setLevel(log_level)
 
     # Reduce noise from third-party libraries
     logging.getLogger('httpx').setLevel(logging.WARNING)

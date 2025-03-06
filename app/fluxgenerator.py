@@ -1,6 +1,7 @@
 import gc
 import os
 from typing import List
+from distutils.util import strtobool
 from PIL import Image, ImageDraw
 import logging
 import threading
@@ -10,10 +11,6 @@ from app import FluxParameters
 #AI STuff
 import torch
 from diffusers import FluxPipeline, StableDiffusionXLPipeline
-# for manual offline pipeline loading
-from diffusers import FluxTransformer2DModel, AutoencoderKL
-from transformers import CLIPTextModel, CLIPTokenizer, T5EncoderModel, T5Tokenizer
-from diffusers import FlowMatchEulerDiscreteScheduler
 
 # Set up module logger
 logger = logging.getLogger(__name__)
@@ -30,9 +27,7 @@ class FluxGenerator():
         self._cached_generation_pipeline = None
         self._generation_lock = threading.Lock()
 
-        #TODO: make sure all files exists
-        #TODO use path.join with model folder path
-        if sdxl or os.getenv("USE_SDXL", False):
+        if sdxl or bool(strtobool(os.getenv("USE_SDXL", "False"))):
             self.pipelinetemplate = StableDiffusionXLPipeline
             logger.info("using SDXL")
             self.SDXL = True
@@ -105,24 +100,20 @@ class FluxGenerator():
                 )
 
             logger.debug("diffuser initiated")
-            #to gpu will not work if offloading is enabled
-            #pipeline = pipeline.to(self.device)
-            #if self.device == "cuda":
-            #TODO: all optimizations must be enabled via config
             
             #cpu offload will not work with pipeline.to(cuda)
-            if os.environ.get("GPU_ALLOW_ATTENTION_SLICING", None):
+            if bool(strtobool(os.getenv("GPU_ALLOW_ATTENTION_SLICING", "False"))):
                 logger.info("attention slicing activated")
                 pipeline.enable_attention_slicing(slice_size="auto")
 
-            if os.environ.get("GPU_ALLOW_XFORMERS", None):
+            if bool(strtobool(os.getenv("GPU_ALLOW_XFORMERS", "False"))):
                 logger.info("xformers activated") 
                 pipeline.enable_xformers_memory_efficient_attention()
 
             if self.device=="cuda":
                 torch.cuda.empty_cache()
 
-            if os.environ.get("GPU_ALLOW_MEMORY_OFFLOAD", None):
+            if bool(strtobool(os.getenv("GPU_ALLOW_MEMORY_OFFLOAD", "False"))):
                 logger.warning("gpu offload activated")
                 pipeline.enable_model_cpu_offload()
             else:
