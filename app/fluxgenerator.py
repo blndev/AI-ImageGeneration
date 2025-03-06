@@ -1,7 +1,7 @@
 import gc
 import os
 from typing import List
-from PIL import Image
+from PIL import Image, ImageDraw
 import logging
 import threading
 from app.utils.singleton import singleton
@@ -161,44 +161,11 @@ class FluxGenerator():
             logger.debug("Exception details: {e}")
             raise (f"Loading new img2img model '{model}' failed", e)
 
-    def _create_debug_image(self, params: FluxParameters) -> Image.Image:
-        """Creates a debug image with white background and black text showing the parameters"""
-        # Create a new white image
-        img = Image.new('RGB', (params.width, params.height), 'white')
-        
-        # Import here to avoid circular imports
-        from PIL import ImageDraw
-        
-        # Create draw object
-        draw = ImageDraw.Draw(img)
-        
-        # Convert parameters to text
-        param_dict = params.to_dict()
-        text_lines = []
-        text_lines.append(f"Prompt: {param_dict['prompt']}")
-        text_lines.append(f"Steps: {param_dict['num_inference_steps']}")
-        text_lines.append(f"Guidance Scale: {param_dict['guidance_scale']}")
-        text_lines.append(f"Size: {param_dict['width']}x{param_dict['height']}")
-        if 'negative_prompt' in param_dict:
-            text_lines.append(f"Negative Prompt: {param_dict['negative_prompt']}")
-        if 'generator' in param_dict:
-            text_lines.append(f"Seed: {params.seed}")
-        if 'image' in param_dict:
-            text_lines.append(f"Strength: {param_dict['strength']}")
-        
-        # Draw text
-        y_position = 20
-        for line in text_lines:
-            draw.text((20, y_position), line, fill='black')
-            y_position += 30
-            
-        return img
-
-    def is_schnell(self):
+    def is_flux_schnell(self):
         """true if a schnell model is used (requires different generation parameters than dev)"""
         return "schnell" in self.model.lower()
     
-    def is_dev(self):
+    def is_flux_dev(self):
         """true if a dev model is used"""
         return "dev" in self.model.lower()
     
@@ -208,8 +175,8 @@ class FluxGenerator():
         # Validate parameters and throw exceptions
         params.validate()
         if os.getenv("NO_AI", False):
-            logger.warning("no ai option is activated")
-            return [self._create_debug_image(params)]
+            logger.warning("'no ai' - option is activated")
+            return self._create_debug_image(params)
         
         with self._generation_lock:
             try:
@@ -219,9 +186,9 @@ class FluxGenerator():
                     raise Exception("No model loaded. Generation not available")
 
                 #https://huggingface.co/docs/diffusers/main/api/pipelines/flux
-                if self.is_schnell():
+                if self.is_flux_schnell():
                     params = params.prepare_flux_schnell()
-                elif self.is_dev():
+                elif self.is_flux_dev():
                     params = params.prepare_flux_dev()
                 elif self.SDXL:
                     params = params.prepare_sdxl()
@@ -237,3 +204,50 @@ class FluxGenerator():
                 except:
                     pass
                 raise Exception(f"Internal error while creating the image.")
+
+
+    def _create_debug_image(self, params: FluxParameters) -> Image.Image:
+        """Creates a debug image with white background and black text showing the parameters"""
+        images = []
+        bg_colors = [
+            "aliceblue",
+            "lightgoldenrodyellow",
+            "lightcyan",
+            "mistyrose",
+            "honeydew",
+            "beige",
+            "lavenderblush",
+            "azure",
+            "ghostwhite",
+            "floralwhite"
+        ]
+        
+        for i in range(params.num_images_per_prompt):
+            # Create a new white image
+            img = Image.new('RGB', (params.width, params.height), color=bg_colors[i] if len (bg_colors)>i else "white")
+
+            # Create draw object
+            draw = ImageDraw.Draw(img)
+            
+            # Convert parameters to text
+            param_dict = params.to_dict()
+            text_lines = []
+            text_lines.append(f"Prompt: {param_dict['prompt']}")
+            text_lines.append(f"Steps: {param_dict['num_inference_steps']}")
+            text_lines.append(f"Guidance Scale: {param_dict['guidance_scale']}")
+            text_lines.append(f"Size: {param_dict['width']}x{param_dict['height']}")
+            if 'negative_prompt' in param_dict:
+                text_lines.append(f"Negative Prompt: {param_dict['negative_prompt']}")
+            if 'generator' in param_dict:
+                text_lines.append(f"Seed: {params.seed}")
+            if 'image' in param_dict:
+                text_lines.append(f"Strength: {param_dict['strength']}")
+            
+            # Draw text
+            y_position = 20
+            for line in text_lines:
+                draw.text((20, y_position), line, fill='black')
+                y_position += 30
+            images.append(img)            
+        return images
+
