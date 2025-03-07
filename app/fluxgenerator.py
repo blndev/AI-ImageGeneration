@@ -174,7 +174,7 @@ class FluxGenerator():
         logger.debug("starting image generation")
         # Validate parameters and throw exceptions
         params.validate()
-        if os.getenv("NO_AI", False):
+        if bool(strtobool(os.getenv("NO_AI", "False"))):
             logger.warning("'no ai' - option is activated")
             return self._create_debug_image(params)
 
