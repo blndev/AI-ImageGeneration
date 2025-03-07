@@ -12,6 +12,7 @@ from app.utils.fileIO import save_image_with_timestamp, save_image_as_png
 from app.fluxparams import FluxParameters
 from app.fluxgenerator import FluxGenerator
 import json
+import shutil
 
 # Set up module logger
 logger = logging.getLogger(__name__)
@@ -165,7 +166,7 @@ class GradioUI():
             gr.Warning(f"Error while generating the image: {e}", duration=30)
         return None, session_state
 
-    def uiaction_image_upload(self, gradio_state: str, image: Image.Image):
+    def uiaction_image_upload(self, gradio_state: str, image_path):
         """
         Handle image upload
 
@@ -174,10 +175,12 @@ class GradioUI():
             image (PIL.Image): The uploaded image
         """
         logger.debug("starting image upload handler")
-        if image is None: 
+        if image_path is None: 
             return gr.Button(interactive=False)
        
         try:
+            image = Image.open(image_path)
+            filename = os.path.basename(image_path)
             session_state = SessionState.from_gradio_state(gradio_state)
             image_sha1 = sha1(image.tobytes()).hexdigest()
             logger.info(f"UPLOAD from {session_state.session} with ID: {image_sha1}")
@@ -189,23 +192,28 @@ class GradioUI():
             
             dir = self.output_directory
             dir = os.path.join(dir, datetime.now().strftime("%Y-%m-%d"),"upload")
-            fn = str(session_state.session)+"_" + image_sha1+".png"
-            input_file_path = save_image_as_png(image, dir, filename=fn)
-            logger.info(f"Image saved to {input_file_path}")
+            targetpath = os.path.join(dir,  image_sha1 + "_" + filename)
+            #copy file from source  to outdir
+            os.makedirs(dir, exist_ok=True)
+            shutil.copy(image_path, targetpath)
+            # fn = str(session_state.session)+"_" + image_sha1+".png"
+            # input_file_path = save_image_as_png(image, dir, filename=fn)
+            logger.info(f"Image saved to {targetpath}")
         except Exception as e:
             logger.error(f"save image failed: {e}")
         return gr.Button(interactive=True)
     
-    def uiaction_image_upload_token_generation(self, gradio_state: str, image: Image.Image):
+    def uiaction_image_upload_token_generation(self, gradio_state: str, image_path):
         """
         Handle token generation for image upload
         """
-        if image is None:
+        if image_path is None:
             logger.error(f"Image received a token generation is none")
             return gradio_state, gr.Button(interactive=False), None
         
         try:
-            logger.debug(f"image type: {type(image)}")
+            logger.debug(f"image type: {type(image_path)} with value {image_path}")
+            image = Image.open(image_path)
             session_state = SessionState.from_gradio_state(gradio_state)
             logger.info(f"Analyze upload to receive TOKEN from {session_state.session}")
             token = 25  #TODO: load from config
@@ -231,6 +239,7 @@ class GradioUI():
                         print(f"IMG.Info: {key}: {value}")
 
                     # TODO: check for an face and ai 
+                    # TODO: exif is not working, refactor to extra function and create tests
                     exif_data = image.getexif()
                     if not exif_data is None:
                         logger.debug(f"{len(exif_data)} EXIF data found")
@@ -399,7 +408,7 @@ class GradioUI():
             with gr.Row():
                 with gr.Accordion("Get more Token", open=False):
                     with gr.Row():
-                        with gr.Column():
+                        with gr.Column(scale=2):
                             gr.Markdown(
                         """
 # Image Sharing and Token Rewards
@@ -419,8 +428,8 @@ For each image accepted, you will receive an **additional 25 tokens**. Thank you
 
 """
                             )
-                        with gr.Column():
-                            upload_image = gr.Image(sources="upload", type="pil", format="jpeg", height=256)
+                        with gr.Column(scale=1):
+                            upload_image = gr.Image(sources="upload", type="filepath", format="jpeg", height=256)
                             upload_button = gr.Button("Upload", visible=True, interactive=False)
 
                     upload_image.change(
