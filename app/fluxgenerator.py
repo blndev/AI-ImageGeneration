@@ -38,6 +38,10 @@ class FluxGenerator():
             self.pipelinetemplate = FluxPipeline
             self.SDXL = False
 
+
+        self.model = os.getenv("GENERATION_MODEL", "black-forest-labs/FLUX.1-dev")
+        logger.info(f"selected model: '{self.model}'")
+        
         self.model_directory = os.getenv("MODEL_DIRECTORY", "./models/")
         logger.info(f"using cache directory '{self.model_directory}'")
         try:
@@ -45,8 +49,9 @@ class FluxGenerator():
         except Exception as e:
             logger.warning(f"failed to create the model directory {e}")
 
-        self.model = os.getenv("GENERATION_MODEL", "black-forest-labs/FLUX.1-dev")
         self._hftoken = os.getenv("HUGGINGFACE_TOKEN", None)
+        if self._hftoken: 
+            logger.info("Huggingface Tokem provided")
 
     def __del__(self):
         logger.info("free memory used for FluxGenerator pipeline")
@@ -116,6 +121,7 @@ class FluxGenerator():
             if self.device == "cuda":
                 torch.cuda.empty_cache()
 
+            # TODO: refactor env handling to a utils class
             if bool(strtobool(os.getenv("GPU_ALLOW_MEMORY_OFFLOAD", "False"))):
                 logger.warning("gpu offload activated")
                 pipeline.enable_model_cpu_offload()
@@ -172,6 +178,7 @@ class FluxGenerator():
             logger.warning("'no ai' - option is activated")
             return self._create_debug_image(params)
 
+        logger.info(f"start generating {params.num_images_per_prompt} images with {params.num_inference_steps} steps")
         with self._generation_lock:
             try:
                 model = self._load_model()
