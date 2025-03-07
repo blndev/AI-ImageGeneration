@@ -44,9 +44,9 @@ def download_file_if_not_existing(url, local_path):
         logger.info("File %s already exists", local_path)
 
 
-def save_image_as_file(image: Image.Image, dir: str):
+def save_image_as_png(image: Image.Image, dir: str, filename: str = None):
     """
-    saves a image as JPEG to the given directory and uses the SHA1 as filename
+    saves a image as PNG to the given directory and uses the SHA1 as filename if not filename is provided
     return value is the full filename
     """
     try:
@@ -59,14 +59,16 @@ def save_image_as_file(image: Image.Image, dir: str):
         #     print("seems no background in image dict")
         #     print (image)
         # Convert the image to bytes and compute the SHA-1 hash
-        image_bytes = image.tobytes()
-        hash = sha1(image_bytes).hexdigest()
-        filetype = "jpg"
-        filename_hash = hash + "." + filetype
-        file_path = os.path.join(dir, filename_hash)
+        if filename is None:
+            image_bytes = image.tobytes()
+            hash = sha1(image_bytes).hexdigest()
+            filetype = "png"
+            filename = hash + "." + filetype
+
+        file_path = os.path.join(dir, filename)
 
         if not os.path.exists(file_path):
-            image.save(file_path, format="JPEG")
+            image.save(file_path, format="PNG")
 
         logger.debug("Image saved to %s", file_path)
         return file_path

@@ -1,15 +1,17 @@
 from datetime import datetime
+from hashlib import sha1
 import io
 import os
 import gradio as gr
 from typing import List
-from PIL import Image
+from PIL import Image, ExifTags
 import logging
 from app import SessionState
 from app.utils.singleton import singleton
-from app.utils.fileIO import save_image_with_timestamp
+from app.utils.fileIO import save_image_with_timestamp, save_image_as_png
 from app.fluxparams import FluxParameters
 from app.fluxgenerator import FluxGenerator
+import json
 
 # Set up module logger
 logger = logging.getLogger(__name__)
@@ -50,6 +52,16 @@ class GradioUI():
             self.new_token_wait_time = int(os.getenv("NEW_TOKEN_WAIT_TIME", 10))
             logger.info("Initial token: %i, wait time: %i minutes", self.initial_token, self.new_token_wait_time)
             self.token_enabled = self.initial_token > 0
+
+            try:
+                self._uploaded_images = {}
+                self.__uploaded_images_path = "./logs/uploaded_images.json"
+                if os.path.exists(self.__uploaded_images_path):
+                    with open(self.__uploaded_images_path, "r") as f:
+                        self._uploaded_images.update(json.load(f))
+            except Exception as e:
+                logger.error(f"Error while loading uploaded_images.json: {e}")
+
         except Exception as e:
             logger.error("Error initializing GradioUI: %s", str(e))
             logger.debug("Exception details:", exc_info=True)
@@ -84,10 +96,10 @@ class GradioUI():
         #     logger.debug("Exception details:", exc_info=True)
 
     def uiaction_timer_check_token(self, gradio_state: str):
-        logger.debug(f"timer tick: {gradio_state}")
         if gradio_state is None:
             return None
         session_state = SessionState.from_gradio_state(gradio_state)
+        logger.debug(f"check new token for '{session_state.session}'. Last Gen.: {session_state.last_generation}")
         # logic: (10) minutes after running out of token, user get filled up to initial (10) new token
         # exception: user upload image for training or receive advertising token
         if self.token_enabled:
@@ -145,13 +157,145 @@ class GradioUI():
             if self.output_directory is not None:
                 logger.debug(f"saving images to {self.output_directory}")
                 for image in images:
-                    outdir = os.path.join(self.output_directory, datetime.now().strftime("%Y-%m-%d"))
+                    outdir = os.path.join(self.output_directory, datetime.now().strftime("%Y-%m-%d"),"generation")
                     save_image_with_timestamp(image=image, folder_path=outdir, ignore_errors=True)
             return images, session_state
         except Exception as e:
             logger.error(f"image generation failed: {e}")
             gr.Warning(f"Error while generating the image: {e}", duration=30)
         return None, session_state
+
+    def uiaction_image_upload(self, gradio_state: str, image: Image.Image):
+        """
+        Handle image upload
+
+        Args:
+            gradio_state: the session state
+            image (PIL.Image): The uploaded image
+        """
+        logger.debug("starting image upload handler")
+        if image is None: 
+            return gr.Button(interactive=False)
+       
+        try:
+            session_state = SessionState.from_gradio_state(gradio_state)
+            image_sha1 = sha1(image.tobytes()).hexdigest()
+            logger.info(f"UPLOAD from {session_state.session} with ID: {image_sha1}")
+            if self._uploaded_images.get(image_sha1) is not None:
+                logger.warning(f"Image {image_sha1} already uploaded, cancel save to disk")
+                # we keep upload button true as the whole logic is behind it
+                # could happen that it was not uploaded by same user and get few points
+                return gr.Button(interactive=True)
+            
+            dir = self.output_directory
+            dir = os.path.join(dir, datetime.now().strftime("%Y-%m-%d"),"upload")
+            fn = str(session_state.session)+"_" + image_sha1+".png"
+            input_file_path = save_image_as_png(image, dir, filename=fn)
+            logger.info(f"Image saved to {input_file_path}")
+        except Exception as e:
+            logger.error(f"save image failed: {e}")
+        return gr.Button(interactive=True)
+    
+    def uiaction_image_upload_token_generation(self, gradio_state: str, image: Image.Image):
+        """
+        Handle token generation for image upload
+        """
+        if image is None or type(image) is not Image.Image:
+            logger.error(f"Uploaded Image is not a PIL.Image.Image. It is {type(image)}")
+            return gradio_state, gr.Button(interactive=False)
+        
+        try:
+            session_state = SessionState.from_gradio_state(gradio_state)
+            token = 25  #TODO: load from config
+            msg = ""
+            image_sha1 = sha1(image.tobytes()).hexdigest()
+            uploadstate = self._uploaded_images.get(image_sha1)
+            if(uploadstate):
+                msg = "The image signature matches a previous submission, so the full token reward isn't possible. We’re awarding you 5 tokens as a thank you for your involvement."
+                token = 5
+                if uploadstate.get(session_state.session) != None:
+                    msg = "You've already submitted this image, and it won't generate any tokens."
+                    gr.Warning(msg, title="Upload failed")
+                    return session_state, gr.Button(interactive=False), None
+            else:
+                self._uploaded_images[image_sha1] = {session_state.session: {"token": token, "msg": ""}}
+            
+                try:
+                    img_info = image.info
+                    if img_info is None:
+                        logger.debug("No image info found")
+                        img_info = {}
+                    for key, value in img_info.items():
+                        print(f"IMG.Info: {key}: {value}")
+
+                    # TODO: check for an face and ai 
+                    exif_data = image.getexif()
+                    if not exif_data is None:
+                        logger.debug(f"{len(exif_data)} EXIF data found")
+                        for key, val in exif_data.items():
+                            print(f'{key}:{val}')
+                            if key in ExifTags.TAGS:
+                                print(f'{ExifTags.TAGS[key]}:{val}')
+                        
+                        actions_description = exif_data.get('Actions Description')
+                        if actions_description:
+                            print(f"Actions Description: {actions_description}")
+                        else:
+                            print("Actions Description nicht gefunden.")
+
+                        gps_ifd = exif_data.get_ifd(ExifTags.IFD.GPSInfo)
+                        if gps_ifd is not None and len(gps_ifd)>0:
+                            logger.debug("Image probably contains GPS data, so no AI")
+                        elif "Generator" in exif_data:
+                            msg = "Image probably AI generated"
+                            logger.warning(msg)
+                            token = 5
+                        elif exif_data[ExifTags.Base.Software] == "PIL" or exif_data[ExifTags.Base.HostComputer] != None:
+                            msg = "Image probably generated or edited"
+                            logger.warning(msg)
+                            token = 5
+                        elif exif_data[ExifTags.Base.Copyright] != None:
+                            msg = "Image is copyright protected"
+                            logger.warning(msg)
+                            token = 10
+                        # elif exif_data[]==:
+                        #     msg = "Image is copyright protected"
+                        #     logger.warning(msg)
+                        #     token = 10
+                    else:
+                        logger.debug("No EXIF data found")
+
+                except Exception as e:
+                    logger.error(f"Error while checking image EXIF data: {e}")
+
+            if (token>0):
+                session_state.token += token
+                if msg != "":
+                    gr.Info(f"You received {token} new generation token! \n\nNotes: {msg}", duration=30)
+                else:
+                    gr.Info(f"Congratulation, you received {token} new generation token!", duration=30)
+    
+            else:
+                gr.Warning(msg, title="Upload failed")
+            #if token = 0, it was already claimed or it's failing the checks
+            if not self._uploaded_images[image_sha1].get(session_state.session):
+                # split creation and assignment as old data might be in the object we ant to keep
+                self._uploaded_images[image_sha1][session_state.session] = {}
+
+            self._uploaded_images[image_sha1][session_state.session]["token"] = token
+            self._uploaded_images[image_sha1][session_state.session]["msg"]=msg
+            self._uploaded_images[image_sha1][session_state.session]["timestamp"]=datetime.now().isoformat()
+            # now save the list to disk for reuse in later sessions
+            try:
+                with open(self.__uploaded_images_path, "w") as f:
+                    json.dump(self._uploaded_images, f)
+            except Exception as e:
+                logger.error(f"Error while loading uploaded_images.json: {e}")
+
+        except Exception as e:
+            logger.error(f"generate token for uploaded image failed: {e}")
+            logger.debug("Exception details:", exc_info=True)
+        return session_state, gr.Button(interactive=False), None
 
     def create_interface(self):
 
@@ -162,6 +306,7 @@ class GradioUI():
             analytics_enabled=False
         ) as self.interface:
             user_session_storage = gr.BrowserState()  # do not initialize it with any value!!! this is used as default
+
 
             # Input Values & Generate row
             with gr.Row():
@@ -202,20 +347,22 @@ class GradioUI():
                     )
 
                 with gr.Column(visible=True):
-                    # token count is restored from app.load
-                    token_label = gr.Text(
-                        show_label=False,
-                        value=f"?",
-                        info=f"Amount of images you can generate before a wait time of {self.new_token_wait_time} minutes",
-                        visible=self.token_enabled
+                    with gr.Row(visible=self.token_enabled):
+                        # token count is restored from app.load
+                        token_label = gr.Text(
+                            show_label=False,
+                            scale=2,
+                            value=f"?",
+                            info=f"Amount of images you can generate before a wait time of {self.new_token_wait_time} minutes",
+                            )
+                        button_check_token = gr.Button(value="🗘", size="sm")
+                    with gr.Row():
+                        # Generate button that's interactive only when prompt has text
+                        generate_btn = gr.Button(
+                            "Generate",
+                            interactive=False
                         )
-
-                    # Generate button that's interactive only when prompt has text
-                    generate_btn = gr.Button(
-                        "Generate",
-                        interactive=False
-                    )
-                    cancel_btn = gr.Button("Cancel", interactive=False, visible=False)
+                        cancel_btn = gr.Button("Cancel", interactive=False, visible=False)
 
             # Examples row
             with gr.Row():
@@ -246,6 +393,59 @@ class GradioUI():
                         label="Click an example to load it"
                     )
 
+            with gr.Row():
+                with gr.Accordion("Get more Token", open=False):
+                    gr.Markdown(
+                        """
+# Image Sharing and Token Rewards
+
+We encourage you to share images to help us improve our model. You can do this without worrying about your privacy, as all contributions are anonymous.
+
+## Key Points
+
+- **Anonymity:** Your shared images remain anonymous, just like your usage of our platform. You will receive generation tokens for your current session only.
+
+- **Any Content Welcome:** We accept all kinds of content. Feel free to share images of what you think the model is missing or where it is currently failing in generation.
+
+- **Focus on Human Images:** Our model is designed to work with images of people. Please ensure the images you upload include a human face.
+
+- **Avoid AI-Generated Images:** To maintain the quality of our model, avoid uploading images created by AI.
+
+- **Automatic Integration:** All accepted images are automatically integrated into our training process without human review.
+
+## Reward
+
+For each image accepted, you will receive an additional 25 tokens. Thank you for helping us enhance our model!
+"""
+                    )
+                    upload_image = gr.Image(sources="upload", type="pil", height=256)
+                    upload_button = gr.Button("Upload", visible=True, interactive=False)
+
+                    upload_image.change(
+                        fn=self.uiaction_image_upload,
+                        inputs=[user_session_storage, upload_image],
+                        outputs=[upload_button],
+                        concurrency_limit=None,
+                        concurrency_id="image upload"
+                    )
+
+                    upload_button.click(
+                        fn=self.uiaction_image_upload_token_generation,
+                        inputs=[user_session_storage, upload_image],
+                        outputs=[user_session_storage, upload_button, upload_image],
+                        concurrency_limit=None,
+                        concurrency_id="image upload"
+                    )
+
+                    # gr.Markdown(
+                    #     """
+                    #     You can get more token by sharing providing we can use to train our model.
+
+                        
+                    #     Provide he follwing link. On the first generation of a user based on that link you gain additonal 25 token
+                    #     """
+                    # )
+
             # Gallery row
             with gr.Row():
                 # Gallery for displaying generated images
@@ -265,11 +465,8 @@ class GradioUI():
             with gr.Row():
                 download_btn = gr.DownloadButton("Download", visible=False)
 
-            # SessionState, do not initialize it with any value!!! this is used as default
-            user_session_storage = gr.BrowserState()
-
             def update_token_info(gradio_state):
-                logger.debug("local_storage changed: SessionState: %s", gradio_state)
+                #logger.debug("local_storage changed: SessionState: %s", gradio_state)
                 token = SessionState.from_gradio_state(gradio_state).token
                 if self.token_enabled == False:
                     token = "unlimited"
@@ -284,13 +481,19 @@ class GradioUI():
                 show_progress=False
             )
 
-            timer_check_token = gr.Timer(10)
+            timer_check_token = gr.Timer(30)
             timer_check_token.tick(
                 fn=self.uiaction_timer_check_token,
                 inputs=[user_session_storage],
                 outputs=[user_session_storage],
                 concurrency_id="check_token",
                 concurrency_limit=30
+            )
+            button_check_token.click(
+                fn=self.uiaction_timer_check_token,
+                inputs=[user_session_storage],
+                outputs=[user_session_storage],
+                concurrency_id="check_token",
             )
 
             # Make button interactive only when prompt has text
@@ -337,14 +540,6 @@ class GradioUI():
                 outputs=[stop_signal, generate_btn, cancel_btn]
             )
 
-            # stop_btn.click(
-            #     fn=lambda: (gr.Info("Cancel")),
-            #     inputs=None,
-            #     outputs=None,
-            #     cancels=[generate_event1, generate_event2],
-            #     #queue=False
-            # )
-
             def prepare_download(selection: gr.SelectData):
                 # gr.Warning(f"Your choice is #{selection.index}, with image: {selection.value['image']['path']}!")
                 # Create a custom filename (for example, using timestamp)
@@ -361,7 +556,6 @@ class GradioUI():
 
             # TODO: link via fn directly to self.action...
             app = self.interface
-
             @app.load(inputs=[user_session_storage], outputs=[user_session_storage])
             def load_from_local_storage(request: gr.Request, gradio_state):
                 # Restore token from local storage
