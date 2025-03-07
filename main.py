@@ -5,7 +5,7 @@ from distutils.util import strtobool
 
 setup_logging()
 if __name__ == "__main__":
-    load_dotenv()
+    load_dotenv(override=True)
     ui = GradioUI()
     ui.launch(
         share=bool(strtobool(os.getenv("GRADIO_SHARED", "False"))),
