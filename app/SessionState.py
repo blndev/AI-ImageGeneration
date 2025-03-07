@@ -1,9 +1,11 @@
+from datetime import datetime
 import json
 import logging
 from typing import Optional
 import uuid
 
 logger = logging.getLogger(__name__)
+
 
 class SessionState:
     """Object to handle session state information for the user"""
@@ -24,10 +26,11 @@ class SessionState:
             raise TypeError(f"session must be of type str, but {type(value).__name__} was assigned.")
         return value
 
-    def __init__(self, token: int = 0, session: str = None):
+    def __init__(self, token: int = 0, session: str = None, last_generation: str = None):
         """State object for storing application data in browser."""
-        self.token: int = token        
-        self.session: str = str(uuid.uuid4()) if session==None else session
+        self.token: int = token
+        self.session: str = str(uuid.uuid4()) if session == None else session
+        self.last_generation = last_generation
 
     def __str__(self) -> str:
         """String representation for logging."""
@@ -38,7 +41,6 @@ class SessionState:
         """Return a string representation of the SessionState."""
         return json.dumps(self.to_dict())
 
-    @classmethod
     def to_gradio_state(self) -> str:
         """Create SessionState from dictionary after deserialization."""
         return repr(self)
@@ -47,8 +49,28 @@ class SessionState:
         """Convert SessionState to dictionary for serialization."""
         return {
             'token': self.token,
-            'session': str(self.session)
+            'session': str(self.session),
+            'last_generation': self.last_generation
         }
+
+    def save_last_generation_activity(self):
+        """Update last generation timestamp."""
+        self.last_generation = datetime.now().isoformat()
+
+    def reset_last_generation_activity(self):
+        """Update last generation timestamp."""
+        self.last_generation = None
+
+    def generation_before_minutes(self, minutes: int) -> bool:
+        """Check if last generation was before N minutes."""
+        if self.last_generation is None or self.last_generation == "" or self.last_generation == "None":
+            return False
+        try:
+            last_generation = datetime.fromisoformat(self.last_generation)
+            return (datetime.now() - last_generation).total_seconds() > minutes * 60
+        except Exception as e:
+            logger.error(f"Error parsing last generation timestamp: {e}")
+            return True
 
     @classmethod
     def from_dict(cls, data: Optional[dict]) -> 'SessionState':
@@ -57,7 +79,8 @@ class SessionState:
             return cls()
         return cls(
             token=data.get('token', 0),
-            session=data.get('session', str(uuid.uuid4()))
+            session=data.get('session', str(uuid.uuid4())),
+            last_generation=data.get('last_generation', None)
         )
 
     @classmethod

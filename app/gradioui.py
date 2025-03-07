@@ -74,27 +74,35 @@ class GradioUI():
         #     logger.error("Error initializing analytics session: %s", str(e))
         #     logger.debug("Exception details:", exc_info=True)
 
+    def uiaction_timer_check_token(self, gradio_state: str):
+        logger.debug(f"timer tick: {gradio_state}")
+        if gradio_state is None:
+            return None
+        session_state = SessionState.from_gradio_state(gradio_state)
+        current_token=session_state.token
+        # logic: 10 minutes after running out of token, user get 10 new token
+        # exception: user upload image for training or receive advertising token
+        if session_state.generation_before_minutes(10):
+            session_state.token += self.initial_token
+            session_state.reset_last_generation_activity()
+        new_token = session_state.token - current_token
+        if new_token>0:
+            gr.Info(f"Congratulation, you received {new_token} new generation token!")
+            logger.info(f"session {session_state.session} received {new_token} new token")
+        
+        return session_state
+
     def create_interface(self):
-
-        def uiaction_timer_tick(gradio_state: str):
-            gr.Info(f"Check for Token!\n\n{gradio_state}")
-            logger.debug(f"timer tick: {gradio_state}")
-            if gradio_state is None:
-                return None
-            session_state = SessionState.from_gradio_state(gradio_state)
-            session_state.token += 5
-            # logic: 10 minutes after running out of token, user get 10 new token
-            # exception: user upload image for training or receive advertising token
-            return session_state
-
 
         # Define the generate function that will be called when the button is clicked
         def uiaction_generate_images(gradio_state , prompt, aspect_ratio, neg_prompt, image_count):
+            session_state = SessionState.from_gradio_state(gradio_state)
             try:
-                session_state = SessionState.from_gradio_state(gradio_state)
                 if session_state.token < image_count:
-                    raise Exception("Not enough token available. Please wait for a while or get more token by sharing the app.")
+                    raise Exception("Not enough generation token available. Please wait for a few minutes, or get more token by sharing the app.")
                 
+                session_state.save_last_generation_activity()
+
                 # Map aspect ratio selection to dimensions
                 width, height = self.aspect_square_width, self.aspect_square_height
             
@@ -126,7 +134,8 @@ class GradioUI():
                 return images, session_state
             except Exception as e:
                 logger.error(f"image generation failed: {e}")
-                gr.Warning(f"Error while generating the image: {e}")
+                gr.Warning(f"Error while generating the image: {e}", duration=30)
+            return None, session_state
 
         # Create the interface components
         with gr.Blocks(
@@ -255,15 +264,15 @@ class GradioUI():
             )
 
 
-            timer = gr.Timer(10)
-            timer.tick(
-                fn=uiaction_timer_tick,
+            timer_check_token = gr.Timer(10)
+            timer_check_token.tick(
+                fn=self.uiaction_timer_check_token,
                 inputs=[local_storage],
                 outputs=[local_storage],
                 concurrency_id="check_token"
             )  
 
-            # displays the token in teh ui            
+            # displays the token in the ui            
             token_counter.change(
                 inputs=[token_counter],
                 outputs=[token_label],
@@ -284,7 +293,7 @@ class GradioUI():
             generate_btn.click(
                 fn=lambda: (gr.Timer(active=False), gr.Button(interactive=False), gr.Button(interactive=True)),
                 inputs=[],
-                outputs=[timer, generate_btn, cancel_btn],
+                outputs=[timer_check_token, generate_btn, cancel_btn],
             ).then(
                 fn=uiaction_generate_images,
                 inputs=[local_storage, prompt, aspect_ratio, neg_prompt, image_count],
@@ -294,7 +303,7 @@ class GradioUI():
             ).then(
                 fn=lambda: (gr.Timer(active=True), gr.Button(interactive=True), gr.Button(interactive=False), gr.Gallery(preview=True)),
                 inputs=[],
-                outputs=[timer, generate_btn, cancel_btn, gallery]
+                outputs=[timer_check_token, generate_btn, cancel_btn, gallery]
             )
 
             # generate_event = generate_btn.click(   
