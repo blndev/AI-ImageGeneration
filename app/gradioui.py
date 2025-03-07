@@ -200,12 +200,14 @@ class GradioUI():
         """
         Handle token generation for image upload
         """
-        if image is None or type(image) is not Image.Image:
-            logger.error(f"Uploaded Image is not a PIL.Image.Image. It is {type(image)}")
-            return gradio_state, gr.Button(interactive=False)
+        if image is None:
+            logger.error(f"Image received a token generation is none")
+            return gradio_state, gr.Button(interactive=False), None
         
         try:
+            logger.debug(f"image type: {type(image)}")
             session_state = SessionState.from_gradio_state(gradio_state)
+            logger.info(f"Analyze upload to receive TOKEN from {session_state.session}")
             token = 25  #TODO: load from config
             msg = ""
             image_sha1 = sha1(image.tobytes()).hexdigest()
@@ -232,32 +234,33 @@ class GradioUI():
                     exif_data = image.getexif()
                     if not exif_data is None:
                         logger.debug(f"{len(exif_data)} EXIF data found")
-                        for key, val in exif_data.items():
-                            print(f'{key}:{val}')
-                            if key in ExifTags.TAGS:
-                                print(f'{ExifTags.TAGS[key]}:{val}')
-                        
-                        actions_description = exif_data.get('Actions Description')
-                        if actions_description:
-                            print(f"Actions Description: {actions_description}")
-                        else:
-                            print("Actions Description nicht gefunden.")
+                        if len(exif_data)>0:
+                            for key, val in exif_data.items():
+                                print(f'{key}:{val}')
+                                if key in ExifTags.TAGS:
+                                    print(f'{ExifTags.TAGS[key]}:{val}')
+                            
+                            actions_description = exif_data.get('Actions Description')
+                            if actions_description:
+                                print(f"Actions Description: {actions_description}")
+                            else:
+                                print("Actions Description nicht gefunden.")
 
-                        gps_ifd = exif_data.get_ifd(ExifTags.IFD.GPSInfo)
-                        if gps_ifd is not None and len(gps_ifd)>0:
-                            logger.debug("Image probably contains GPS data, so no AI")
-                        elif "Generator" in exif_data:
-                            msg = "Image probably AI generated"
-                            logger.warning(msg)
-                            token = 5
-                        elif exif_data[ExifTags.Base.Software] == "PIL" or exif_data[ExifTags.Base.HostComputer] != None:
-                            msg = "Image probably generated or edited"
-                            logger.warning(msg)
-                            token = 5
-                        elif exif_data[ExifTags.Base.Copyright] != None:
-                            msg = "Image is copyright protected"
-                            logger.warning(msg)
-                            token = 10
+                            gps_ifd = exif_data.get_ifd(ExifTags.IFD.GPSInfo)
+                            if gps_ifd is not None and len(gps_ifd)>0:
+                                logger.debug("Image probably contains GPS data, so no AI")
+                            elif "Generator" in exif_data:
+                                msg = "Image probably AI generated"
+                                logger.warning(msg)
+                                token = 5
+                            elif exif_data[ExifTags.Base.Software] == "PIL" or exif_data[ExifTags.Base.HostComputer] != None:
+                                msg = "Image probably generated or edited"
+                                logger.warning(msg)
+                                token = 5
+                            elif exif_data[ExifTags.Base.Copyright] != None:
+                                msg = "Image is copyright protected"
+                                logger.warning(msg)
+                                token = 10
                         # elif exif_data[]==:
                         #     msg = "Image is copyright protected"
                         #     logger.warning(msg)
@@ -395,13 +398,14 @@ class GradioUI():
 
             with gr.Row():
                 with gr.Accordion("Get more Token", open=False):
-                    gr.Markdown(
+                    with gr.Row():
+                        with gr.Column():
+                            gr.Markdown(
                         """
 # Image Sharing and Token Rewards
 
 We encourage you to share images to help us improve our model. You can do this without worrying about your privacy, as all contributions are anonymous.
-
-## Key Points
+For each image accepted, you will receive an **additional 25 tokens**. Thank you for helping us enhance our model!
 
 - **Anonymity:** Your shared images remain anonymous, just like your usage of our platform. You will receive generation tokens for your current session only.
 
@@ -413,13 +417,11 @@ We encourage you to share images to help us improve our model. You can do this w
 
 - **Automatic Integration:** All accepted images are automatically integrated into our training process without human review.
 
-## Reward
-
-For each image accepted, you will receive an additional 25 tokens. Thank you for helping us enhance our model!
 """
-                    )
-                    upload_image = gr.Image(sources="upload", type="pil", height=256)
-                    upload_button = gr.Button("Upload", visible=True, interactive=False)
+                            )
+                        with gr.Column():
+                            upload_image = gr.Image(sources="upload", type="pil", format="jpeg", height=256)
+                            upload_button = gr.Button("Upload", visible=True, interactive=False)
 
                     upload_image.change(
                         fn=self.uiaction_image_upload,
