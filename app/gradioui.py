@@ -254,6 +254,15 @@ class GradioUI():
                 show_progress=False
             )
 
+
+            timer = gr.Timer(10)
+            timer.tick(
+                fn=uiaction_timer_tick,
+                inputs=[local_storage],
+                outputs=[local_storage],
+                concurrency_id="check_token"
+            )  
+
             # displays the token in teh ui            
             token_counter.change(
                 inputs=[token_counter],
@@ -273,19 +282,19 @@ class GradioUI():
         
             # Connect the generate button to the generate function
             generate_btn.click(
-                fn=lambda: (gr.Button(interactive=False), gr.Button(interactive=True)),
+                fn=lambda: (gr.Timer(active=False), gr.Button(interactive=False), gr.Button(interactive=True)),
                 inputs=[],
-                outputs=[generate_btn, cancel_btn],
+                outputs=[timer, generate_btn, cancel_btn],
             ).then(
                 fn=uiaction_generate_images,
                 inputs=[local_storage, prompt, aspect_ratio, neg_prompt, image_count],
                 outputs=[gallery, local_storage],
-                concurrency_id="gpu_queue",
+                concurrency_id="gpu",
                 show_progress="full"
             ).then(
-                fn=lambda: (gr.Button(interactive=True), gr.Button(interactive=False), gr.Gallery(preview=True)),
+                fn=lambda: (gr.Timer(active=True), gr.Button(interactive=True), gr.Button(interactive=False), gr.Gallery(preview=True)),
                 inputs=[],
-                outputs=[generate_btn, cancel_btn, gallery]
+                outputs=[timer, generate_btn, cancel_btn, gallery]
             )
 
             # generate_event = generate_btn.click(   
@@ -295,13 +304,7 @@ class GradioUI():
             # )
             # Connect the cancel button
 
-            timer = gr.Timer(10)
-            timer.tick(
-                fn=uiaction_timer_tick,
-                inputs=[local_storage],
-                outputs=[local_storage]
-            )  
-            
+
             stop_signal = gr.State(False)
             def cancel_generation():
                 gr.close_all()
