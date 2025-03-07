@@ -2,10 +2,9 @@ import os
 from dotenv import load_dotenv
 from app import GradioUI, setup_logging
 from distutils.util import strtobool
-
+load_dotenv(override=True)
 setup_logging()
 if __name__ == "__main__":
-    load_dotenv(override=True)
     ui = GradioUI()
     ui.launch(
         share=bool(strtobool(os.getenv("GRADIO_SHARED", "False"))),
