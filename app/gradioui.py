@@ -10,7 +10,9 @@ from app import SessionState
 from app.utils.singleton import singleton
 from app.utils.fileIO import save_image_with_timestamp, save_image_as_png
 from app.fluxparams import FluxParameters
-from app.fluxgenerator import FluxGenerator
+from app import FluxGenerator
+from app.FaceDetector import FaceDetector
+
 import json
 import shutil
 from distutils.util import strtobool
@@ -26,6 +28,8 @@ class GradioUI():
         try:
             self.interface = None
             self.generator = FluxGenerator()
+            self.face_analyzer = FaceDetector()
+
             self.output_directory = os.getenv("OUTPUT_DIRECTORY", None)
             self.allow_upload = bool(strtobool(os.getenv("ALLOW_UPLOAD", "False")))
             try:
@@ -61,7 +65,7 @@ class GradioUI():
             try:
                 self._uploaded_images = {}
                 self.__uploaded_images_path = "./logs/uploaded_images.json"
-                if os.path.exists(self.__uploaded_images_path):
+                if False and os.path.exists(self.__uploaded_images_path):
                     with open(self.__uploaded_images_path, "r") as f:
                         self._uploaded_images.update(json.load(f))
             except Exception as e:
@@ -298,10 +302,17 @@ class GradioUI():
                         #     token = 10
                     else:
                         logger.debug("No EXIF data found")
-
                 except Exception as e:
                     logger.error(f"Error while checking image EXIF data: {e}")
 
+                try:
+                    faces = self.face_analyzer.get_faces(image)
+                    if len(faces)==0:
+                        msg = "No face detected in the image."
+                        token = 2
+                except Exception as e:
+                    logger.error(f"Error while detecting face: {e}")
+        
             if (token>0):
                 session_state.token += token
                 if msg != "":

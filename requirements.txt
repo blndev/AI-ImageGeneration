@@ -8,7 +8,6 @@ dotenv          # Load environment variables for config from file
 
 ###############################################################
 # Analytics
-geoip2          # for analytics to determine country and city
 user-agents     # to parse user agents and split into 
 
 ###############################################################
@@ -20,3 +19,9 @@ torch>=2.6              # for gpu support and ai operations
 xformers                # memory optimization
 protobuf                # required by pipeline
 sentencepiece           # required by tokenizer
+
+###############################################################
+# Image Analyzer
+insightface             # to detect faces in uploaded images
+onnxruntime             # required by insightface but not automatically installed          
+opencv-python           # to prepare PIL images for face detection
