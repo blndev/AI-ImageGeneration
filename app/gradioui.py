@@ -497,7 +497,7 @@ class GradioUI():
                 show_progress=False
             )
 
-            timer_check_token = gr.Timer(30)
+            timer_check_token = gr.Timer(60)
             timer_check_token.tick(
                 fn=self.uiaction_timer_check_token,
                 inputs=[user_session_storage],
