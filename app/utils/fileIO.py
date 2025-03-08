@@ -1,3 +1,4 @@
+import json
 import os
 from time import sleep
 import requests                 # for downloads of files
@@ -78,10 +79,11 @@ def save_image_as_png(image: Image.Image, dir: str, filename: str = None):
         return None
 
 
-def save_image_with_timestamp(image, folder_path, ignore_errors=False, reference=""):
+def save_image_with_timestamp(image, folder_path, ignore_errors=False, reference="", generation_details: dict = None):
     """
     saves a image in a given folder and returns the used path
     reference: could be the SHA1 from source image to make a combined filename
+    generation_details: if given, it wil be save as imagefilename.txt
     """
     try:
         # Create the folder if it does not exist
@@ -99,6 +101,14 @@ def save_image_with_timestamp(image, folder_path, ignore_errors=False, reference
 
         # Save the image
         image.save(file_path)
+        if generation_details != None:
+            try:
+                with open(file_path+".txt", "w") as f:
+                    generation_details
+                    json.dump(obj=generation_details,fp=f,indent=4)
+            except Exception as e:
+                logger.error(f"Error while loading uploaded_images.json: {e}")
+
         return file_path
     except Exception as e:
         logger.error("Save image failed: %s", str(e))

@@ -175,7 +175,7 @@ class GradioUI():
                 logger.debug(f"saving images to {self.output_directory}")
                 for image in images:
                     outdir = os.path.join(self.output_directory, datetime.now().strftime("%Y-%m-%d"),"generation")
-                    save_image_with_timestamp(image=image, folder_path=outdir, ignore_errors=True)
+                    save_image_with_timestamp(image=image, folder_path=outdir, ignore_errors=True, generation_details=generation_details.to_dict())
             return images, session_state
         except Exception as e:
             logger.error(f"image generation failed: {e}")
@@ -324,7 +324,7 @@ class GradioUI():
                 with open(self.__uploaded_images_path, "w") as f:
                     json.dump(self._uploaded_images, f)
             except Exception as e:
-                logger.error(f"Error while loading uploaded_images.json: {e}")
+                logger.error(f"Error while saving {self.__uploaded_images_path}: {e}")
 
         except Exception as e:
             logger.error(f"generate token for uploaded image failed: {e}")
