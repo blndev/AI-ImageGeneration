@@ -29,15 +29,16 @@ class GradioUI():
             self.output_directory = os.getenv("OUTPUT_DIRECTORY", None)
             self.allow_upload = bool(strtobool(os.getenv("ALLOW_UPLOAD", "False")))
             try:
-                ars = os.getenv("ASPECT_RATIO_SQUARE", "512x512")
+                #TODO: add unittest which checks env and internal settings
+                ars = os.getenv("GENERATION_ASPECT_SQUARE", "512x512")
                 self.aspect_square_width = int(ars.split("x")[0])
                 self.aspect_square_height = int(ars.split("x")[1])
 
-                arl = os.getenv("ASPECT_RATIO_LANDSCAPE", "768x512")
+                arl = os.getenv("GENERATION_ASPECT_LANDSCAPE", "768x512")
                 self.aspect_landscape_width = int(arl.split("x")[0])
                 self.aspect_landscape_height = int(arl.split("x")[1])
 
-                arp = os.getenv("ASPECT_RATIO_PORTRAIT", "512x768")
+                arp = os.getenv("GENERATION_ASPECT_PORTRAIT", "512x768")
                 self.aspect_portrait_width = int(arp.split("x")[0])
                 self.aspect_portrait_height = int(arp.split("x")[1])
             except Exception as e:
