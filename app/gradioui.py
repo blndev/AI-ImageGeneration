@@ -8,7 +8,7 @@ from PIL import Image, ExifTags
 import logging
 from app import SessionState
 from app.utils.singleton import singleton
-from app.utils.fileIO import save_image_with_timestamp, save_image_as_png
+from app.utils.fileIO import save_image_with_timestamp, save_image_as_png, get_date_subfolder
 from app.fluxparams import FluxParameters
 from app import FluxGenerator
 from app.FaceDetector import FaceDetector
@@ -65,6 +65,7 @@ class GradioUI():
             try:
                 self._uploaded_images = {}
                 self.__uploaded_images_path = "./logs/uploaded_images.json"
+                #TODO: revert this!!!
                 if False and os.path.exists(self.__uploaded_images_path):
                     with open(self.__uploaded_images_path, "r") as f:
                         self._uploaded_images.update(json.load(f))
@@ -178,7 +179,7 @@ class GradioUI():
             if self.output_directory is not None:
                 logger.debug(f"saving images to {self.output_directory}")
                 for image in images:
-                    outdir = os.path.join(self.output_directory, datetime.now().strftime("%Y-%m-%d"),"generation")
+                    outdir = os.path.join(self.output_directory, get_date_subfolder(),"generation")
                     save_image_with_timestamp(image=image, folder_path=outdir, ignore_errors=True, generation_details=generation_details.to_dict())
             return images, session_state
         except Exception as e:
@@ -217,7 +218,7 @@ class GradioUI():
                 return gr.Button(interactive=True)
             
             dir = self.output_directory
-            dir = os.path.join(dir, datetime.now().strftime("%Y-%m-%d"),"upload")
+            dir = os.path.join(dir, get_date_subfolder(),"upload")
             targetpath = os.path.join(dir,  image_sha1 + "_" + filename)
             #copy file from source  to outdir
             os.makedirs(dir, exist_ok=True)
@@ -306,18 +307,23 @@ class GradioUI():
                     logger.error(f"Error while checking image EXIF data: {e}")
 
                 try:
-                    faces = self.face_analyzer.get_faces(image)
+                    faces, cv2 = self.face_analyzer.get_faces(image)
                     if len(faces)==0:
-                        logger.debug(f"no face detected for standard analyzes")
-                        fc = self.face_analyzer.get_faces_count(image)
-                        logger.debug(f"used faces count to detect faces and received '{fc}'")
-                        if fc==0:
-                            msg = "No face detected in the image. Could happen that the face is to narrow or the resoltution is too small. Try another pictrue to get more token!"
-                            token = 5
-                            logger.warning(f"No Face detected on upload from {session_state.session}")
+                        msg = "No face detected in the image. Could happen that the face is to narrow or the resoltution is too small. Try another pictrue to get more token!"
+                        token = 5
+                        logger.warning(f"No Face detected on image {image_sha1} from {session_state.session}")
                     else:
-                        # TODO: should we do something with the faces like recognition from previous uploads to get more points?
-                        logger.info(f"Face detected on upload from {session_state.session}")
+                        # prepare for auto removal of critical images
+                        logger.info(f"{len(faces)} Face(s) detected on upload from {session_state.session}")
+                        ages = ""
+                        for face in faces:
+                            if face.age:
+                                ages+=str(face.age)+","
+                                if face.age<16 and self.output_directory!= None:
+                                    fn = os.path.join(self.output_directory,"warning",get_date_subfolder(),f"{image_sha1}-{face.age}.jpg")
+                                    self.face_analyzer.get_face_picture(cv2, face, filename=fn)
+                                    logger.warning(f"Suspected age detected on image {image_sha1}")
+                        logger.debug(f"Ages on the image {image_sha1}: {ages[:-1]}")
 
 
                 except Exception as e:

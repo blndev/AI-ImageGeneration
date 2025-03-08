@@ -11,6 +11,9 @@ import logging
 logger = logging.getLogger(__name__)
 
 
+def get_date_subfolder():
+    return datetime.now().strftime("%Y-%m-%d")
+
 def get_all_local_models(model_folder: str, extension: str = ".safetensors"):
     """find all local flux models"""
     safetensors_files = []

@@ -33,7 +33,8 @@ class FaceDetector():
         #providers = ['CUDAExecutionProvider', 'CPUExecutionProvider']
         providers = ['CPUExecutionProvider']
         try:
-            self.face_detector = FaceAnalysisEnhanced(name="buffalo_sc", providers=providers)  # https://github.com/deepinsight/insightface/tree/master/model_zoo
+            #smallest: buffalo_sc but problems for some faces (blurry, mirror etc)
+            self.face_detector = FaceAnalysisEnhanced(name="buffalo_l", providers=providers)  # https://github.com/deepinsight/insightface/tree/master/model_zoo
             self.face_detector.prepare(ctx_id=self.ctx_id, det_size=(512,512))
             logger.debug("FaceDetector initialization done")
         except Exception as e:
@@ -43,6 +44,7 @@ class FaceDetector():
     def get_faces(self, pil_image: Image):
         """ return values are a list of dictionaries. if len=0, then no face was detected"""
         retVal = []
+        cv2_image = None
         try:
             # reduce size if it is a big image to process it faster
             max_size = 1024
@@ -63,20 +65,52 @@ class FaceDetector():
             #TODO: with lock:
             faces = self.face_detector.get(cv2_image)
 
+            if len(faces)==0: faces = self._reduced_detection_site_detection(cv2_image)
             for face in faces:
                 #print ("Face bbox", face['bbox'])
                 x1, y1, x2, y2 = map(int, face.bbox)
                 cropped_face = cv2_image[y1:y2, x1:x2]
-                retVal.append(cropped_face)
+                retVal.append(face)
                 #cv2.imwrite(img=cropped_face, filename=f"./models/face_{x1}.jpg")
             logger.debug(f"Detected Faces {len(retVal)}")
         except Exception as e:
             logger.error("Error while detecting face: %s", str(e))
             logger.debug("Exception details:", exc_info=True)
-        return retVal
+        return retVal, cv2_image
 
 
-    def get_faces_count(self, pil_image: Image, det_size=(640, 640)):
+    def _reduced_detection_site_detection(self, cv2_image):
+        """ return values are a list of dictionaries. if len=0, then no face was detected"""
+        try:
+            logger.debug("startin enhanced detection with different detection sizes")
+            detection_sizes = [None] + [(size, size) for size in range(640, 256, -64)] + [(256, 256)]
+            for size in detection_sizes:
+                faces = self.face_detector.get(cv2_image, det_size=size)
+                if len(faces) > 0:
+                    logger.debug(f"Detected  {len(faces)} Faces with reduced detection size of {size}")
+                    return faces
+            
+        except Exception as e:
+            logger.error("Error while detecting face with reduced_detection_site_detection: %s", str(e))
+            logger.debug("Exception details:", exc_info=True)
+        return []
+
+    def get_face_picture(self, cv2_image: np.array, face, filename: str = None):
+        """ returns a cv2 image containing the face to work with it
+        if filename is provided, the image is saved as jpg
+        """
+        try:
+            x1, y1, x2, y2 = map(int, face.bbox)
+            cropped_face = cv2_image[y1:y2, x1:x2]
+            if not filename is None:
+                cv2.imwrite(img=cropped_face, filename=filename)
+            return cropped_face
+        except Exception as e:
+            logger.error("Error while detecting face: %s", str(e))
+            logger.debug("Exception details:", exc_info=True)
+        return None
+
+    def get_faces_count(self, pil_image: Image):
         """ return values are a list of dictionaries. if len=0, then no face was detected"""
         try:
             # reduce size if it is a big image to process it faster
