@@ -9,7 +9,17 @@ from insightface.app import FaceAnalysis    # face boxes detection
 # Set up module logger
 logger = logging.getLogger(__name__)
 
+# src reference: https://github.com/cubiq/ComfyUI_IPAdapter_plus/issues/165
+class FaceAnalysisEnhanced(FaceAnalysis):
+    # NOTE: allows setting det_size for each detection call.
+    # the model allows it but the wrapping code from insightface
+    # doesn't show it, and people end up loading duplicate models
+    # for different sizes where there is absolutely no need to
+    def get(self, img, max_num=0, det_size=(640, 640)):
+        if det_size is not None:
+            self.det_model.input_size = det_size
 
+        return super().get(img, max_num)
 
 @singleton
 class FaceDetector():
@@ -23,7 +33,7 @@ class FaceDetector():
         #providers = ['CUDAExecutionProvider', 'CPUExecutionProvider']
         providers = ['CPUExecutionProvider']
         try:
-            self.face_detector = FaceAnalysis(name="buffalo_sc", providers=providers)  # https://github.com/deepinsight/insightface/tree/master/model_zoo
+            self.face_detector = FaceAnalysisEnhanced(name="buffalo_sc", providers=providers)  # https://github.com/deepinsight/insightface/tree/master/model_zoo
             self.face_detector.prepare(ctx_id=self.ctx_id, det_size=(512,512))
             logger.debug("FaceDetector initialization done")
         except Exception as e:
@@ -64,3 +74,38 @@ class FaceDetector():
             logger.error("Error while detecting face: %s", str(e))
             logger.debug("Exception details:", exc_info=True)
         return retVal
+
+
+    def get_faces_count(self, pil_image: Image, det_size=(640, 640)):
+        """ return values are a list of dictionaries. if len=0, then no face was detected"""
+        try:
+            # reduce size if it is a big image to process it faster
+            max_size = 1024
+            pil_image.thumbnail((max_size, max_size))
+            # correct EXIF-Orientation!! very important
+            pil_image = ImageOps.exif_transpose(pil_image)
+            # face analysis needs a base RGB format
+            cv2_image = np.array(pil_image.convert("RGB"))
+
+            # convert to OpenCV conforme colors
+            cv2_image = cv2.cvtColor(cv2_image, cv2.COLOR_RGBA2RGB)
+
+            if len(cv2_image.shape) == 2:  # if gray make RGB
+                cv2_image = cv2.cvtColor(cv2_image, cv2.COLOR_GRAY2BGR)
+
+            #size = scaling to for face detection (smaller = faster)
+            #if size is bigger then the image size, we got no detection so 512x512 is fine
+            #TODO: with lock:
+    
+    
+            detection_sizes = [None] + [(size, size) for size in range(640, 256, -64)] + [(256, 256)]
+            for size in detection_sizes:
+                faces = self.face_detector.get(cv2_image, det_size=size)
+                if len(faces) > 0:
+                    logger.debug(f"Detected Faces {len(faces)}")
+                    return len(faces)
+            
+        except Exception as e:
+            logger.error("Error while detecting face: %s", str(e))
+            logger.debug("Exception details:", exc_info=True)
+        return 0

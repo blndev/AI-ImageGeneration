@@ -308,8 +308,18 @@ class GradioUI():
                 try:
                     faces = self.face_analyzer.get_faces(image)
                     if len(faces)==0:
-                        msg = "No face detected in the image."
-                        token = 2
+                        logger.debug(f"no face detected for standard analyzes")
+                        fc = self.face_analyzer.get_faces_count(image)
+                        logger.debug(f"used faces count to detect faces and received '{fc}'")
+                        if fc==0:
+                            msg = "No face detected in the image. Could happen that the face is to narrow or the resoltution is too small. Try another pictrue to get more token!"
+                            token = 5
+                            logger.warning(f"No Face detected on upload from {session_state.session}")
+                    else:
+                        # TODO: should we do something with the faces like recognition from previous uploads to get more points?
+                        logger.info(f"Face detected on upload from {session_state.session}")
+
+
                 except Exception as e:
                     logger.error(f"Error while detecting face: {e}")
         
