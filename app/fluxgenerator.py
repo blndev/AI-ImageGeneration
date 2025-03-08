@@ -194,7 +194,7 @@ class FluxGenerator():
                 elif self.SDXL:
                     params = params.prepare_sdxl()
 
-                logger.debug("Strength: %f, Steps: %d", params.strength, params.num_inference_steps)
+                logger.debug("Guidance: %f Strength: %f, Steps: %d",params.guidance_scale, params.strength, params.num_inference_steps)
                 result_images = model(**params.to_dict()).images
                 return result_images
 

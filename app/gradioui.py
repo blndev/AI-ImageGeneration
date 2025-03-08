@@ -49,6 +49,8 @@ class GradioUI():
                 os.getenv("GENERATION_STEPS", 30 if self.generator.is_flux_dev() or self.generator.SDXL else 4))
             self.generation_guidance_scale = float(
                 os.getenv("GENERATION_GUIDANCE", 7.5 if self.generator.is_flux_dev() or self.generator.SDXL else 0))
+            self.generation_strength = float(
+                os.getenv("GENERATION_STRENGHT", 0.8))
 
             self.initial_token = int(os.getenv("INITIAL_GENERATION_TOKEN", 0))
             self.new_token_wait_time = int(os.getenv("NEW_TOKEN_WAIT_TIME", 10))
@@ -138,7 +140,8 @@ class GradioUI():
                 msg = f"Not enough generation token available.\n\nPlease wait {self.new_token_wait_time} minutes"
                 if self.allow_upload:
                     msg+=", or get new token by sharing images for training"
-                raise Exception(msg)
+                gr.Warning(msg, title="Image generation failed", duration=30)
+                return None, session_state
                     
 
             session_state.save_last_generation_activity()
@@ -158,6 +161,7 @@ class GradioUI():
                 negative_prompt=neg_prompt,
                 num_inference_steps=self.generation_steps,
                 guidance_scale=self.generation_guidance_scale,
+                strength=self.generation_strength,
                 num_images_per_prompt=image_count,
                 width=width,
                 height=height
