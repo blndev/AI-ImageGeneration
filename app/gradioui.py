@@ -13,6 +13,7 @@ from app.fluxparams import FluxParameters
 from app.fluxgenerator import FluxGenerator
 import json
 import shutil
+from distutils.util import strtobool
 
 # Set up module logger
 logger = logging.getLogger(__name__)
@@ -26,7 +27,7 @@ class GradioUI():
             self.interface = None
             self.generator = FluxGenerator()
             self.output_directory = os.getenv("OUTPUT_DIRECTORY", None)
-
+            self.allow_upload = bool(strtobool(os.getenv("ALLOW_UPLOAD", "False")))
             try:
                 ars = os.getenv("ASPECT_RATIO_SQUARE", "512x512")
                 self.aspect_square_width = int(ars.split("x")[0])
@@ -62,7 +63,14 @@ class GradioUI():
                         self._uploaded_images.update(json.load(f))
             except Exception as e:
                 logger.error(f"Error while loading uploaded_images.json: {e}")
-
+            try:
+                self.msg_share_image = ""
+                p = "./msgs/sift.md"
+                if os.path.exists(p):
+                    with open(p, "r") as f:
+                        self.msg_share_image = f.read()
+            except Exception as e:
+                logger.error(f"Error while loading msgs: {e}")
         except Exception as e:
             logger.error("Error initializing GradioUI: %s", str(e))
             logger.debug("Exception details:", exc_info=True)
@@ -100,7 +108,7 @@ class GradioUI():
         if gradio_state is None:
             return None
         session_state = SessionState.from_gradio_state(gradio_state)
-        logger.debug(f"check new token for '{session_state.session}'. Last Gen.: {session_state.last_generation}")
+        logger.debug(f"check new token for '{session_state.session}'. Last Generation: {session_state.last_generation}")
         # logic: (10) minutes after running out of token, user get filled up to initial (10) new token
         # exception: user upload image for training or receive advertising token
         if self.token_enabled:
@@ -111,7 +119,7 @@ class GradioUI():
             new_token = session_state.token - current_token
             if new_token > 0:
                 gr.Info(f"Congratulation, you received {new_token} new generation token!", duration=0)
-                logger.info(f"session {session_state.session} received {new_token} new token")
+                logger.info(f"session {session_state.session} received {new_token} new token for waiting")
 
         return session_state
 
@@ -127,8 +135,11 @@ class GradioUI():
         session_state = SessionState.from_gradio_state(gradio_state)
         try:
             if self.token_enabled and session_state.token < image_count:
-                raise Exception(
-                    "Not enough generation token available. Please wait for a few minutes, or get more token by sharing the app.")
+                msg = f"Not enough generation token available.\n\nPlease wait {self.new_token_wait_time} minutes"
+                if self.allow_upload:
+                    msg+=", or get new token by sharing images for training"
+                raise Exception(msg)
+                    
 
             session_state.save_last_generation_activity()
 
@@ -163,7 +174,7 @@ class GradioUI():
             return images, session_state
         except Exception as e:
             logger.error(f"image generation failed: {e}")
-            gr.Warning(f"Error while generating the image: {e}", duration=30)
+            gr.Warning(f"Error while generating the image: {e}", title="Image generation failed", duration=30)
         return None, session_state
 
     def uiaction_image_upload(self, gradio_state: str, image_path):
@@ -175,10 +186,16 @@ class GradioUI():
             image (PIL.Image): The uploaded image
         """
         logger.debug("starting image upload handler")
+
+        if self.output_directory is None:
+            logger.debug("output directory not configured, skipping upload")
+            return gr.Button(interactive=False)
+
         if image_path is None: 
             return gr.Button(interactive=False)
        
         try:
+            logger.debug(f"image type: {type(image_path)} with value {image_path}")
             image = Image.open(image_path)
             filename = os.path.basename(image_path)
             session_state = SessionState.from_gradio_state(gradio_state)
@@ -380,7 +397,7 @@ class GradioUI():
             with gr.Row():
                 with gr.Accordion("Examples", open=False):
                     # Examples
-                    gr.Examples(
+                    gr.Examples(#TODO: read samples from file
                         examples=[
                             [
                                 "A majestic mountain landscape at sunset with snow-capped peaks",
@@ -405,29 +422,12 @@ class GradioUI():
                         label="Click an example to load it"
                     )
 
-            with gr.Row():
+            # Upload to get Token row
+            with gr.Row(visible=(self.output_directory!=None and self.allow_upload)):
                 with gr.Accordion("Get more Token", open=False):
                     with gr.Row():
-                        with gr.Column(scale=2):
-                            gr.Markdown(
-                        """
-# Image Sharing and Token Rewards
-
-We encourage you to share images to help us improve our model. You can do this without worrying about your privacy, as all contributions are anonymous.
-For each image accepted, you will receive an **additional 25 tokens**. Thank you for helping us enhance our model!
-
-- **Anonymity:** Your shared images remain anonymous, just like your usage of our platform. You will receive generation tokens for your current session only.
-
-- **Any Content Welcome:** We accept all kinds of content. Feel free to share images of what you think the model is missing or where it is currently failing in generation.
-
-- **Focus on Human Images:** Our model is designed to work with images of people. Please ensure the images you upload include a human face.
-
-- **Avoid AI-Generated Images:** To maintain the quality of our model, avoid uploading images created by AI.
-
-- **Automatic Integration:** All accepted images are automatically integrated into our training process without human review.
-
-"""
-                            )
+                        with gr.Column(scale=2):#TODO: get text from app/msgs/share_image.md via __init__ amd self.msg_share_image
+                            gr.Markdown(self.msg_share_image)
                         with gr.Column(scale=1):
                             upload_image = gr.Image(sources="upload", type="filepath", format="jpeg", height=256)
                             upload_button = gr.Button("Upload", visible=True, interactive=False)
