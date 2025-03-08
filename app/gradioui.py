@@ -116,7 +116,7 @@ class GradioUI():
         # exception: user upload image for training or receive advertising token
         if self.token_enabled:
             current_token = session_state.token
-            if session_state.generation_before_minutes(self.new_token_wait_time) and session_state.token <= 0:
+            if session_state.generation_before_minutes(self.new_token_wait_time) and session_state.token <= 2:
                 session_state.token = self.initial_token
                 session_state.reset_last_generation_activity()
             new_token = session_state.token - current_token
