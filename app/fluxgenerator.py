@@ -57,13 +57,6 @@ class FluxGenerator():
         logger.info("free memory used for FluxGenerator pipeline")
         self.unload_model()
 
-    def _download_model():
-        """will download missing parts of the model if huggingface token is not provided"""
-        # TODO: implement
-        pass
-        # https://huggingface.co/Kijai/flux-fp8/resolve/main/flux1-dev-fp8.safetensors?download=true
-        # https://huggingface.co/Kijai/flux-fp8/resolve/main/flux1-dev-fp8-e5m2.safetensors?download=true
-
     def check_safety(self, x_image):
         """Support function to check if the image is NSFW."""
         return x_image, False

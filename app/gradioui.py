@@ -65,8 +65,7 @@ class GradioUI():
             try:
                 self._uploaded_images = {}
                 self.__uploaded_images_path = "./logs/uploaded_images.json"
-                #TODO: revert this!!!
-                if False and os.path.exists(self.__uploaded_images_path):
+                if os.path.exists(self.__uploaded_images_path):
                     with open(self.__uploaded_images_path, "r") as f:
                         self._uploaded_images.update(json.load(f))
             except Exception as e:
@@ -265,7 +264,7 @@ class GradioUI():
                     for key, value in img_info.items():
                         print(f"IMG.Info: {key}: {value}")
 
-                    # TODO: check for an face and ai 
+                    # check for an face and ai 
                     # TODO: exif is not working, refactor to extra function and create tests
                     exif_data = image.getexif()
                     if not exif_data is None:
@@ -349,7 +348,7 @@ class GradioUI():
             # now save the list to disk for reuse in later sessions
             try:
                 with open(self.__uploaded_images_path, "w") as f:
-                    json.dump(self._uploaded_images, f)
+                    json.dump(self._uploaded_images, f, indent=4)
             except Exception as e:
                 logger.error(f"Error while saving {self.__uploaded_images_path}: {e}")
 
@@ -458,7 +457,7 @@ class GradioUI():
             with gr.Row(visible=(self.output_directory!=None and self.allow_upload)):
                 with gr.Accordion("Get more Token", open=False):
                     with gr.Row():
-                        with gr.Column(scale=2):#TODO: get text from app/msgs/share_image.md via __init__ amd self.msg_share_image
+                        with gr.Column(scale=2):
                             gr.Markdown(self.msg_share_image)
                         with gr.Column(scale=1):
                             upload_image = gr.Image(sources="upload", type="filepath", format="jpeg", height=256)
