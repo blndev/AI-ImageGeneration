@@ -27,10 +27,67 @@ class GradioUI():
     def __init__(self):
         try:
             self.interface = None
+
+            self.output_directory = os.getenv("OUTPUT_DIRECTORY", None)
+            if self.output_directory == None:
+                self.__feedback_file = "./output/feedback.txt"
+            else:
+                self.__feedback_file = os.path.join(self.output_directory, get_date_subfolder(),"feedback.txt")
+            
+            logger.info(f"Initialize Feedback file on '{self.__feedback_file}'")
+                
+
+            self.initial_token = int(os.getenv("INITIAL_GENERATION_TOKEN", 0))
+            self.new_token_wait_time = int(os.getenv("NEW_TOKEN_WAIT_TIME", 10))
+            logger.info("Initial token: %i, wait time: %i minutes", self.initial_token, self.new_token_wait_time)
+            self.token_enabled = self.initial_token > 0
+
+            self.allow_upload = bool(strtobool(os.getenv("ALLOW_UPLOAD", "False")))
+
+            if self.allow_upload:
+                # Fallback
+                basedir = "./output/"
+                if self.output_directory is None:
+                    basedir = self.output_directory
+                    logger.error("Upload allowed but no output directory specified. Using fallback ./output")
+                try:
+                    self._uploaded_images = {}
+                    # check maybe it's better to add the data folder as well
+                    self.__uploaded_images_path = os.path.join(basedir, "uploaded_images.json")
+                    if os.path.exists(self.__uploaded_images_path):
+                        with open(self.__uploaded_images_path, "r") as f:
+                            self._uploaded_images.update(json.load(f))
+                    logger.info(f"Initialized upload files history from '{self.__uploaded_images_path}'")
+                except Exception as e:
+                    logger.error(f"Error while loading uploaded_images.json: {e}")
+            try:
+                self.msg_share_image = ""
+                p = "./msgs/sift.md"
+                if os.path.exists(p):
+                    with open(p, "r") as f:
+                        self.msg_share_image = f.read()
+                logger.info(f"Initialized messages from '{p}'")
+            except Exception as e:
+                logger.error(f"Error while loading msgs: {e}")
+
+            # loading examples
+            self.examples = []
+            try:
+                p = "./msgs/examples.json"
+                # with open(p, "w") as f:
+                #         json.dump(self.examples, f, indent=4)
+                if os.path.exists(p):
+                    with open(p, "r") as f:
+                        self.examples = json.load(f)
+                logger.info(f"Initialized examples from '{p}'")
+            except Exception as e:
+                logger.error(f"Error while loading examples: {e}")
+
             self.generator = FluxGenerator()
             self.face_analyzer = FaceDetector()
 
-            self.output_directory = os.getenv("OUTPUT_DIRECTORY", None)
+            logger.info(f"reading apect ratios and generation settings ... ")
+
             try:
                 #TODO: add unittest which checks env and internal settings
                 ars = os.getenv("GENERATION_ASPECT_SQUARE", "512x512")
@@ -55,49 +112,8 @@ class GradioUI():
                 os.getenv("GENERATION_GUIDANCE", 7.5 if self.generator.is_flux_dev() or self.generator.SDXL else 0))
             self.generation_strength = float(
                 os.getenv("GENERATION_STRENGHT", 0.8))
-
-            self.initial_token = int(os.getenv("INITIAL_GENERATION_TOKEN", 0))
-            self.new_token_wait_time = int(os.getenv("NEW_TOKEN_WAIT_TIME", 10))
-            logger.info("Initial token: %i, wait time: %i minutes", self.initial_token, self.new_token_wait_time)
-            self.token_enabled = self.initial_token > 0
-
-            self.allow_upload = bool(strtobool(os.getenv("ALLOW_UPLOAD", "False")))
-
-            if self.allow_upload:
-                # Fallback
-                basedir = "./output/"
-                if self.output_directory != None:
-                    basedir = self.output_directory
-                    logger.error("Upload allowed but no output directory specified. Using fallback ./output")
-                try:
-                    self._uploaded_images = {}
-                    # check maybe it's better to add the data folder as well
-                    self.__uploaded_images_path = os.path.join(basedir, "uploaded_images.json")
-                    if os.path.exists(self.__uploaded_images_path):
-                        with open(self.__uploaded_images_path, "r") as f:
-                            self._uploaded_images.update(json.load(f))
-                except Exception as e:
-                    logger.error(f"Error while loading uploaded_images.json: {e}")
-            try:
-                self.msg_share_image = ""
-                p = "./msgs/sift.md"
-                if os.path.exists(p):
-                    with open(p, "r") as f:
-                        self.msg_share_image = f.read()
-            except Exception as e:
-                logger.error(f"Error while loading msgs: {e}")
-
-            # loading examples
-            self.examples = []
-            try:
-                p = "./msgs/examples.json"
-                # with open(p, "w") as f:
-                #         json.dump(self.examples, f, indent=4)
-                if os.path.exists(p):
-                    with open(p, "r") as f:
-                        self.examples = json.load(f)
-            except Exception as e:
-                logger.error(f"Error while loading examples: {e}")
+            
+            logger.info(f"Application succesful initialized")
 
         except Exception as e:
             logger.error("Error initializing GradioUI: %s", str(e))
@@ -484,15 +500,6 @@ class GradioUI():
                         concurrency_id="image upload"
                     )
 
-                    # gr.Markdown(
-                    #     """
-                    #     You can get more token by sharing providing we can use to train our model.
-
-                        
-                    #     Provide he follwing link. On the first generation of a user based on that link you gain additonal 25 token
-                    #     """
-                    # )
-
             # Gallery row
             with gr.Row():
                 # Gallery for displaying generated images
@@ -511,6 +518,44 @@ class GradioUI():
             # Download Button
             with gr.Row():
                 download_btn = gr.DownloadButton("Download", visible=False)
+
+            # Feedback row
+            with gr.Row(visible=(self.__feedback_file!=None)):
+                with gr.Accordion("Feedback", open=False):
+                    with gr.Row():
+                        with gr.Column(scale=1):
+                            gr.Markdown("""
+This Generator App is under development. Please provide us valuable feedback so we can improve this solution.
+"""                            )
+                        with gr.Column(scale=1):
+                            feedback_txt = gr.Textbox(label="Please share your feedback here", lines=3, max_length=300)
+                            feedback_button = gr.Button("Send Feedback", visible=True, interactive=False)
+                        feedback_txt.change(
+                            fn=lambda x: gr.Button(interactive=len(x.strip()) > 0),
+                            inputs=[feedback_txt],
+                            outputs=[feedback_button]
+                        )
+                        def send_feedback(gradio_state, text):
+                            session_state = SessionState.from_gradio_state(gradio_state)
+                            logger.info(f"User Feedback from {session_state.session}: {text}")
+                            try:
+                                with open(self.__feedback_file, "a") as f:
+                                    f.write(f"{datetime.now()} - {session_state.session}\n{text}\n\n")
+                            except Exception:
+                                pass
+                            gr.Info("Thanks for your Feedback!")
+                        feedback_button.click(
+                            fn=send_feedback,
+                            inputs=[user_session_storage, feedback_txt],
+                            outputs=[],
+                            concurrency_limit=None,
+                            concurrency_id="feedback"
+                        ).then(
+                            fn=lambda: (gr.Textbox(value="", interactive=False), gr.Button(interactive=False)),
+                            inputs=[],
+                            outputs=[feedback_txt, feedback_button]
+                        )
+
 
             def update_token_info(gradio_state):
                 #logger.debug("local_storage changed: SessionState: %s", gradio_state)
@@ -566,6 +611,11 @@ class GradioUI():
                             gr.Button(interactive=False), gr.Gallery(preview=False)),
                 inputs=[],
                 outputs=[timer_check_token, generate_btn, cancel_btn, gallery]
+            ).then(
+                #enable feedback again
+                fn=lambda: (gr.Textbox(interactive=True)),
+                inputs=[],
+                outputs=[feedback_txt]
             )
 
             # generate_event = generate_btn.click(
