@@ -1,3 +1,4 @@
+import os
 from PIL import Image, ImageOps # for image handling
 import numpy as np              # converting PIL to CV2
 import logging
@@ -110,6 +111,7 @@ class FaceDetector():
             x1, y1, x2, y2 = map(int, face.bbox)
             cropped_face = cv2_image[y1:y2, x1:x2]
             if not filename is None:
+                os.makedirs(os.path.dirname(filename), exist_ok=True)
                 cv2.imwrite(img=cropped_face, filename=filename)
             return cropped_face
         except Exception as e:
