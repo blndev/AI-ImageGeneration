@@ -62,14 +62,22 @@ class GradioUI():
             self.token_enabled = self.initial_token > 0
 
             self.allow_upload = bool(strtobool(os.getenv("ALLOW_UPLOAD", "False")))
-            try:
-                self._uploaded_images = {}
-                self.__uploaded_images_path = "./logs/uploaded_images.json"
-                if os.path.exists(self.__uploaded_images_path):
-                    with open(self.__uploaded_images_path, "r") as f:
-                        self._uploaded_images.update(json.load(f))
-            except Exception as e:
-                logger.error(f"Error while loading uploaded_images.json: {e}")
+
+            if self.allow_upload:
+                # Fallback
+                basedir = "./output/"
+                if self.output_directory != None:
+                    basedir = self.output_directory
+                    logger.error("Upload allowed but no output directory specified. Using fallback ./output")
+                try:
+                    self._uploaded_images = {}
+                    # check maybe it's better to add the data folder as well
+                    self.__uploaded_images_path = os.path.join(basedir, "uploaded_images.json")
+                    if os.path.exists(self.__uploaded_images_path):
+                        with open(self.__uploaded_images_path, "r") as f:
+                            self._uploaded_images.update(json.load(f))
+                except Exception as e:
+                    logger.error(f"Error while loading uploaded_images.json: {e}")
             try:
                 self.msg_share_image = ""
                 p = "./msgs/sift.md"
