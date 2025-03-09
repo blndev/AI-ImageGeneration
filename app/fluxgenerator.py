@@ -16,6 +16,8 @@ from diffusers import FluxPipeline, StableDiffusionXLPipeline
 # Set up module logger
 logger = logging.getLogger(__name__)
 
+#TODO: create dedicated class for SDXL
+# fo SDXL use refiner as well: https://huggingface.co/stabilityai/stable-diffusion-xl-base-1.0
 
 @singleton
 class FluxGenerator():
@@ -86,6 +88,7 @@ class FluxGenerator():
                     # requires_safety_checker=False,
                     use_safetensors=True,
                     device_map="auto",
+                    add_watermarker=False, #https://github.com/ShieldMnt/invisible-watermark/
                     strict=False
                 )
             else:
@@ -111,6 +114,23 @@ class FluxGenerator():
                 logger.info("xformers activated")
                 pipeline.enable_xformers_memory_efficient_attention()
 
+
+            if self.SDXL and self.device=="cuda":
+                logger.info("load empeddings")
+
+                self.sdxl_embedding_positive=None
+                pos_path = os.getenv("GENERATION_SDXL_EMBEDDING_POS_PATH", None)
+                if not pos_path is None:
+                    self.sdxl_embedding_positive= os.getenv("GENERATION_SDXL_EMBEDDING_POS_KEYWORD", None)
+                    pipeline.load_textual_inversion(pos_path, token=self.sdxl_embedding_positive)
+
+                self.sdxl_embedding_negative=None
+                neg_path = os.getenv("GENERATION_SDXL_EMBEDDING_NEG_PATH", None)
+                if not neg_path is None:
+                    self.sdxl_embedding_negative= os.getenv("GENERATION_SDXL_EMBEDDING_NEG_KEYWORD", None)
+                    pipeline.load_textual_inversion(neg_path, token=self.sdxl_embedding_negative)
+
+
             if self.device == "cuda":
                 torch.cuda.empty_cache()
 
@@ -120,6 +140,11 @@ class FluxGenerator():
                 pipeline.enable_model_cpu_offload()
             else:
                 pipeline.to(self.device)
+
+            #     # https://huggingface.co/stabilityai/stable-diffusion-xl-base-1.0
+            #     pipeline.unet = torch.compile(pipeline.unet, mode="reduce-overhead", fullgraph=True)
+            #     logger.info("torch compile done")
+
 
             # pipeline.enable_attention_slicing("auto")
             #
@@ -186,7 +211,13 @@ class FluxGenerator():
                     params = params.prepare_flux_dev()
                 elif self.SDXL:
                     params = params.prepare_sdxl()
-
+                    if self.sdxl_embedding_positive != None:
+                        logger.debug("apply positive embeddings")
+                        params.prompt = self.sdxl_embedding_positive + "," + params.prompt
+                    if self.sdxl_embedding_negative != None:
+                        logger.debug("apply negative embeddings")
+                        params.negative_prompt = self.sdxl_embedding_negative + "," + (params.negative_prompt if params.negative_prompt else "")
+                
                 logger.debug("Guidance: %f Strength: %f, Steps: %d",params.guidance_scale, params.strength, params.num_inference_steps)
                 result_images = model(**params.to_dict()).images
                 return result_images
