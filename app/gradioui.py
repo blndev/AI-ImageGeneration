@@ -47,8 +47,9 @@ class GradioUI():
             if self.allow_upload:
                 # Fallback
                 basedir = "./output/"
-                if self.output_directory is None:
+                if self.output_directory != None:
                     basedir = self.output_directory
+                else:
                     logger.error("Upload allowed but no output directory specified. Using fallback ./output")
                 try:
                     self._uploaded_images = {}
