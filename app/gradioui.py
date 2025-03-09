@@ -525,8 +525,10 @@ class GradioUI():
                     with gr.Row():
                         with gr.Column(scale=1):
                             gr.Markdown("""
-This Generator App is under development. Please provide us valuable feedback so we can improve this solution.
-"""                            )
+## We’d Love Your Feedback!
+
+We’re excited to bring you this Image Generator App, which is still in development! Your feedback is invaluable to us—please share your thoughts on the app and the images it creates so we can make it even better for you. Your input helps shape the future of this tool, and we truly appreciate your time and suggestions.
+                         """                            )
                         with gr.Column(scale=1):
                             feedback_txt = gr.Textbox(label="Please share your feedback here", lines=3, max_length=300)
                             feedback_button = gr.Button("Send Feedback", visible=True, interactive=False)
@@ -543,7 +545,7 @@ This Generator App is under development. Please provide us valuable feedback so 
                                     f.write(f"{datetime.now()} - {session_state.session}\n{text}\n\n")
                             except Exception:
                                 pass
-                            gr.Info("Thanks for your Feedback!")
+                            gr.Info("Thank you so much for taking the time to share your feedback! We really appreciate your input—it means a lot to us and helps us make the Image Generator App better for everyone.")
                         feedback_button.click(
                             fn=send_feedback,
                             inputs=[user_session_storage, feedback_txt],
