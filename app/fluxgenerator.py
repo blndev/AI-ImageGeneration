@@ -118,18 +118,22 @@ class FluxGenerator():
             if self.SDXL and self.device=="cuda":
                 logger.info("load empeddings")
 
-                self.sdxl_embedding_positive=None
-                pos_path = os.getenv("GENERATION_SDXL_EMBEDDING_POS_PATH", None)
-                if not pos_path is None:
-                    self.sdxl_embedding_positive= os.getenv("GENERATION_SDXL_EMBEDDING_POS_KEYWORD", None)
-                    pipeline.load_textual_inversion(pos_path, token=self.sdxl_embedding_positive)
+                try:
+                    # both vars used later, import to have them as None
+                    self.sdxl_embedding_positive=None
+                    self.sdxl_embedding_negative=None
 
-                self.sdxl_embedding_negative=None
-                neg_path = os.getenv("GENERATION_SDXL_EMBEDDING_NEG_PATH", None)
-                if not neg_path is None:
-                    self.sdxl_embedding_negative= os.getenv("GENERATION_SDXL_EMBEDDING_NEG_KEYWORD", None)
-                    pipeline.load_textual_inversion(neg_path, token=self.sdxl_embedding_negative)
+                    pos_path = os.getenv("GENERATION_SDXL_EMBEDDING_POS_PATH", None)
+                    if not pos_path is None:
+                        self.sdxl_embedding_positive= os.getenv("GENERATION_SDXL_EMBEDDING_POS_KEYWORD", None)
+                        pipeline.load_textual_inversion(pos_path, token=self.sdxl_embedding_positive)
 
+                    neg_path = os.getenv("GENERATION_SDXL_EMBEDDING_NEG_PATH", None)
+                    if not neg_path is None:
+                        self.sdxl_embedding_negative= os.getenv("GENERATION_SDXL_EMBEDDING_NEG_KEYWORD", None)
+                        pipeline.load_textual_inversion(neg_path, token=self.sdxl_embedding_negative)
+                except Exception as e:
+                    logger.error(f"Loading embeddings failed {e}")
 
             if self.device == "cuda":
                 torch.cuda.empty_cache()
