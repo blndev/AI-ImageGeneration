@@ -4,6 +4,8 @@ models/
 output/
 logs/
 .gradio/
+*.off
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]

@@ -31,7 +31,6 @@ class GradioUI():
             self.face_analyzer = FaceDetector()
 
             self.output_directory = os.getenv("OUTPUT_DIRECTORY", None)
-            self.allow_upload = bool(strtobool(os.getenv("ALLOW_UPLOAD", "False")))
             try:
                 #TODO: add unittest which checks env and internal settings
                 ars = os.getenv("GENERATION_ASPECT_SQUARE", "512x512")
@@ -62,6 +61,7 @@ class GradioUI():
             logger.info("Initial token: %i, wait time: %i minutes", self.initial_token, self.new_token_wait_time)
             self.token_enabled = self.initial_token > 0
 
+            self.allow_upload = bool(strtobool(os.getenv("ALLOW_UPLOAD", "False")))
             try:
                 self._uploaded_images = {}
                 self.__uploaded_images_path = "./logs/uploaded_images.json"
@@ -78,6 +78,19 @@ class GradioUI():
                         self.msg_share_image = f.read()
             except Exception as e:
                 logger.error(f"Error while loading msgs: {e}")
+
+            # loading examples
+            self.examples = []
+            try:
+                p = "./msgs/examples.json"
+                # with open(p, "w") as f:
+                #         json.dump(self.examples, f, indent=4)
+                if os.path.exists(p):
+                    with open(p, "r") as f:
+                        self.examples = json.load(f)
+            except Exception as e:
+                logger.error(f"Error while loading examples: {e}")
+
         except Exception as e:
             logger.error("Error initializing GradioUI: %s", str(e))
             logger.debug("Exception details:", exc_info=True)
@@ -318,8 +331,9 @@ class GradioUI():
                         for face in faces:
                             if face.age:
                                 ages+=str(face.age)+","
-                                if face.age<16 and self.output_directory!= None:
-                                    fn = os.path.join(self.output_directory,"warning",get_date_subfolder(),f"{image_sha1}-{face.age}.jpg")
+                                if face.age<18 and self.output_directory!= None:
+                                    fn = os.path.join(self.output_directory,"warning",get_date_subfolder())
+                                    fn = os.path.join(fn,f"{image_sha1}-{face.age}.jpg")
                                     self.face_analyzer.get_face_picture(cv2, face, filename=fn)
                                     logger.warning(f"Suspected age detected on image {image_sha1}")
                         logger.debug(f"Ages on the image {image_sha1}: {ages[:-1]}")
@@ -377,7 +391,8 @@ class GradioUI():
                         placeholder="Describe the image you want to generate...",
                         value="",
                         scale=4,
-                        lines=4
+                        lines=4,
+                        max_length=340
                     )
 
                     # Text prompt input
@@ -386,7 +401,8 @@ class GradioUI():
                         placeholder="Describe what you don't want...",
                         value="",
                         scale=4,
-                        lines=4
+                        lines=4,
+                        max_length=340
                     )
 
                 with gr.Column():
@@ -425,30 +441,11 @@ class GradioUI():
                         cancel_btn = gr.Button("Cancel", interactive=False, visible=False)
 
             # Examples row
-            with gr.Row():
+            with gr.Row(visible=len(self.examples)>0):
                 with gr.Accordion("Examples", open=False):
                     # Examples
                     gr.Examples(#TODO: read samples from file
-                        examples=[
-                            [
-                                "A majestic mountain landscape at sunset with snow-capped peaks",
-                                "painting",
-                                "▤ Landscape",
-                                1
-                            ],
-                            [
-                                "A professional portrait of a business person in a modern office",
-                                "ugly face",
-                                "▯ Portrait",
-                                1
-                            ],
-                            [
-                                "A top-down view of a colorful mandala pattern",
-                                "realistic",
-                                "□ Square",
-                                1
-                            ]
-                        ],
+                        examples=self.examples,
                         inputs=[prompt, neg_prompt, aspect_ratio, image_count],
                         label="Click an example to load it"
                     )

@@ -1,0 +1,38 @@
+[
+    [
+        "A majestic mountain landscape at sunset with snow-capped peaks",
+        "painting",
+        "\u25a4 Landscape",
+        1
+    ],
+    [
+        "A professional portrait of a business person in a modern office",
+        "ugly face",
+        "\u25af Portrait",
+        1
+    ],
+    [
+        "A cinematic shot of a man with a brown eye, long hair, neck, natural skin texture, intricate skin details, movie themed style,",
+        "",
+        "\u25af Portrait",
+        1
+    ],
+    [
+        "photorealistic background, detailed eyes, 1girl, solo, looking at viewer, short hair, blue eyes, hair ornament, white background, animal ears, hair between eyes, closed mouth, upper body, pink hair, flower, sidelocks, japanese clothes, hair flower, kimono, hair bun",
+        "squint. cross-eyed",
+        "\u25a1 Square",
+        1
+    ],
+    [
+        "highly realistic, Dark Fantasy, one beautiful woman sitting on a rock by a river, behind her is a gigantic castle above a misty waterfall, starry sky, mountainous horizon, night, moon, girl wand is made from lightning, black armored dress with ornaments, short skirt, black knee high boots, looking at viewer, dark purple hair,",
+        "worst quality, low quality, illustration, 3d, 2d, painting, cartoons, sketch,  bad anatomy",
+        "\u25a1 Square",
+        1
+    ],
+    [
+        "girl, natural skin texture, perfect eyes, detailed, photorealistic, slim and sassy woman in her early thirties, cute face, standing, sexy hips, sexy pose, closeup, wearing a designer short dress, perfect legs and feet, waiting for a cab outside a busy Italian restaurant late at night",
+        "perfect hands",
+        "\u25af Portrait",
+        1
+    ]
+]
