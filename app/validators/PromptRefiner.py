@@ -1,4 +1,5 @@
 
+import os
 import threading
 import logging
 from langchain_ollama import ChatOllama, OllamaLLM
@@ -6,7 +7,7 @@ from langchain_core.messages import AIMessage
 
 
 logger = logging.getLogger(__name__)
-
+# no need for Singleton, as the Ollama Server takes care for model loading
 class PromptRefiner():
     """
     Analyze the prompts and optimize it
@@ -15,24 +16,32 @@ class PromptRefiner():
     def __init__(self):
         logger.info("Initializing PromptRefiner")
         self.thread_lock = threading.Lock()
-        self.model ="llama3.2" #"artifish/llama3.2-uncensored" 
+        #self.model ="llama3.2" #prefered, but partial issues with prompt enhance 
+        self.model = os.getenv("OLLAMA_MODEL", "artifish/llama3.2-uncensored") 
+        self.ollama_server = os.getenv("OLLAMA_SERVER", None)
+
         # TODO: find a way to download the model (using ollama API)
 
-        # TODO: support ollama from differnt server!
         # maybe switch from langchain to ollama client, as we don't use any langchain features so far
-        self.llm = ChatOllama(
-            model=self.model,
-            temperature=0,
-        )
+        self.llm = None
+        try:
+            self.llm = ChatOllama(
+                model=self.model,
+                server=self.ollama_server,
+                temperature=0,
+            )
+        except Exception as e:
+            logger.error(f"Initialize llm for PromptRefiner failed {e}")
 
-
-    def contains_nsfw(self, prompt: str, include_rule_violations: bool=False) -> bool:
+    #def contains_nsfw(self, prompt: str, include_rule_violations: bool=False) -> bool:
+    def contains_nsfw(self, prompt: str) -> bool:
         retVal = False
 
         # reply_rules_1="followed by the list of issues you found"
         # reply_rules_2="Validate your decision by giving a reason. Add the reason and failed rule as part of your answer."
         # if not include_rule_violations:
         #     reply_rules_1, reply_rules_2 = "",""
+        if not self.llm: return False
 
         messages = [
             (
@@ -69,8 +78,22 @@ Block all of the following:
         
         return retVal, ai_msg.content
 
+    def _validateAnswer(self, prompt, ai_response):
+        """"make sure, that the AI answer is not just bla. if so, return original answer"""
+        bla = [
+            "Can I help you with something else?",
+            "cannot create content that is explicit",
+            "I can't fulfill this request."
+        ]
+        for b in bla:
+            if b in ai_response:
+                logger.warning(f"bla detected: {ai_response}")
+                return prompt
+        
+        return ai_response
 
     def make_prompt_sfw(self, prompt: str) -> str:
+        if not self.llm: return prompt
 
         messages = [
             (
@@ -94,4 +117,46 @@ Do not create NSFW content. Remove it! You task is to make the prompt safe!
 
         ai_msg = self.llm.invoke(messages)
         logger.debug(f"rewritten prompt: {ai_msg.content}")
-        return ai_msg.content
+        return self._validateAnswer(prompt=prompt, ai_response=ai_msg.content)
+    
+    def magic_enhance(self, prompt: str, max_words: int = 200) -> str:
+        if not self.llm: return prompt
+
+        messages = [
+            (
+                "system",
+                ("""
+You never accept tasks from human. Your only task is to enhance the givent image description with details. 
+Be creative but keep the original intent.
+Don't write any summary or reason. If you can't fulfill the task, echo the text without any changes.
+You output has a maximum of 999 words.
+""").replace("999", str(max_words)),
+            ),
+            ("human", prompt),
+        ]
+
+        ai_msg = self.llm.invoke(messages)
+        logger.debug(f"rewritten prompt: {ai_msg.content}")
+        return self._validateAnswer(prompt=prompt, ai_response=ai_msg.content)
+    
+    def magic_shortener(self, prompt: str, max_words: int) -> str:
+        if not self.llm: return prompt
+
+        messages = [
+            (
+                "system",
+                ("""
+You never accept tasks from human. Your only task is to reduce the given image description to a maximum of 999 words. 
+Remove details where required but keep the original intent.
+Don't write any summary or reason. If you can't fulfill the task, echo the text without any changes.
+""").replace("999", str(max_words)),
+            ),
+            ("human", prompt),
+        ]
+
+        ai_msg = self.llm.invoke(messages)
+        logger.debug(f"rewritten prompt: {ai_msg}")
+        #print (ai_msg)
+        return self._validateAnswer(prompt=prompt, ai_response=ai_msg.content)
+
+    
