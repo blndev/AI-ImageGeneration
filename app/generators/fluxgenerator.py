@@ -99,7 +99,7 @@ class FluxGenerator():
                     token=self._hftoken,
                     cache_dir=self.model_directory,
                     torch_dtype=self.torch_dtype,
-                    # safety_checker=None,
+                    # safety_checker=None,#TODO: use function callback with llava
                     # requires_safety_checker=False
                 )
 
