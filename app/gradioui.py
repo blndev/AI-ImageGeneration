@@ -198,16 +198,19 @@ class GradioUI():
                 width, height = self.aspect_portrait_width, self.aspect_portrait_height
 
             prompt = prompt.strip()
+            neg_prompt = neg_prompt.strip()
             # make default only sfw, TODO add ehancement (upload required for NSFW)
             # TODO: feature switch in config to enable NSFW and NSFW_AFTER_UPLOAD
             if self.prompt_magic:
-                if self.prompt_magic.is_not_save_for_work(prompt): #TODO: and config and not enabled for user
+                if self.prompt_magic.check_contains_nsfw(prompt): #TODO: and config and not enabled for user
                     logger.info(f"Convert NSFW prompt to SFW. User Prompt: '{prompt}'")
                     prompt=self.prompt_magic.make_prompt_sfw(prompt)
                     neg_prompt = "nude, naked, nsfw," + neg_prompt
 
             if self.prompt_magic and prompt_magic_active:
-                prompt=self.prompt_magic.magic_enhance(prompt, 70)
+                logger.info(f"Apply Prompt-Magic")
+                prompt=self.prompt_magic.magic_enhance(prompt, 50)
+                prompt=self.prompt_magic.make_prompt_sfw(prompt)
 
             logger.info(f"generating image for {session_state.session} with {session_state.token} token available.\n - prompt: '{prompt}' \n - Infos: aspect ratio {width}x{height}")
 

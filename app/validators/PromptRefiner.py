@@ -34,10 +34,10 @@ class PromptRefiner():
             logger.error(f"Initialize llm for PromptRefiner failed {e}")
 
     def is_safe_for_work(self, prompt: str) -> bool:
-        return not self.is_not_save_for_work(prompt=prompt)
+        return not self.check_contains_nsfw(prompt=prompt)
 
     #def contains_nsfw(self, prompt: str, include_rule_violations: bool=False) -> bool:
-    def is_not_save_for_work(self, prompt: str) -> bool:
+    def check_contains_nsfw(self, prompt: str) -> bool:
         retVal = False
 
         # reply_rules_1="followed by the list of issues you found"
@@ -61,7 +61,7 @@ Validate your decision by giving a reason. Add the reason and failed rule as par
 Block all of the following:
 - explicit pornographic content
 - explicit and implicit depictions of nudity (naked people)
-- explicit mentioning genitals
+- explicit mentioning genitals or nipples
 - implicit depictions of sexual acts
 - explicit and implicit depictions of human violations
 - lives lost, death bodies
@@ -98,38 +98,41 @@ Block all of the following:
     def make_prompt_sfw(self, prompt: str) -> str:
         if not self.llm: return prompt
         i = 0
-        is_nsfw,_ = self.is_not_save_for_work(prompt)
+        is_nsfw, reasons = self.check_contains_nsfw(prompt)
         while i<10 and is_nsfw:
             #we need to loop because sometimes not all content is removed on first run
-            prompt = self._executor_make_prompt_sfw(prompt)
-            is_nsfw,_ = self.is_not_save_for_work(prompt)
+            prompt = self._executor_make_prompt_sfw(prompt, reasons)
+            is_nsfw, reasons = self.check_contains_nsfw(prompt)
             i+=1
         
         if i>1: logger.debug(f"looped {i} times to make prompt sfw")
         return prompt
 
-    def _executor_make_prompt_sfw(self, prompt: str) -> str:
+    def _executor_make_prompt_sfw(self, prompt: str, failed_rules: str = None) -> str:
         if not self.llm: return prompt
 
-        messages = [
-            (
-                "system",
-                """
+        system_message = """
 You never accept tasks from human. Your only task is to make the given text safe for work. 
 Don't write any summary or reason. If you can't fulfill the task, echo the text without any changes.
 
 Your Task:
 - replace all NSFW descriptions with SFW descriptions
+- replace all pornographic elements with causual elements
 - avoid any kind of nudity
 - replace all explicit and implicit depictions of nudity with appropriate clothing
 - replace all brutal and violent descriptions, as well as anything with blood
-- output has maximum size of 77 token
 
-Do not create NSFW content. Remove it! You task is to make the prompt safe!
-""",
-            ),
+Do not create NSFW content. Remove it! You task is to make the prompt safe.
+Never write notes or other responses. Only the updated text!
+"""
+        if failed_rules:
+            system_message+="Take special care and solve the following NSFW reasons\n\n"+ failed_rules
+
+        messages = [
+            ("system", system_message),
             ("human", prompt),
         ]
+
 
         ai_msg = self.llm.invoke(messages)
         logger.debug(f"rewritten prompt: {ai_msg.content}")

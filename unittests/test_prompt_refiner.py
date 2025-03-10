@@ -34,7 +34,7 @@ class TestGradioUISessionState(unittest.TestCase):
         for nsfw_prompt in self.nsfw_prompts:
             sfw_prompt = self.prompt_refiner.make_prompt_sfw(nsfw_prompt)
             self.assertFalse("fullfill your" in sfw_prompt.lower(), "make sure that the model is not just answering it can't do")
-            is_nsfw, msg = self.prompt_refiner.is_not_save_for_work(sfw_prompt)
+            is_nsfw, msg = self.prompt_refiner.check_contains_nsfw(sfw_prompt)
             print(f"Original prompt: {nsfw_prompt}\nSFW Prompt: {sfw_prompt}\nNSFW: {is_nsfw}. Details: {msg}\n--------------------")
             self.assertFalse(is_nsfw, f"prompt '{sfw_prompt}' dosent contain nsfw but answer is '{msg}'")
 
@@ -44,7 +44,7 @@ class TestGradioUISessionState(unittest.TestCase):
         """Test Prompt Contains NSFW."""
 
         for prompt in self.nsfw_prompts:
-            is_nsfw, msg = self.prompt_refiner.is_not_save_for_work(prompt)
+            is_nsfw, msg = self.prompt_refiner.check_contains_nsfw(prompt)
             print(f"---------------------\nPrompt: '{prompt}'\nResponse: {msg}\n--------------------")
             self.assertTrue(is_nsfw, f"prompt '{prompt}' should contain nsfw but answer is '{msg}'")
 
@@ -52,7 +52,7 @@ class TestGradioUISessionState(unittest.TestCase):
         """Test SFW Prompt accepted."""
 
         for prompt in self.sfw_prompts:
-            is_nsfw, msg = self.prompt_refiner.is_not_save_for_work(prompt)
+            is_nsfw, msg = self.prompt_refiner.check_contains_nsfw(prompt)
             print(f"{prompt}\n{msg}\n--------------------")
             self.assertFalse(is_nsfw, f"prompt '{prompt}' dosent contain nsfw but answer is '{msg}'")
 
@@ -91,9 +91,10 @@ class TestGradioUISessionState(unittest.TestCase):
 
     def test_debug_entry_point_magic_shortener(self):
 
-        org_prompt ="woman in underwear"
+        org_prompt ="NSFW - PROMPT"
         #org_prompt ="a fish in a bowl"
-
+        self.prompt_refiner.make_prompt_sfw(org_prompt)
+        return 
         enhanced_prompt = self.prompt_refiner.magic_enhance(org_prompt)
         shortened_prompt = self.prompt_refiner.magic_shortener(enhanced_prompt, 70)
         print(f"Original prompt: {org_prompt}\n\nEnhanced Prompt: {enhanced_prompt}\n\nShort Prompt:{shortened_prompt}\n--------------------")
