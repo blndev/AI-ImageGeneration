@@ -34,7 +34,7 @@ class TestGradioUISessionState(unittest.TestCase):
         for nsfw_prompt in self.nsfw_prompts:
             sfw_prompt = self.prompt_refiner.make_prompt_sfw(nsfw_prompt)
             self.assertFalse("fullfill your" in sfw_prompt.lower(), "make sure that the model is not just answering it can't do")
-            is_nsfw, msg = self.prompt_refiner.contains_nsfw(sfw_prompt)
+            is_nsfw, msg = self.prompt_refiner.is_not_save_for_work(sfw_prompt)
             print(f"Original prompt: {nsfw_prompt}\nSFW Prompt: {sfw_prompt}\nNSFW: {is_nsfw}. Details: {msg}\n--------------------")
             self.assertFalse(is_nsfw, f"prompt '{sfw_prompt}' dosent contain nsfw but answer is '{msg}'")
 
@@ -44,7 +44,7 @@ class TestGradioUISessionState(unittest.TestCase):
         """Test Prompt Contains NSFW."""
 
         for prompt in self.nsfw_prompts:
-            is_nsfw, msg = self.prompt_refiner.contains_nsfw(prompt)
+            is_nsfw, msg = self.prompt_refiner.is_not_save_for_work(prompt)
             print(f"---------------------\nPrompt: '{prompt}'\nResponse: {msg}\n--------------------")
             self.assertTrue(is_nsfw, f"prompt '{prompt}' should contain nsfw but answer is '{msg}'")
 
@@ -52,7 +52,7 @@ class TestGradioUISessionState(unittest.TestCase):
         """Test SFW Prompt accepted."""
 
         for prompt in self.sfw_prompts:
-            is_nsfw, msg = self.prompt_refiner.contains_nsfw(prompt)
+            is_nsfw, msg = self.prompt_refiner.is_not_save_for_work(prompt)
             print(f"{prompt}\n{msg}\n--------------------")
             self.assertFalse(is_nsfw, f"prompt '{prompt}' dosent contain nsfw but answer is '{msg}'")
 

@@ -33,8 +33,11 @@ class PromptRefiner():
         except Exception as e:
             logger.error(f"Initialize llm for PromptRefiner failed {e}")
 
+    def is_safe_for_work(self, prompt: str) -> bool:
+        return not self.is_not_save_for_work(prompt=prompt)
+
     #def contains_nsfw(self, prompt: str, include_rule_violations: bool=False) -> bool:
-    def contains_nsfw(self, prompt: str) -> bool:
+    def is_not_save_for_work(self, prompt: str) -> bool:
         retVal = False
 
         # reply_rules_1="followed by the list of issues you found"
@@ -93,6 +96,19 @@ Block all of the following:
         return ai_response
 
     def make_prompt_sfw(self, prompt: str) -> str:
+        if not self.llm: return prompt
+        i = 0
+        is_nsfw,_ = self.is_not_save_for_work(prompt)
+        while i<10 and is_nsfw:
+            #we need to loop because sometimes not all content is removed on first run
+            prompt = self._executor_make_prompt_sfw(prompt)
+            is_nsfw,_ = self.is_not_save_for_work(prompt)
+            i+=1
+        
+        if i>1: logger.debug(f"looped {i} times to make prompt sfw")
+        return prompt
+
+    def _executor_make_prompt_sfw(self, prompt: str) -> str:
         if not self.llm: return prompt
 
         messages = [
