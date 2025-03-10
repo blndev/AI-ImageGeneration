@@ -7,7 +7,7 @@ from PIL import Image, ImageDraw
 import logging
 import threading
 from app.utils.singleton import singleton
-from app import FluxParameters
+from . import FluxParameters
 
 # AI STuff
 import torch
@@ -200,7 +200,7 @@ class FluxGenerator():
             logger.warning("'no ai' - option is activated")
             return self._create_debug_image(params)
 
-        logger.info(f"start generating {params.num_images_per_prompt} images with {params.num_inference_steps} steps")
+        logger.debug(f"start generating {params.num_images_per_prompt} images with {params.num_inference_steps} steps")
         with self._generation_lock:
             try:
                 model = self._load_model()
@@ -229,6 +229,7 @@ class FluxGenerator():
             except RuntimeError as e:
                 logger.error(f"Error while generating Images: {e}")
                 try:
+                    torch.cuda.empty_cache()
                     pass  # self.unload_model()
                 except:
                     pass

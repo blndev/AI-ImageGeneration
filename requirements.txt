@@ -25,3 +25,7 @@ sentencepiece           # required by tokenizer
 insightface             # to detect faces in uploaded images
 onnxruntime             # required by insightface but not automatically installed          
 opencv-python           # to prepare PIL images for face detection
+
+###############################################################
+# Prompt Analyzer
+langchain-ollama

@@ -9,9 +9,8 @@ import logging
 from app import SessionState
 from app.utils.singleton import singleton
 from app.utils.fileIO import save_image_with_timestamp, save_image_as_png, get_date_subfolder
-from app.fluxparams import FluxParameters
-from app import FluxGenerator
-from app.FaceDetector import FaceDetector
+from app.generators import FluxGenerator, FluxParameters
+from app.validators.FaceDetector import FaceDetector
 
 import json
 import shutil
@@ -197,7 +196,7 @@ class GradioUI():
             elif "portrait" in aspect_ratio.lower():  # == "▤ Portrait (2:3)"
                 width, height = self.aspect_portrait_width, self.aspect_portrait_height
 
-            logger.info(f"generating image with prompt: {prompt} and aspect ratio: {width}x{height}")
+            logger.info(f"generating image for {session_state.session} with {session_state.token} token available.\n - prompt: '{prompt}' \n - Infos: aspect ratio {width}x{height}")
 
             generation_details = FluxParameters(
                 prompt=prompt,
@@ -218,6 +217,10 @@ class GradioUI():
                 for image in images:
                     outdir = os.path.join(self.output_directory, get_date_subfolder(),"generation")
                     save_image_with_timestamp(image=image, folder_path=outdir, ignore_errors=True, generation_details=generation_details.to_dict())
+
+            if session_state.token<=1:
+                logger.warning(f"session {session_state.session} running out of token ({session_state.token}) left")
+
             return images, session_state
         except Exception as e:
             logger.error(f"image generation failed: {e}")
