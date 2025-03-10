@@ -10,7 +10,7 @@ from app import SessionState
 from app.utils.singleton import singleton
 from app.utils.fileIO import save_image_with_timestamp, save_image_as_png, get_date_subfolder
 from app.generators import FluxGenerator, FluxParameters
-from app.validators.FaceDetector import FaceDetector
+from app.validators import FaceDetector, PromptRefiner
 
 import json
 import shutil
@@ -113,6 +113,7 @@ class GradioUI():
             self.generation_strength = float(
                 os.getenv("GENERATION_STRENGHT", 0.8))
             
+            self.prompt_magic = PromptRefiner()
             logger.info(f"Application succesful initialized")
 
         except Exception as e:
@@ -167,7 +168,7 @@ class GradioUI():
 
         return session_state
 
-    def uiaction_generate_images(self, gradio_state, prompt, aspect_ratio, neg_prompt, image_count):
+    def uiaction_generate_images(self, gradio_state, prompt, aspect_ratio, neg_prompt, image_count, prompt_magic_active):
         """
         Generate images based on the given prompt and aspect ratio.
 
@@ -196,6 +197,9 @@ class GradioUI():
             elif "portrait" in aspect_ratio.lower():  # == "▤ Portrait (2:3)"
                 width, height = self.aspect_portrait_width, self.aspect_portrait_height
 
+            if self.prompt_magic and prompt_magic_active:
+                prompt=self.prompt_magic.magic_enhance(prompt, 70)
+                
             logger.info(f"generating image for {session_state.session} with {session_state.token} token available.\n - prompt: '{prompt}' \n - Infos: aspect ratio {width}x{height}")
 
             generation_details = FluxParameters(
@@ -449,6 +453,7 @@ class GradioUI():
                         step=1,
                         scale=1
                     )
+                    prompt_magic_checkbox = gr.Checkbox(label="Enable Prompt Magic")
 
                 with gr.Column(visible=True):
                     with gr.Row(visible=self.token_enabled):
@@ -608,7 +613,7 @@ We’re excited to bring you this Image Generator App, which is still in develop
                 outputs=[timer_check_token, generate_btn, cancel_btn],
             ).then(
                 fn=self.uiaction_generate_images,
-                inputs=[user_session_storage, prompt, aspect_ratio, neg_prompt, image_count],
+                inputs=[user_session_storage, prompt, aspect_ratio, neg_prompt, image_count, prompt_magic_checkbox],
                 outputs=[gallery, user_session_storage],
                 concurrency_id="gpu",
                 show_progress="full"
