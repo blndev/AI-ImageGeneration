@@ -113,7 +113,11 @@ class GradioUI():
             self.generation_strength = float(
                 os.getenv("GENERATION_STRENGHT", 0.8))
             
-            self.prompt_magic = PromptRefiner()
+            self.prompt_refiner = None
+            if bool(strtobool(os.getenv("PROMPTMAGIC", "True"))):
+                self.prompt_refiner = PromptRefiner()
+            else:
+                logger.warning("NSFW protection via PromptMagic is turned off")
             logger.info(f"Application succesful initialized")
 
         except Exception as e:
@@ -178,6 +182,7 @@ class GradioUI():
             image_count (int): The number of images to generate
         """
         session_state = SessionState.from_gradio_state(gradio_state)
+
         try:
             if self.token_enabled and session_state.token < image_count:
                 msg = f"Not enough generation token available.\n\nPlease wait {self.new_token_wait_time} minutes"
@@ -196,21 +201,26 @@ class GradioUI():
                 width, height = self.aspect_landscape_width, self.aspect_landscape_height
             elif "portrait" in aspect_ratio.lower():  # == "▤ Portrait (2:3)"
                 width, height = self.aspect_portrait_width, self.aspect_portrait_height
-
             prompt = prompt.strip()
+            userprompt = prompt
             neg_prompt = neg_prompt.strip()
             # make default only sfw, TODO add ehancement (upload required for NSFW)
             # TODO: feature switch in config to enable NSFW and NSFW_AFTER_UPLOAD
-            if self.prompt_magic:
-                if self.prompt_magic.check_contains_nsfw(prompt): #TODO: and config and not enabled for user
+            if self.prompt_refiner:
+                if self.prompt_refiner.check_contains_nsfw(prompt): #TODO: and config and not enabled for user
                     logger.info(f"Convert NSFW prompt to SFW. User Prompt: '{prompt}'")
-                    prompt=self.prompt_magic.make_prompt_sfw(prompt)
-                    neg_prompt = "nude, naked, nsfw," + neg_prompt
+                    prompt=self.prompt_refiner.make_prompt_sfw(prompt, True)
+                else:
+                    logger.debug("prompt is SFW")
+            
+            # TODO: check for exclusion
+            if self.prompt_refiner!=None:
+                neg_prompt = "nude, naked, nsfw, porn," + neg_prompt
 
-            if self.prompt_magic and prompt_magic_active:
+            if self.prompt_refiner and prompt_magic_active:
                 logger.info(f"Apply Prompt-Magic")
-                prompt=self.prompt_magic.magic_enhance(prompt, 50)
-                prompt=self.prompt_magic.make_prompt_sfw(prompt)
+                prompt=self.prompt_refiner.magic_enhance(prompt, 70)
+                prompt=self.prompt_refiner.make_prompt_sfw(prompt)
 
             logger.info(f"generating image for {session_state.session} with {session_state.token} token available.\n - prompt: '{prompt}' \n - Infos: aspect ratio {width}x{height}")
 
@@ -230,9 +240,12 @@ class GradioUI():
             logger.debug(f"received {len(images)} image(s) from generator")
             if self.output_directory is not None:
                 logger.debug(f"saving images to {self.output_directory}")
+                gen_data = generation_details.to_dict()
+                gen_data["userprompt"] = userprompt
+                gen_data["model"] = self.generator.model
                 for image in images:
                     outdir = os.path.join(self.output_directory, get_date_subfolder(),"generation")
-                    save_image_with_timestamp(image=image, folder_path=outdir, ignore_errors=True, generation_details=generation_details.to_dict())
+                    save_image_with_timestamp(image=image, folder_path=outdir, ignore_errors=True, generation_details=gen_data)
 
             if session_state.token<=1:
                 logger.warning(f"session {session_state.session} running out of token ({session_state.token}) left")
@@ -460,13 +473,23 @@ class GradioUI():
                     image_count = gr.Slider(
                         label="Image Count",
                         minimum=1,
-                        maximum=4,
-                        value=2,
+                        maximum=int(os.getenv("MAX_IMAGES",2)),
+                        value=1,
                         step=1,
                         scale=1
                     )
-                    prompt_magic_checkbox = gr.Checkbox(label="Enable Prompt Magic")
+                    prompt_magic_checkbox = gr.Checkbox(
+                        label="Enable Prompt Magic",
+                        value=(self.prompt_refiner!=None), visible=(self.prompt_refiner!=None))
+                    gr.Markdown(label="Note", 
+                                value="""NSFW protection is active
+                                
+                                Upload 3 NSFW images to turn it off.
+                                """
+                                , show_label=True, container=True,
+                                visible=(self.prompt_refiner!=None))
 
+                # generate and token count
                 with gr.Column(visible=True):
                     with gr.Row(visible=self.token_enabled):
                         # token count is restored from app.load
