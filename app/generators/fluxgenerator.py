@@ -116,7 +116,7 @@ class FluxGenerator():
 
 
             if self.SDXL and self.device=="cuda":
-                logger.info("load empeddings")
+                logger.info("checking embeddings")
 
                 try:
                     # both vars used later, import to have them as None
@@ -143,6 +143,7 @@ class FluxGenerator():
                 logger.warning("gpu offload activated")
                 pipeline.enable_model_cpu_offload()
             else:
+                logger.info("load model to GPU")
                 pipeline.to(self.device)
 
             #     # https://huggingface.co/stabilityai/stable-diffusion-xl-base-1.0
