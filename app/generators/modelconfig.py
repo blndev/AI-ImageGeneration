@@ -50,6 +50,18 @@ class Lora:
         }
 
 class ModelConfig:
+    """
+    Usage example:
+    # JSON to Objekt
+    configs = ModelConfig.from_json(json_str)
+    
+    # Erstes Config-Objekt aus der Liste
+    config = configs[0]
+    
+    # Object to JSON
+    json_output = config.to_json()
+    print(json_output)
+    """
     def __init__(
         self,
         model: str,
@@ -99,26 +111,6 @@ class ModelConfig:
             configs.append(config)
             
         return configs
-    @classmethod
-    def list_to_json(cls, configs: List['ModelConfig']) -> str:
-        data = []
-        for config in configs:
-            config_data = {
-                'Model': config.model,
-                'Path': config.path,
-                'Type': config.type,
-                'Description': config.description,
-                'Generation': config.generation,
-                'Aspect_Ratio': config.aspect_ratio,
-                'Embeddings': {
-                    'positive': [e.to_json() for e in config.embeddings['positive']],
-                    'negative': [e.to_json() for e in config.embeddings['negative']]
-                },
-                'Loras': [l.to_json() for l in config.loras],
-                'Examples': config.examples
-            }
-            data.append(config_data)
-        return json.dumps(data, indent=4)
 
     def to_json(self) -> str:
         data = {
@@ -137,75 +129,9 @@ class ModelConfig:
         }
         return json.dumps([data], indent=4)
 
-# Beispiel zur Verwendung:
-if __name__ == "__main__":
-    json_str = '''[
-        {
-            "Model": "Name as referenced in config",
-            "Path": "file or huggingface name",
-            "Type": "FLUX|SDXL|SD1|AUTO",
-            "Description": "best for anime",
-            "Generation": {
-                "steps": 40,
-                "guidance": 4.0,
-                "negative_prompt": "False"
-            },
-            "Aspect_Ratio": {
-                "Square": "1024x1024",
-                "Landscape": "1152x768",
-                "Portrait": "768x1152"
-            },
-            "Embeddings": {
-                "positive": [
-                    {
-                        "name": "Name",
-                        "source": "xyz.pt",
-                        "keyword": "keyword"
-                    }
-                ],
-                "negative": [
-                    {
-                        "name": "Name",
-                        "source": "xyz.pt",
-                        "keyword": "keyword"
-                    }
-                ]
-            },
-            "Loras": [
-                {
-                    "name": "abc",
-                    "src": "file.safetensors",
-                    "trigger": "tree",
-                    "weight": 1.0,
-                    "inject_when": [
-                        "keyword liste",
-                        "keyword 2"
-                    ]
-                }
-            ],
-            "Examples": [
-                [
-                    "A majestic mountain landscape at sunset with snow-capped peaks",
-                    "painting",
-                    "■ Landscape",
-                    1
-                ],
-                [
-                    "two dogs",
-                    "painting",
-                    "■ Landscape",
-                    1
-                ]
-            ]
-        }
-    ]'''
+    @classmethod
+    def list_to_json(cls, configs: List['ModelConfig']) -> str:
+        # Nutze die existierende to_json-Methode und extrahiere die Daten
+        data = [json.loads(config.to_json())[0] for config in configs]
+        return json.dumps(data, indent=4)
 
-    # Von JSON zu Objekt
-    configs = ModelConfig.from_json(json_str)
-    
-    # Erstes Config-Objekt aus der Liste
-    config = configs[0]
-    
-    # Zurück zu JSON
-    json_output = config.to_json()
-    print(json_output)

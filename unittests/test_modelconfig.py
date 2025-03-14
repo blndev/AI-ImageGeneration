@@ -1,6 +1,6 @@
 # Unittests
 import unittest, json
-from app.modelconfig import ModelConfig
+from app.generators.modelconfig import ModelConfig
 
 
 class TestModelConfig(unittest.TestCase):
@@ -96,3 +96,6 @@ class TestModelConfig(unittest.TestCase):
         self.assertEqual(data[1]["Model"], "Model2")
         self.assertEqual(data[0]["Type"], "FLUX")
         self.assertEqual(data[1]["Type"], "SDXL")
+        # Zusätzlicher Test um Konsistenz mit to_json zu verifizieren
+        single_json = json.loads(configs[0].to_json())[0]
+        self.assertEqual(data[0], single_json)
