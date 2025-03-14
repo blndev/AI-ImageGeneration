@@ -97,27 +97,37 @@ class PromptRefiner():
         if not self.llm: return prompt
 
         system_message = """
-        The user provides always an image description. You have to rewrite it.
-        The final text must be without pornography, sexuality and nudity. Don't explain yourself. Only retrun the optimized text.
-        Hint: naked humans are never SFW.
+        The user provides always an image description. You have to rewrite it by given tasks.
+        Don't explain yourself. Only return the optimized text.
         """
 
         # if failed_rules:
         #     system_message+="Take special care and solve the following NSFW reasons\n\n"+ failed_rules
 
-        messages = [
-            ("system", system_message),
-            ("human", prompt),
+        rules = [
+            "Replace all explicit or implicit depictions of nudity or porn including the words naked, nude with clothed e.g. underwear or lingerie",
+            "Remove all mentionings of genitals",
+            "Remove mentioning of death or killed people.",
         ]
 
-
-        ai_msg = self.llm.invoke(messages)
+        messages = [ 
+            SystemMessage(system_message),
+            HumanMessage(f"Example: Replace all mentioning of airplanes in the given text: 'An airplane is flying over the forest"),
+            AIMessage("A bird is flying over the forest."),
+            HumanMessage(f"Perfect. New Tasks will follow. Here is the image description to work with: '{prompt}'")
+        ]
+        for rule in rules:
+            messages.append(HumanMessage(rule))
+            ai_msg = self.llm.invoke(messages)
+            messages.append(ai_msg)
+            
         logger.debug(f"rewritten prompt: {ai_msg.content}")
         return self._validateAnswer(prompt=prompt, ai_response=ai_msg.content)
 
     def _magic_prompt_tweaks(self, prompt: str, max_words, enhance: bool) -> str:
         if not self.llm: return prompt
         task = "enhance" if enhance else "reduce"
+        
         messages = [
             SystemMessage(
                 """
