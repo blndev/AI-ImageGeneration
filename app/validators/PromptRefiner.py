@@ -116,11 +116,12 @@ class PromptRefiner():
 
         rules = [
             "Keep maturity, age, gender and country in any of the tasks you execute.",
-            "Replace all explicit or implicit depictions of nudity or porn including the words naked, nude with clothed e.g. underwear or lingerie",
+            "Replace all explicit or implicit depictions of nudity or porn including the words naked, nude with clothed e.g. underwear",
             "Remove all mentionings of genitals and nipples",
             "Remove all mentionings of transexuals, make them woman or man",
             "Remove mentioning of death or killed people.",
             "Remove mentioning of sexual activity like gangbang or sex between humans.",
+            "If the image is related to People, add terms like perfect face or beautiful."
         ]
 
         messages = [ 
