@@ -201,7 +201,9 @@ class GradioUI():
                 width, height = self.aspect_landscape_width, self.aspect_landscape_height
             elif "portrait" in aspect_ratio.lower():  # == "▤ Portrait (2:3)"
                 width, height = self.aspect_portrait_width, self.aspect_portrait_height
-            prompt = prompt.strip()
+            
+            
+            prompt = str(prompt.strip()).replace("'", "-")
             userprompt = prompt
             neg_prompt = neg_prompt.strip()
             # make default only sfw, TODO add ehancement (upload required for NSFW)
