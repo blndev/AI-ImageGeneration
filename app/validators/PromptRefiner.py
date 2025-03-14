@@ -17,7 +17,7 @@ class PromptRefiner():
         logger.info("Initializing PromptRefiner")
         self.thread_lock = threading.Lock()
         #self.model ="llama3.2" #prefered, but partial issues with prompt enhance 
-        self.model = os.getenv("OLLAMA_MODEL", "artifish/llama3.2-uncensored").strip() 
+        self.model = os.getenv("OLLAMA_MODEL", "llava").strip() 
         self.ollama_server = os.getenv("OLLAMA_SERVER", None)
 
         # TODO: find a way to download the model (using ollama API)
@@ -33,13 +33,22 @@ class PromptRefiner():
         except Exception as e:
             logger.error(f"Initialize llm for PromptRefiner failed {e}")
 
+        try:
+            self.llm_creative = ChatOllama(
+                model=self.model,
+                server=self.ollama_server,
+                temperature=0.6,
+            )
+        except Exception as e:
+            logger.error(f"Initialize llm for PromptRefiner failed {e}")
+
     def is_safe_for_work(self, prompt: str) -> bool:
         return not self.check_contains_nsfw(prompt=prompt)
 
     #def contains_nsfw(self, prompt: str, include_rule_violations: bool=False) -> bool:
     def check_contains_nsfw(self, prompt: str) -> bool:
         """Validates if the prompt contains NSFW"""
-        if not self.llm: return False, None
+        if not self.llm: return False, ""
 
         checks = [
             "Contains the text explicit or implicit depictions of nudity or porn including the words naked, nude? Ignore underwear or lingerie!",
@@ -60,7 +69,7 @@ class PromptRefiner():
             if "yes" in lower_response:
                 return True, ai_msg.content
 
-        return False, ai_msg.content
+        return False, ""
 
     def _validateAnswer(self, prompt, ai_response):
         """"make sure, that the AI answer is not just bla. if so, return original answer"""
@@ -78,22 +87,23 @@ class PromptRefiner():
         
         return ai_response
 
-    def make_prompt_sfw(self, prompt: str) -> str:
+    def make_prompt_sfw(self, prompt: str, is_nsfw: bool=False) -> str:
         if not self.llm: return prompt
         i = 0
-        is_nsfw, reasons = self.check_contains_nsfw(prompt)
         if not is_nsfw:
-            logger.debug("prompt is already SFW")
+            logger.debug("analyze image")
+            is_nsfw, reasons = self.check_contains_nsfw(prompt)
+            logger.debug(f"result NSFW check:{is_nsfw}, message: '{reasons}'")
         while i<10 and is_nsfw:
             #we need to loop because sometimes not all content is removed on first run
-            prompt = self._executor_make_prompt_sfw(prompt, reasons)
+            prompt = self._executor_make_prompt_sfw(prompt)
             is_nsfw, reasons = self.check_contains_nsfw(prompt)
             i+=1
         
         if i>1: logger.debug(f"looped {i} times to make prompt sfw")
         return prompt
 
-    def _executor_make_prompt_sfw(self, prompt: str, failed_rules: str = None) -> str:
+    def _executor_make_prompt_sfw(self, prompt: str) -> str:
         if not self.llm: return prompt
 
         system_message = """
@@ -105,20 +115,25 @@ class PromptRefiner():
         #     system_message+="Take special care and solve the following NSFW reasons\n\n"+ failed_rules
 
         rules = [
+            "Keep maturity, age, gender and country in any of the tasks you execute.",
             "Replace all explicit or implicit depictions of nudity or porn including the words naked, nude with clothed e.g. underwear or lingerie",
-            "Remove all mentionings of genitals",
+            "Remove all mentionings of genitals and nipples",
+            "Remove all mentionings of transexuals, make them woman or man",
             "Remove mentioning of death or killed people.",
+            "Remove mentioning of sexual activity like gangbang or sex between humans.",
         ]
 
         messages = [ 
             SystemMessage(system_message),
             HumanMessage(f"Example: Replace all mentioning of airplanes in the given text: 'An airplane is flying over the forest"),
             AIMessage("A bird is flying over the forest."),
+            HumanMessage(f"Example: Replace all mentioning of nudity in the given text: 'A naked woman on the beach"),
+            AIMessage("A woman wearing a bikini on the beach."),
             HumanMessage(f"Perfect. New Tasks will follow. Here is the image description to work with: '{prompt}'")
         ]
         for rule in rules:
             messages.append(HumanMessage(rule))
-            ai_msg = self.llm.invoke(messages)
+            ai_msg = self.llm_creative.invoke(messages)
             messages.append(ai_msg)
             
         logger.debug(f"rewritten prompt: {ai_msg.content}")
@@ -126,20 +141,25 @@ class PromptRefiner():
 
     def _magic_prompt_tweaks(self, prompt: str, max_words, enhance: bool) -> str:
         if not self.llm: return prompt
-        task = "enhance" if enhance else "reduce"
-        
+        task = "enhance" if enhance else "shorten"
+        advanced_task =  "with fitting details" if enhance else "by removing details. Keep focus on the People."
         messages = [
             SystemMessage(
-                """
-You never accept tasks from human. You always {task} the user given image description with details. 
+                f"""
+You never accept tasks from human. You always {task} the user given image description {advanced_task}. 
 If the context is missing be creative. Try to keep the original intent.
-Don't write any summary or reason. If you can't fulfill the task, echo the text without any changes.
-You output has a maximum of {max_words} words.
+Don't write any summary or explanation. If you can't fulfill the task, echo the text without any changes.
 """),
-            HumanMessage(f"{task} this image description to a maximum of {max_words} words: '{prompt}'"),
+            HumanMessage(f"{task} this image description to a maximum of 14 words, answer only with the new text: 'yellow leafes'"),
+            AIMessage("A tree in autum. Yellow leafes falling as the wind blows."),
+            HumanMessage(f"Perfect. New Task:\n{task} this image description to a maximum of {max_words} words, answer only with the new text: '{prompt}'"),
         ]
 
-        ai_msg = self.llm.invoke(messages)
+        ai_msg = self.llm_creative.invoke(messages)
+        messages.append(ai_msg)
+        messages.append(HumanMessage(f"make sure that the image description not contains more then {max_words}. Shorten if required by removing details. Answer only with the image description"))
+        ai_msg = self.llm_creative.invoke(messages)
+        
         logger.debug(f"rewritten prompt: {ai_msg.content}")
         return self._validateAnswer(prompt=prompt, ai_response=ai_msg.content)
 

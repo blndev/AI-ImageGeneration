@@ -29,7 +29,7 @@ class TestGradioUISessionState(unittest.TestCase):
              "a lingerie model in a photo studio"
         ]
 
-    def test_replace_nsfw(self):
+    def test_make_prompt_sfw(self):
         """Test Replace NSFW from prompt."""
 
         for nsfw_prompt in self.nsfw_prompts:
