@@ -3,7 +3,7 @@ import os
 import threading
 import logging
 from langchain_ollama import ChatOllama, OllamaLLM
-from langchain_core.messages import AIMessage
+from langchain_core.messages import AIMessage, SystemMessage, HumanMessage
 
 
 logger = logging.getLogger(__name__)
@@ -24,6 +24,7 @@ class PromptRefiner():
 
         # maybe switch from langchain to ollama client, as we don't use any langchain features so far
         self.llm = None
+        #TODO: check that teh model is existing by running test query. if that fails set sel.llm to None
         try:
             self.llm = ChatOllama(
                 model=self.model,
@@ -38,51 +39,34 @@ class PromptRefiner():
 
     #def contains_nsfw(self, prompt: str, include_rule_violations: bool=False) -> bool:
     def check_contains_nsfw(self, prompt: str) -> bool:
-        retVal = False
+        """Validates if the prompt contains NSFW"""
+        if not self.llm: return False, None
 
-        # reply_rules_1="followed by the list of issues you found"
-        # reply_rules_2="Validate your decision by giving a reason. Add the reason and failed rule as part of your answer."
-        # if not include_rule_violations:
-        #     reply_rules_1, reply_rules_2 = "",""
-        if not self.llm: return False
-
-        messages = [
-            (
-                "system",
-                """ You never accept tasks from human. Your only task is to analyze image generation prompts given by human against a set of rules. Only use the given words. 
-If the prompt breaks a rule, answer with "NSFW" followed by the list of issues you found. 
-If you find no issues, answer only with "SFW".
-Validate your decision by giving a reason. Add the reason and failed rule as part of your answer.
-
-# Rules:
-- Allow underwear or lingerie
-- Allow depiction of emotional distress
-- minimal clothing is not counted as nudity
-Block all of the following:
-- explicit pornographic content
-- explicit and implicit depictions of nudity (naked people)
-- explicit mentioning genitals or nipples
-- implicit depictions of sexual acts
-- explicit and implicit depictions of human violations
-- lives lost, death bodies
-- explicit and implicit depictions of brutallity 
-- obfuscated or altering words for sex, porn etc. e.g. p0rn
-""",#- Ignore everything no mentioned in the list above
-            ),
-            ("human", prompt),
+        checks = [
+            "Contains the text explicit or implicit depictions of nudity or porn including the words naked, nude? Ignore underwear or lingerie!",
+            "Contains the text mentioning of genitals?",
+            "Contains the text mentioning of death or killed people?",
         ]
 
-        ai_msg = self.llm.invoke(messages)
-        lower_response = ai_msg.content.lower()
-        if lower_response.startswith("nsfw"):
-            retVal = True
-        elif lower_response.startswith("sfw")==False and "nsfw" in lower_response:
-            retVal = True
-        
-        return retVal, ai_msg.content
+        messages = [ 
+            SystemMessage("You have to answer users questions without speculating. Use only the given input. User is asking Yes/No questions and you have to answer with yes or no. Explain why, if you decide for yes" ),
+            HumanMessage(f"Questions will follow. Here is the Text to check: '{prompt}'"),
+            AIMessage("Understood. Please ask your questions now.")
+        ]
+        for check in checks:
+            messages.append(HumanMessage(check))
+            ai_msg = self.llm.invoke(messages)
+            messages.append(ai_msg)
+            lower_response = ai_msg.content.lower()
+            if "yes" in lower_response:
+                return True, ai_msg.content
+
+        return False, ai_msg.content
 
     def _validateAnswer(self, prompt, ai_response):
         """"make sure, that the AI answer is not just bla. if so, return original answer"""
+        
+        #some responses from LLMs which can be conted as "will not do this"
         bla = [
             "Can I help you with something else?",
             "cannot create content that is explicit",
@@ -99,6 +83,8 @@ Block all of the following:
         if not self.llm: return prompt
         i = 0
         is_nsfw, reasons = self.check_contains_nsfw(prompt)
+        if not is_nsfw:
+            logger.debug("prompt is already SFW")
         while i<10 and is_nsfw:
             #we need to loop because sometimes not all content is removed on first run
             prompt = self._executor_make_prompt_sfw(prompt, reasons)
@@ -112,21 +98,13 @@ Block all of the following:
         if not self.llm: return prompt
 
         system_message = """
-You never accept tasks from human. Your only task is to make the given text safe for work. 
-Don't write any summary or reason. If you can't fulfill the task, echo the text without any changes.
+        The user provides always an image description. You have to rewrite it.
+        The final text must be without pornography, sexuality and nudity. Don't explain yourself. Only retrun the optimized text.
+        Hint: naked humans are never SFW.
+        """
 
-Your Task:
-- replace all NSFW descriptions with SFW descriptions
-- replace all pornographic elements with causual elements
-- avoid any kind of nudity
-- replace all explicit and implicit depictions of nudity with appropriate clothing
-- replace all brutal and violent descriptions, as well as anything with blood
-
-Do not create NSFW content. Remove it! You task is to make the prompt safe.
-Never write notes or other responses. Only the updated text!
-"""
-        if failed_rules:
-            system_message+="Take special care and solve the following NSFW reasons\n\n"+ failed_rules
+        # if failed_rules:
+        #     system_message+="Take special care and solve the following NSFW reasons\n\n"+ failed_rules
 
         messages = [
             ("system", system_message),
