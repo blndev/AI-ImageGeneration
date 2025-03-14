@@ -9,7 +9,7 @@ import logging
 from app import SessionState
 from app.utils.singleton import singleton
 from app.utils.fileIO import save_image_with_timestamp, save_image_as_png, get_date_subfolder
-from app.generators import FluxGenerator, FluxParameters
+from app.generators import FluxGenerator, FluxParameters, ModelConfig
 from app.validators import FaceDetector, PromptRefiner
 
 import json
@@ -23,9 +23,10 @@ logger = logging.getLogger(__name__)
 
 @singleton
 class GradioUI():
-    def __init__(self):
+    def __init__(self, modelconfigs: List[ModelConfig] = None):
         try:
             self.interface = None
+            self.modelconfigs=modelconfigs
 
             self.output_directory = os.getenv("OUTPUT_DIRECTORY", None)
             if self.output_directory == None:
@@ -70,7 +71,7 @@ class GradioUI():
             except Exception as e:
                 logger.error(f"Error while loading msgs: {e}")
 
-            # loading examples
+            # loading examples TODO: can be changed via modelconfig
             self.examples = []
             try:
                 p = "./msgs/examples.json"
@@ -83,11 +84,15 @@ class GradioUI():
             except Exception as e:
                 logger.error(f"Error while loading examples: {e}")
 
+            # TODO: handover self.modelconfigs or better the selected model
+            # rethink the singleton, maybe it's better to have multiple different pipelines
+            # singleton only per model?
             self.generator = FluxGenerator()
             self.face_analyzer = FaceDetector()
 
             logger.info(f"reading apect ratios and generation settings ... ")
-
+            # TODO: obsolete ist already part of the modelconfig
+            # TODO: add splitting to modelconfig
             try:
                 #TODO: add unittest which checks env and internal settings
                 ars = os.getenv("GENERATION_ASPECT_SQUARE", "512x512")
@@ -113,9 +118,12 @@ class GradioUI():
             self.generation_strength = float(
                 os.getenv("GENERATION_STRENGHT", 0.8))
             
+            #TODO: create appconfig which is doing the env parsing 
+            # appconfig can also contains logic e.g. dependencies between settings
             self.prompt_refiner = None
             if bool(strtobool(os.getenv("PROMPTMAGIC", "True"))):
                 self.prompt_refiner = PromptRefiner()
+                #TODO: self.promptmagic_enabled=self.prompt_refiner.validate_ollama()
             else:
                 logger.warning("NSFW protection via PromptMagic is turned off")
             logger.info(f"Application succesful initialized")
