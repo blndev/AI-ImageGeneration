@@ -1,0 +1,41 @@
+[
+    {
+        "Model": "Name as referenced in config",
+        "Path": "file or huggingface name",
+        "Generation": {
+            "steps": 40,
+            "guidance": 4.0
+            
+        },
+        "Aspect_Ratio": {
+            "Square": "1024x1024",
+            "Landscape": "1152x768",
+            "Portrait": "768x1152"
+        },
+        "Embeddings": {
+            "positive": [
+                {
+                    "name": "Name",
+                    "source": "xyz.pt",
+                    "keyword": "keyword"
+                }
+            ],
+            "negative": []
+        },
+        "Loras": [
+            {
+                "name": "abc",
+                "src": "file.safetensors",
+                "trigger": "tree",
+                "weight": 1.0,
+                "inject_when": [
+                    "keyword liste",
+                    "keyword 2"
+                ]
+            }
+        ],
+        "Examples": [
+            "#wenn gesetzt werden diese genommen udn nicht die aus der standard example datei"
+        ]
+    }
+]
