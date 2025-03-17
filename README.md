@@ -12,6 +12,7 @@ Welcome to an exciting world of AI-powered image generation! This project levera
 - 📊 Token-based usage system (optional)
 - 💾 Automatic model management and caching
 - 🛠️ Memory optimization options for different hardware setups
+- 🪄 Smart prompt refinement with Ollama integration
 
 ## 🚀 Installation
 
@@ -63,6 +64,10 @@ Customize your experience through environment variables in `.env`:
 - `NEW_TOKEN_WAIT_TIME`: Minutes between token refreshes
 - `ALLOW_UPLOAD`: Enable image sharing for token rewards
 
+### 🪄 Prompt Magic
+- `OLLAMA_SERVER`: Custom Ollama server location (default: localhost)
+- `OLLAMA_MODEL`: Model for prompt enhancement (default: artifish/llama3.2-uncensored)
+
 ### 🖼️ Generation Settings
 - `GENERATION_MODEL`: Choose your model (default: black-forest-labs/FLUX.1-dev)
 - `GENERATION_STEPS`: Number of generation steps
@@ -74,9 +79,7 @@ Customize your experience through environment variables in `.env`:
 - `GPU_ALLOW_ATTENTION_SLICING`: Split calculations for lower memory usage
 - `GPU_ALLOW_MEMORY_OFFLOAD`: Use CPU memory for model handling
 
-## 🎯 Output Configuration
-
-Customize your output settings:
+### 🎯 Output Configuration
 - `MODEL_DIRECTORY`: Location for downloaded models
 - `OUTPUT_DIRECTORY`: Where to save generated images
 
