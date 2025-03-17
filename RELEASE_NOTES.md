@@ -1,3 +1,11 @@
+# Version 1.1
+
+## New Features
+- Model Configuration with inheritance support
+- SDXL and SD1.5 support
+- Prompt Magic
+- NSFW check for prompt and generation
+
 # 🚀 Release Notes - Version 1.0
 
 ## 🌟 Initial Release of AI Image Generation with FLUX
@@ -36,7 +44,6 @@ We're thrilled to announce the first stable release of our AI Image Generation p
 - Environment-based configuration
 - Flexible logging levels
 - Development mode support
-- Customizable generation parameters
 
 ### 🏗️ Technical Requirements
 - Python 3.x (tested with 3.12)
