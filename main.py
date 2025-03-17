@@ -15,7 +15,7 @@ if __name__ == "__main__":
         with open(mc_path, "r") as f:
             try:
                 j = f.read()
-                mc = ModelConfig.from_json(j)
+                mc = ModelConfig.create_config_list_from_json(j)
             except Exception as e:
                 print(f"Startup failed while reading model config from '{mc_path}'")
                 raise 

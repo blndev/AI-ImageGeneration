@@ -7,9 +7,10 @@ from typing import List
 from PIL import Image, ExifTags
 import logging
 from app import SessionState
+from .appconfig import AppConfig
 from app.utils.singleton import singleton
 from app.utils.fileIO import save_image_with_timestamp, save_image_as_png, get_date_subfolder
-from app.generators import FluxGenerator, FluxParameters, ModelConfig
+from app.generators import FluxGenerator, FluxParameters, ModelConfig, GenericGenerator
 from app.validators import FaceDetector, PromptRefiner
 
 import json
@@ -27,67 +28,25 @@ class GradioUI():
         try:
             self.interface = None
             self.modelconfigs=modelconfigs
+            self.config = AppConfig()
 
-            self.output_directory = os.getenv("OUTPUT_DIRECTORY", None)
-            if self.output_directory == None:
-                self.__feedback_file = "./output/feedback.txt"
-            else:
-                self.__feedback_file = os.path.join(self.output_directory, get_date_subfolder(),"feedback.txt")
-            
+            self.__feedback_file = self.config.user_feedback_filestorage
             logger.info(f"Initialize Feedback file on '{self.__feedback_file}'")
-                
 
-            self.initial_token = int(os.getenv("INITIAL_GENERATION_TOKEN", 0))
-            self.new_token_wait_time = int(os.getenv("NEW_TOKEN_WAIT_TIME", 10))
-            logger.info("Initial token: %i, wait time: %i minutes", self.initial_token, self.new_token_wait_time)
-            self.token_enabled = self.initial_token > 0
+            logger.info("Initial token: %i, wait time: %i minutes", self.config.initial_token, self.config.new_token_wait_time)
 
-            self.allow_upload = bool(strtobool(os.getenv("ALLOW_UPLOAD", "False")))
-
-            if self.allow_upload:
-                # Fallback
-                basedir = "./output/"
-                if self.output_directory != None:
-                    basedir = self.output_directory
-                else:
-                    logger.error("Upload allowed but no output directory specified. Using fallback ./output")
-                try:
-                    self._uploaded_images = {}
-                    # check maybe it's better to add the data folder as well
-                    self.__uploaded_images_path = os.path.join(basedir, "uploaded_images.json")
-                    if os.path.exists(self.__uploaded_images_path):
-                        with open(self.__uploaded_images_path, "r") as f:
-                            self._uploaded_images.update(json.load(f))
-                    logger.info(f"Initialized upload files history from '{self.__uploaded_images_path}'")
-                except Exception as e:
-                    logger.error(f"Error while loading uploaded_images.json: {e}")
-            try:
-                self.msg_share_image = ""
-                p = "./msgs/sift.md"
-                if os.path.exists(p):
-                    with open(p, "r") as f:
-                        self.msg_share_image = f.read()
-                logger.info(f"Initialized messages from '{p}'")
-            except Exception as e:
-                logger.error(f"Error while loading msgs: {e}")
-
-            # loading examples TODO: can be changed via modelconfig
-            self.examples = []
-            try:
-                p = "./msgs/examples.json"
-                # with open(p, "w") as f:
-                #         json.dump(self.examples, f, indent=4)
-                if os.path.exists(p):
-                    with open(p, "r") as f:
-                        self.examples = json.load(f)
-                logger.info(f"Initialized examples from '{p}'")
-            except Exception as e:
-                logger.error(f"Error while loading examples: {e}")
+            self.initialize_database_uploaded_images()
+            self.initialize_upload_ui()
+            self.initialize_examples()
 
             # TODO: handover self.modelconfigs or better the selected model
             # rethink the singleton, maybe it's better to have multiple different pipelines
             # singleton only per model?
-            self.generator = FluxGenerator()
+            selectedmodel = self.config.selected_model
+            #selectedmodelconfig = modelconfigs.get
+            selectedmodelconfig = next((config for config in modelconfigs if config.model == selectedmodel), None)
+            
+            self.generator = FluxGenerator(modelconfigs=modelconfigs)
             self.face_analyzer = FaceDetector()
 
             logger.info(f"reading apect ratios and generation settings ... ")
@@ -133,6 +92,51 @@ class GradioUI():
             logger.debug("Exception details:", exc_info=True)
             raise e
 
+    def initialize_upload_ui(self):
+        try:
+            self.msg_share_image = ""
+            p = "./msgs/sift.md"
+            if os.path.exists(p):
+                with open(p, "r") as f:
+                    self.msg_share_image = f.read()
+            logger.info(f"Initialized messages from '{p}'")
+        except Exception as e:
+            logger.error(f"Error while loading msgs: {e}")
+
+    def initialize_examples(self):
+        # loading examples TODO: can be changed via modelconfig
+        self.examples = []
+        try:
+            p = "./msgs/examples.json"
+            # with open(p, "w") as f:
+            #         json.dump(self.examples, f, indent=4)
+            if os.path.exists(p):
+                with open(p, "r") as f:
+                    self.examples = json.load(f)
+            logger.info(f"Initialized examples from '{p}'")
+        except Exception as e:
+            logger.error(f"Error while loading examples: {e}")
+
+
+    def initialize_database_uploaded_images(self):
+        if self.config.allow_upload:
+                # Fallback
+            basedir = "./output/"
+            if self.config.output_directory != None:
+                basedir = self.config.output_directory
+            else:
+                logger.error("Upload allowed but no output directory specified. Using fallback ./output")
+            try:
+                self._uploaded_images = {}
+                    # check maybe it's better to add the data folder as well
+                self.__uploaded_images_path = os.path.join(basedir, "uploaded_images.json")
+                if os.path.exists(self.__uploaded_images_path):
+                    with open(self.__uploaded_images_path, "r") as f:
+                        self._uploaded_images.update(json.load(f))
+                logger.info(f"Initialized upload files history from '{self.__uploaded_images_path}'")
+            except Exception as e:
+                logger.error(f"Error while loading uploaded_images.json: {e}")
+
     def action_session_initialized(self, request: gr.Request, session_state: SessionState):
         """Initialize analytics session when app loads.
 
@@ -168,10 +172,10 @@ class GradioUI():
         logger.debug(f"check new token for '{session_state.session}'. Last Generation: {session_state.last_generation}")
         # logic: (10) minutes after running out of token, user get filled up to initial (10) new token
         # exception: user upload image for training or receive advertising token
-        if self.token_enabled:
+        if self.config.token_enabled:
             current_token = session_state.token
-            if session_state.generation_before_minutes(self.new_token_wait_time) and session_state.token <= 2:
-                session_state.token = self.initial_token
+            if session_state.generation_before_minutes(self.config.new_token_wait_time) and session_state.token <= 2:
+                session_state.token = self.config.initial_token
                 session_state.reset_last_generation_activity()
             new_token = session_state.token - current_token
             if new_token > 0:
@@ -192,9 +196,9 @@ class GradioUI():
         session_state = SessionState.from_gradio_state(gradio_state)
 
         try:
-            if self.token_enabled and session_state.token < image_count:
-                msg = f"Not enough generation token available.\n\nPlease wait {self.new_token_wait_time} minutes"
-                if self.allow_upload:
+            if self.config.token_enabled and session_state.token < image_count:
+                msg = f"Not enough generation token available.\n\nPlease wait {self.config.new_token_wait_time} minutes"
+                if self.config.allow_upload:
                     msg+=", or get new token by sharing images for training"
                 gr.Warning(msg, title="Image generation failed", duration=30)
                 return None, session_state
@@ -248,13 +252,13 @@ class GradioUI():
             images = self.generator.generate_images(params=generation_details)
             session_state.token -= image_count
             logger.debug(f"received {len(images)} image(s) from generator")
-            if self.output_directory is not None:
-                logger.debug(f"saving images to {self.output_directory}")
+            if self.config.output_directory is not None:
+                logger.debug(f"saving images to {self.config.output_directory}")
                 gen_data = generation_details.to_dict()
                 gen_data["userprompt"] = userprompt
                 gen_data["model"] = self.generator.model
                 for image in images:
-                    outdir = os.path.join(self.output_directory, get_date_subfolder(),"generation")
+                    outdir = os.path.join(self.config.output_directory, get_date_subfolder(),"generation")
                     save_image_with_timestamp(image=image, folder_path=outdir, ignore_errors=True, generation_details=gen_data)
 
             if session_state.token<=1:
@@ -276,7 +280,7 @@ class GradioUI():
         """
         logger.debug("starting image upload handler")
 
-        if self.output_directory is None:
+        if self.config.output_directory is None:
             logger.debug("output directory not configured, skipping upload")
             return gr.Button(interactive=False)
 
@@ -296,7 +300,7 @@ class GradioUI():
                 # could happen that it was not uploaded by same user and get few points
                 return gr.Button(interactive=True)
             
-            dir = self.output_directory
+            dir = self.config.output_directory
             dir = os.path.join(dir, get_date_subfolder(),"upload")
             targetpath = os.path.join(dir,  image_sha1 + "_" + filename)
             #copy file from source  to outdir
@@ -398,8 +402,8 @@ class GradioUI():
                         for face in faces:
                             if face.age:
                                 ages+=str(face.age)+","
-                                if face.age<18 and self.output_directory!= None:
-                                    fn = os.path.join(self.output_directory,"warning",get_date_subfolder())
+                                if face.age<18 and self.config.output_directory!= None:
+                                    fn = os.path.join(self.config.output_directory,"warning",get_date_subfolder())
                                     fn = os.path.join(fn,f"{image_sha1}-{face.age}.jpg")
                                     self.face_analyzer.get_face_picture(cv2, face, filename=fn)
                                     logger.warning(f"Suspected age detected on image {image_sha1}")
@@ -501,13 +505,13 @@ class GradioUI():
 
                 # generate and token count
                 with gr.Column(visible=True):
-                    with gr.Row(visible=self.token_enabled):
+                    with gr.Row(visible=self.config.token_enabled):
                         # token count is restored from app.load
                         token_label = gr.Text(
                             show_label=False,
                             scale=2,
                             value=f"?",
-                            info=f"Amount of images you can generate before a wait time of {self.new_token_wait_time} minutes",
+                            info=f"Amount of images you can generate before a wait time of {self.config.new_token_wait_time} minutes",
                             )
                         button_check_token = gr.Button(value="🗘", size="sm")
                     with gr.Row():
@@ -529,7 +533,7 @@ class GradioUI():
                     )
 
             # Upload to get Token row
-            with gr.Row(visible=(self.output_directory!=None and self.allow_upload)):
+            with gr.Row(visible=(self.config.output_directory!=None and self.config.allow_upload)):
                 with gr.Accordion("Get more Token", open=False):
                     with gr.Row():
                         with gr.Column(scale=2):
@@ -616,7 +620,7 @@ We’re excited to bring you this Image Generator App, which is still in develop
             def update_token_info(gradio_state):
                 #logger.debug("local_storage changed: SessionState: %s", gradio_state)
                 token = SessionState.from_gradio_state(gradio_state).token
-                if self.token_enabled == False:
+                if self.config.token_enabled == False:
                     token = "unlimited"
                 return f"Generations left: {token}"
             user_session_storage.change(
@@ -716,7 +720,7 @@ We’re excited to bring you this Image Generator App, which is still in develop
                 logger.debug("Restoring session from local storage: %s", session_state.session)
 
                 if gradio_state is None:
-                    session_state.token = self.initial_token
+                    session_state.token = self.config.initial_token
 
                 # Initialize session when app loads
                 self.action_session_initialized(request=request, session_state=session_state)

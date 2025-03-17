@@ -1,5 +1,45 @@
 [
     {
+        "Model": "default",
+        "Description": "default configuration flux-schnell",
+        "Parent": "flux1:schnell",
+        "Aspect_Ratio": {
+            "Square": "1024x1024"
+        }
+    },
+    {
+        "Model": "flux",
+        "Parent": "",
+        "ModelType": "flux",
+        "Aspect_Ratio": {
+            "Square": "1024x1024",
+            "Landscape": "1152x768",
+            "Portrait": "768x1152"
+        },
+        "Examples": []
+    },
+    {
+        "Model": "flux1:schnell",
+        "Path": "black-forest-labs/FLUX.1-schnell",
+        "Description": "Model Flux1-Schnell",
+        "Parent": "flux",
+        "Generation": {
+            "steps": 5,
+            "guidance": 0
+        },
+        "Aspect_Ratio": {
+            "Square": "1024x1024",
+            "Landscape": "1152x768",
+            "Portrait": "768x1152"
+        },
+        "Embeddings": {
+            "positive": [],
+            "negative": []
+        },
+        "Loras": [],
+        "Examples": []
+    },
+    {
         "Model": "Name as referenced in config",
         "Path": "file or huggingface name",
         "Generation": {
