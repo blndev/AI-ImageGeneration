@@ -116,6 +116,67 @@ This system makes it easy to:
 - Create specialized configurations with minimal duplication
 - Quickly switch between different model setups while preserving common settings
 
+#### Complete Configuration Example
+```json
+{
+    "Model": "model-name",                    // Name used to reference this config
+    "Path": "huggingface-repo/model-name",   // HuggingFace path or local file
+    "Description": "Model description",       // Optional description
+    "Parent": "parent-model",                // Optional parent config to inherit from
+    "Generation": {
+        "steps": 40,                         // Number of generation steps
+        "guidance": 4.0                      // Guidance scale for generation
+    },
+    "Aspect_Ratio": {
+        "Square": "1024x1024",              // Square image dimensions
+        "Landscape": "1152x768",            // Landscape image dimensions
+        "Portrait": "768x1152"              // Portrait image dimensions
+    },
+    "Embeddings": {
+        "positive": [
+            {
+                "name": "embedding-name",    // Name of the embedding
+                "source": "embedding.pt",    // Path to embedding file
+                "keyword": "trigger-word"    // Word that triggers this embedding
+            }
+        ],
+        "negative": []                      // Negative embeddings list
+    },
+    "Loras": [
+        {
+            "name": "lora-name",            // Name of the LoRA
+            "src": "lora.safetensors",      // Path to LoRA file
+            "trigger": "trigger-word",       // Word that activates this LoRA
+            "weight": 1.0,                  // LoRA weight (0.0 to 1.0)
+            "inject_when": [                // Keywords that trigger LoRA injection
+                "keyword1",
+                "keyword2"
+            ]
+        }
+    ],
+    "Examples": [                           // Optional example prompts
+        [
+            "A majestic mountain landscape at sunset",  // Positive prompt
+            "ugly, blurry",                            // Negative prompt
+            "▤ Landscape",                             // Aspect ratio (▤ Landscape, ▯ Portrait, □ Square)
+            1                                          // Weight/priority
+        ],
+        [
+            "Professional portrait in modern office",
+            "bad anatomy, deformed",
+            "▯ Portrait",
+            1
+        ]
+    ]
+}
+```
+
+This configuration shows all available settings that can be defined for a model. Settings can be:
+- Inherited from a parent configuration
+- Partially overridden in child configurations
+- Extended with additional settings
+- Left undefined to use defaults
+
 ## 🤝 Contributing
 
 We love contributions! Feel free to:
