@@ -83,6 +83,39 @@ Customize your experience through environment variables in `.env`:
 - `MODEL_DIRECTORY`: Location for downloaded models
 - `OUTPUT_DIRECTORY`: Where to save generated images
 
+### 📝 Model Configuration (modelconfig.json)
+
+The `modelconfig.json` file supports a powerful inheritance system that allows you to define model configurations hierarchically. This helps reduce redundancy and makes it easier to manage multiple model configurations that share common settings.
+
+#### Inheritance Example
+```json
+{
+    "Model": "default",
+    "Description": "default configuration flux-schnell",
+    "Parent": "flux1:schnell"
+}
+```
+
+In this example:
+1. The "default" configuration inherits from "flux1:schnell"
+2. "flux1:schnell" inherits from "flux"
+3. "flux" is a base configuration with no parent
+
+This creates an inheritance chain where:
+- Base settings are defined in the "flux" configuration
+- "flux1:schnell" extends these settings with specific parameters for the FLUX.1-schnell model
+- The "default" configuration can override or extend these settings further
+
+Properties are inherited recursively, meaning a child configuration will receive all properties from its parent, grandparent, and so on. Child configurations can:
+- Override inherited properties by redefining them
+- Add new properties not present in the parent
+- Inherit complex nested objects (like Aspect_Ratio, Generation settings, etc.)
+
+This system makes it easy to:
+- Maintain consistent base settings across multiple configurations
+- Create specialized configurations with minimal duplication
+- Quickly switch between different model setups while preserving common settings
+
 ## 🤝 Contributing
 
 We love contributions! Feel free to:
