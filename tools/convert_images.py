@@ -61,7 +61,7 @@ def convert_image(input_path, output_path, max_size=None):
 
 def process_directory(input_dir, output_dir=None, max_size=None):
     """
-    Process all images in a directory.
+    Process all images in a directory and its subdirectories.
     
     Args:
         input_dir (str): Input directory containing images
@@ -74,17 +74,18 @@ def process_directory(input_dir, output_dir=None, max_size=None):
     else:
         output_dir = Path(output_dir)
 
-    # Create output directory if it doesn't exist
-    output_dir.mkdir(parents=True, exist_ok=True)
-
-    # Process all image files
+    # Process all image files recursively
     success_count = 0
     total_count = 0
     
-    for file_path in input_dir.iterdir():
+    for file_path in input_dir.rglob('*'):
         if file_path.is_file() and is_image_file(file_path.name):
             total_count += 1
-            output_path = output_dir / f"{file_path.stem}.png"
+            # Preserve directory structure
+            rel_path = file_path.relative_to(input_dir)
+            output_path = output_dir / rel_path.parent / f"{file_path.stem}.png"
+            # Ensure the parent directory exists
+            output_path.parent.mkdir(parents=True, exist_ok=True)
             if convert_image(str(file_path), str(output_path), max_size):
                 success_count += 1
 
