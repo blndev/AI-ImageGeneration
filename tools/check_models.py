@@ -15,12 +15,34 @@ def setup_environment():
     if os.getenv('GPU_ALLOW_MEMORY_OFFLOAD', '0') == '1':
         os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
 
+def load_prompts():
+    """Load prompts from prompts.txt file"""
+    prompt_file = os.path.join(os.path.dirname(__file__), 'prompts.txt')
+    try:
+        with open(prompt_file, 'r') as f:
+            prompts = [line.strip() for line in f if line.strip()]
+    except FileNotFoundError:
+        print(f"Warning: {prompt_file} not found, using default prompts")
+
+    if not prompts:
+        # Fallback prompts if file is empty
+        prompts = [
+            "a beautiful landscape with mountains and a lake, masterpiece, highly detailed",
+            "a futuristic cityscape at night with neon lights and flying cars, cinematic, detailed"
+        ]
+
+    return prompts
+
 def check_models():
     load_dotenv()
     setup_environment()
     
-    models_path = os.getenv('MODEL_DIRECTORY', '/home/me/ai-models/')
+    models_path = os.getenv('MODEL_DIRECTORY', './text2img/models/')
     output_path = os.getenv('OUTPUT_DIRECTORY', './output')
+    
+    # Load prompts at startup
+    prompts = load_prompts()
+    print(f"Loaded {len(prompts)} prompts for testing")
     
     # Ensure output directory exists
     os.makedirs(output_path, exist_ok=True)
@@ -58,24 +80,25 @@ def check_models():
                 if os.getenv('GPU_ALLOW_ATTENTION_SLICING', '0') == '1':
                     pipeline.enable_attention_slicing()
                 
-                # Generate a test image
-                prompt = "a beautiful landscape with mountains and a lake, masterpiece, highly detailed"
-                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-                output_filename = f"{model_name}_{timestamp}.jpg"
-                output_path_full = os.path.join(output_path, output_filename)
-                
-                print(f"Generating test image...")
-                image = pipeline(
-                    prompt=prompt,
-                    height=height,
-                    width=width,
-                    num_inference_steps=20,
-                    guidance_scale=7.5
-                ).images[0]
-                
-                # Save the image
-                image.save(output_path_full)
-                print(f"Generated image saved as: {output_filename}")
+                # Generate test images for each prompt
+                for i, prompt in enumerate(prompts, 1):
+                    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                    output_filename = f"{model_name}_prompt{i}_{timestamp}.jpg"
+                    output_path_full = os.path.join(output_path, output_filename)
+                    
+                    print(f"Generating test image {i}/{len(prompts)}...")
+                    print(f"Prompt: {prompt}")
+                    image = pipeline(
+                        prompt=prompt,
+                        height=height,
+                        width=width,
+                        num_inference_steps=20,
+                        guidance_scale=7.5
+                    ).images[0]
+                    
+                    # Save the image
+                    image.save(output_path_full)
+                    print(f"Generated image saved as: {output_filename}")
                 
             finally:
                 # Cleanup
