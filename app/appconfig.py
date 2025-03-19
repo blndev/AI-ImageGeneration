@@ -1,9 +1,10 @@
 
 import os, logging
 from distutils.util import strtobool
-#from .utils.singleton import singleton
+from app.utils.fileIO import get_date_subfolder
+from .utils.singleton import singleton
 
-#@singleton
+@singleton
 class AppConfig:
     def __init__(self):
         self.refresh()
@@ -22,8 +23,8 @@ class AppConfig:
         self.allow_upload = self.getbool("ALLOW_UPLOAD", False)
         self.output_directory = os.getenv("OUTPUT_DIRECTORY", None)
 
-        if self.config.output_directory == None:
+        if self.output_directory == None:
             self.user_feedback_filestorage = "./output/feedback.txt"
         else:
-            self.user_feedback_filestorage = os.path.join(self.config.output_directory, get_date_subfolder(),"feedback.txt")
+            self.user_feedback_filestorage = os.path.join(self.output_directory, get_date_subfolder(),"feedback.txt")
         
