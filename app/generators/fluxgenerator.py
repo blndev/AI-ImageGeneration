@@ -7,6 +7,7 @@ from PIL import Image, ImageDraw
 import logging
 import threading
 from app.utils.singleton import singleton
+from app.analytics import analytics
 from . import FluxParameters
 
 # AI STuff
@@ -204,6 +205,9 @@ class FluxGenerator():
         logger.debug(f"start generating {params.num_images_per_prompt} images with {params.num_inference_steps} steps")
         with self._generation_lock:
             try:
+                # Start timing image generation
+                start_time = analytics.start_image_creation_timer()
+                
                 model = self._load_model()
                 if not model:
                     logger.error("No model loaded")
@@ -225,6 +229,14 @@ class FluxGenerator():
                 
                 logger.debug("Guidance: %f Strength: %f, Steps: %d",params.guidance_scale, params.strength, params.num_inference_steps)
                 result_images = model(**params.to_dict()).images
+                
+                # Record metrics for each image created
+                for _ in result_images:
+                    analytics.record_image_creation()
+                
+                # Record generation time
+                analytics.stop_image_creation_timer(start_time)
+                
                 return result_images
 
             except RuntimeError as e:

@@ -177,6 +177,104 @@ This configuration shows all available settings that can be defined for a model.
 - Extended with additional settings
 - Left undefined to use defaults
 
+## 📊 Monitoring Setup
+
+### Prerequisites
+- Podman or Docker installed on your system
+- Sufficient disk space for monitoring data
+- Port 3000 (Grafana) and 9090 (Prometheus) available
+
+### Quick Start
+Use the provided script to automatically set up and manage monitoring containers:
+```bash
+./run_monitoring_podman.sh
+```
+This script will:
+- Create necessary directories and configurations
+- Start existing containers if they're stopped
+- Create new containers if they don't exist
+- Display the status of monitoring services
+
+### Manual Setup
+If you prefer to set up the monitoring stack manually, follow these steps:
+
+#### Directory Structure
+Create the following directory structure for persistent storage:
+```bash
+mkdir -p monitoring/grafana-data
+mkdir -p monitoring/prometheus-data
+```
+
+#### Prometheus Setup
+Create a `monitoring/prometheus.yml` configuration file:
+```yaml
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: 'flux-app'
+    static_configs:
+      - targets: ['host.containers.internal:8080']  # Adjust port if needed
+```
+
+Start Prometheus container:
+```bash
+# Using Podman
+podman run -d \
+  --name prometheus \
+  --network=host \
+  -v ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:Z \
+  -v ./monitoring/prometheus-data:/prometheus:Z \
+  docker.io/prom/prometheus:latest
+
+# Using Docker
+docker run -d \
+  --name prometheus \
+  --network=host \
+  -v $(pwd)/monitoring/prometheus.yml:/etc/prometheus/prometheus.yml \
+  -v $(pwd)/monitoring/prometheus-data:/prometheus \
+  prom/prometheus:latest
+```
+
+### Grafana Setup
+Start Grafana container:
+```bash
+# Using Podman
+podman run -d \
+  --name grafana \
+  --network=host \
+  -v ./monitoring/grafana-data:/var/lib/grafana:Z \
+  -e "GF_AUTH_ANONYMOUS_ENABLED=true" \
+  -e "GF_AUTH_ANONYMOUS_ORG_ROLE=Admin" \
+  -e "GF_AUTH_DISABLE_LOGIN_FORM=true" \
+  docker.io/grafana/grafana:latest
+
+# Using Docker
+docker run -d \
+  --name grafana \
+  --network=host \
+  -v $(pwd)/monitoring/grafana-data:/var/lib/grafana \
+  -e "GF_AUTH_ANONYMOUS_ENABLED=true" \
+  -e "GF_AUTH_ANONYMOUS_ORG_ROLE=Admin" \
+  -e "GF_AUTH_DISABLE_LOGIN_FORM=true" \
+  grafana/grafana:latest
+```
+
+### Accessing the Dashboards
+- Grafana: http://localhost:3000 (or your server IP for network access)
+- Prometheus: http://localhost:9090
+
+### Initial Grafana Setup
+1. Log into Grafana
+2. Add Prometheus as a data source:
+   - URL: http://localhost:9090
+   - Access: Browser
+3. Import or create dashboards to visualize your metrics
+
+### Security Note
+The above configuration enables anonymous access to Grafana for simplicity. For production environments, configure proper authentication and HTTPS.
+
 ## 🤝 Contributing
 
 We love contributions! Feel free to:

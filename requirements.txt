@@ -9,6 +9,7 @@ dotenv          # Load environment variables for config from file
 ###############################################################
 # Analytics
 user-agents     # to parse user agents and split into 
+prometheus-client    # for metrics collection and exposition
 
 ###############################################################
 # AI
