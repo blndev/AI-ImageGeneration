@@ -1,9 +1,13 @@
 from prometheus_client import Counter, Histogram, Gauge, start_http_server
-import time
-from app.utils.singleton import Singleton
+import time, logging
+from app.utils.singleton import singleton
 
-class Analytics(metaclass=Singleton):
+logger = logging.getLogger(__name__)
+
+@singleton
+class Analytics():
     def __init__(self):
+        logger.info("Initializing Analytics")
         # Initialize Prometheus metrics
         self.image_creations = Counter(
             'flux_image_creations_total',
@@ -37,6 +41,7 @@ class Analytics(metaclass=Singleton):
     def record_new_session(self):
         """Record a new user session"""
         self.sessions.inc()
+        logger.info(f"New user session recorded. Now: {self.sessions._value.get()}")
     
     def start_image_creation_timer(self):
         """Start timing an image creation"""
@@ -47,9 +52,9 @@ class Analytics(metaclass=Singleton):
         duration = time.time() - start_time
         self.image_creation_time.observe(duration)
     
-    def update_user_tokens(self, user_id: str, tokens: float):
+    def update_user_tokens(self, user_id: str, tokens: int):
         """Update the token count for a user"""
         self.user_tokens.labels(user_id=user_id).set(tokens)
 
-# Initialize analytics when module is imported
-analytics = Analytics()
+# # Initialize analytics when module is imported
+# analytics = Analytics()

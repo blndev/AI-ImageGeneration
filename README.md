@@ -179,6 +179,13 @@ This configuration shows all available settings that can be defined for a model.
 
 ## 📊 Monitoring Setup
 
+This application provides built-in monitoring capabilities using Prometheus metrics, exposed on port 9101. The following metrics are available:
+
+- `flux_image_creations_total`: Counter for total number of images created
+- `flux_sessions_total`: Counter for total number of user sessions
+- `flux_image_creation_duration_seconds`: Histogram of image creation duration
+- `flux_user_tokens`: Gauge showing available tokens per user
+
 ### Prerequisites
 - Podman or Docker installed on your system
 - Sufficient disk space for monitoring data
@@ -274,6 +281,89 @@ docker run -d \
 
 ### Security Note
 The above configuration enables anonymous access to Grafana for simplicity. For production environments, configure proper authentication and HTTPS.
+
+### Additional Monitoring Recommendations
+
+For comprehensive system and GPU monitoring, we recommend installing these additional exporters:
+
+#### Node Exporter
+The Node Exporter provides detailed system metrics including CPU, memory, disk, and network statistics.
+
+Installation:
+```bash
+# Download and install Node Exporter
+wget https://github.com/prometheus/node_exporter/releases/download/v1.6.1/node_exporter-1.6.1.linux-amd64.tar.gz
+tar xvfz node_exporter-1.6.1.linux-amd64.tar.gz
+cd node_exporter-1.6.1.linux-amd64
+sudo cp node_exporter /usr/local/bin/
+
+# Create systemd service (optional)
+sudo useradd -rs /bin/false node_exporter
+sudo tee /etc/systemd/system/node_exporter.service << EOF
+[Unit]
+Description=Node Exporter
+After=network.target
+
+[Service]
+User=node_exporter
+Group=node_exporter
+Type=simple
+ExecStart=/usr/local/bin/node_exporter
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+sudo systemctl daemon-reload
+sudo systemctl start node_exporter
+sudo systemctl enable node_exporter
+```
+Node Exporter metrics will be available on :9100/metrics
+
+#### NVIDIA GPU Exporter
+For monitoring GPU metrics (utilization, memory, temperature, etc.), install the NVIDIA GPU Exporter:
+
+```bash
+# Install NVIDIA Container Toolkit
+distribution=$(. /etc/os-release;echo $ID$VERSION_ID)
+curl -s -L https://nvidia.github.io/libnvidia-container/gpgkey | sudo apt-key add -
+curl -s -L https://nvidia.github.io/libnvidia-container/$distribution/libnvidia-container.list | \
+    sudo tee /etc/apt/sources.list.d/nvidia-container-toolkit.list
+
+sudo apt-get update
+sudo apt-get install -y nvidia-container-toolkit
+
+# Run NVIDIA GPU Exporter using Docker
+docker run -d \
+    --restart=always \
+    --name nvidia_gpu_exporter \
+    --device=/dev/nvidiactl \
+    --device=/dev/nvidia0 \
+    --volume=/usr/lib/x86_64-linux-gnu/libnvidia-ml.so.1:/usr/lib/x86_64-linux-gnu/libnvidia-ml.so.1 \
+    nvidia/dcgm-exporter:latest
+```
+
+NVIDIA GPU metrics will be available on :9400/metrics
+
+#### Prometheus Configuration
+
+Add these jobs to your Prometheus configuration to collect metrics from all exporters:
+
+```yaml
+scrape_configs:
+  - job_name: 'flux_app'
+    static_configs:
+      - targets: ['localhost:9101']
+
+  - job_name: 'node'
+    static_configs:
+      - targets: ['localhost:9100']
+
+  - job_name: 'nvidia_gpu'
+    static_configs:
+      - targets: ['localhost:9400']
+```
+This setup will provide comprehensive monitoring of your application, system resources, and GPU utilization.
 
 ## 🤝 Contributing
 

@@ -45,6 +45,7 @@ else
     podman run -d \
         --name prometheus \
         --network=host \
+        --userns keep-id \
         -v ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:Z \
         -v ./monitoring/prometheus-data:/prometheus:Z \
         docker.io/prom/prometheus:latest
@@ -64,6 +65,7 @@ else
     podman run -d \
         --name grafana \
         --network=host \
+        --userns: keep-id \
         -v ./monitoring/grafana-data:/var/lib/grafana:Z \
         -e "GF_AUTH_ANONYMOUS_ENABLED=true" \
         -e "GF_AUTH_ANONYMOUS_ORG_ROLE=Admin" \
