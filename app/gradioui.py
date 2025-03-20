@@ -10,9 +10,9 @@ from app import SessionState
 from .appconfig import AppConfig
 from app.utils.singleton import singleton
 from app.utils.fileIO import save_image_with_timestamp, save_image_as_png, get_date_subfolder
-from app.generators import FluxGenerator, FluxParameters, ModelConfig, GenericGenerator
+from app.generators import FluxGenerator, FluxParameters, ModelConfig
 from app.validators import FaceDetector, PromptRefiner
-
+from .analytics import Analytics
 import json
 import shutil
 from distutils.util import strtobool
@@ -26,6 +26,7 @@ logger = logging.getLogger(__name__)
 class GradioUI():
     def __init__(self, modelconfigs: List[ModelConfig] = None):
         try:
+            self.analytics = Analytics()
             self.interface = None
             self.modelconfigs=modelconfigs
             self.config = AppConfig()
@@ -154,6 +155,7 @@ class GradioUI():
         share_value = request.query_params.get("share")
         url = request.url
         logger.debug(f"Request URL: {url}")
+        self.analytics.record_new_session()
         # try:
         # analytics.save_session(
         #     session=session_state.session,

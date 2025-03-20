@@ -7,7 +7,7 @@ from PIL import Image, ImageDraw
 import logging
 import threading
 from app.utils.singleton import singleton
-from app.analytics import analytics
+from app.analytics import Analytics
 from . import FluxParameters
 
 # AI STuff
@@ -22,8 +22,9 @@ logger = logging.getLogger(__name__)
 
 @singleton
 class FluxGenerator():
-    def __init__(self, sdxl: bool = False):
+    def __init__(self, modelconfigs = None, sdxl: bool = False):
         logger.info("Initialize FluxGenerator")
+        self.analytics=Analytics()
         # black-forest-labs/FLUX.1-dev
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
         self.torch_dtype = torch.float16 if self.device == "cuda" else torch.float32
