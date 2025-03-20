@@ -9,12 +9,12 @@ class AppConfig:
     def __init__(self):
         self.refresh()
 
-    def getbool(key, default=False):
-        return bool(strtobool(os.getenv(key,default)))
+    def getbool(self, key, default=False):
+        return bool(strtobool(os.getenv(key,str(default))))
     
     #TODO: load from file instead of env for most keys
     def refresh(self):
-        self.selected_model = os.environ("GENERATION_MODEL", )
+        self.selected_model = os.getenv("GENERATION_MODEL", )
         
         self.initial_token = int(os.getenv("INITIAL_GENERATION_TOKEN", 0))
         self.token_enabled = self.initial_token > 0
