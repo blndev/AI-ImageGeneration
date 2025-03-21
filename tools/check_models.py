@@ -34,6 +34,19 @@ def load_prompts():
 
     return prompts
 
+def load_filters():
+    """Load prompts from prompts.txt file"""
+    filter_file = os.path.join(os.path.dirname(__file__), os.getenv("MODEL_FILTER", None))
+    filters = []
+    if not filter_file: return []
+    try:
+        with open(filter_file, 'r') as f:
+            filters = [line.strip() for line in f if line.strip()]
+    except FileNotFoundError:
+        print(f"Warning: {filter_file} not found")
+
+    return filters
+
 def check_models():
     load_dotenv(override=True)
     setup_environment()
@@ -46,7 +59,8 @@ def check_models():
     # Load prompts at startup
     prompts = load_prompts()
     print(f"Loaded {len(prompts)} prompts for testing")
-    
+    filters = load_filters()
+
     # Ensure output directory exists
     os.makedirs(output_path, exist_ok=True)
     
@@ -55,7 +69,7 @@ def check_models():
     for root, dirs, files in os.walk(models_path):
         if not os.path.abspath(cache_path) in os.path.abspath(root):
             for file in files:
-                if file.endswith('.safetensors'):
+                if file.endswith('.safetensors') and file in filters :
                     model_path = os.path.join(root, file)
                     if model_path not in safetensors_files:  # Only add unique model directories
                         safetensors_files.append(model_path)
