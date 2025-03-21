@@ -10,7 +10,7 @@ from app import SessionState
 from .appconfig import AppConfig
 from app.utils.singleton import singleton
 from app.utils.fileIO import save_image_with_timestamp, save_image_as_png, get_date_subfolder
-from app.generators import FluxGenerator, FluxParameters, ModelConfig
+from app.generators import FluxGenerator, GenerationParameters, ModelConfig, GenericGenerator
 from app.validators import FaceDetector, PromptRefiner
 from .analytics import Analytics
 import json
@@ -240,7 +240,7 @@ class GradioUI():
 
             logger.info(f"generating image for {session_state.session} with {session_state.token} token available.\n - prompt: '{prompt}' \n - Infos: aspect ratio {width}x{height}")
 
-            generation_details = FluxParameters(
+            generation_details = GenerationParameters(
                 prompt=prompt,
                 negative_prompt=neg_prompt,
                 num_inference_steps=self.generation_steps,

@@ -8,7 +8,7 @@ import logging
 import threading
 from app.utils.singleton import singleton
 from app.analytics import Analytics
-from . import FluxParameters
+from . import GenerationParameters
 
 # AI STuff
 import torch
@@ -194,7 +194,7 @@ class FluxGenerator():
         """true if a dev model is used"""
         return "dev" in self.model.lower()
 
-    def generate_images(self, params: FluxParameters) -> List[Image.Image]:
+    def generate_images(self, params: GenerationParameters) -> List[Image.Image]:
         """Generate a list of images."""
         logger.debug("starting image generation")
         # Validate parameters and throw exceptions
@@ -249,7 +249,7 @@ class FluxGenerator():
                     pass
                 raise Exception(f"Internal error while creating the image.")
 
-    def _create_debug_image(self, params: FluxParameters) -> Image.Image:
+    def _create_debug_image(self, params: GenerationParameters) -> Image.Image:
         """Creates a debug image with white background and black text showing the parameters"""
         images = []
         bg_colors = [
