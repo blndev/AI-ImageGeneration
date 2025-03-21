@@ -65,7 +65,7 @@ else
     podman run -d \
         --name grafana \
         --network=host \
-        --userns: keep-id \
+        --userns keep-id \
         -v ./monitoring/grafana-data:/var/lib/grafana:Z \
         -e "GF_AUTH_ANONYMOUS_ENABLED=true" \
         -e "GF_AUTH_ANONYMOUS_ORG_ROLE=Admin" \
