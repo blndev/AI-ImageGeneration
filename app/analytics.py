@@ -19,6 +19,12 @@ class Analytics():
             'Total number of user sessions'
         )
         
+        #TODO: implement convinience and session state check (use last generation maybe)
+        self.active_sessions = Gauge(
+            'flux_active_sessions_total',
+            'Amount of users active in the last 30 minutes'
+        )
+
         self.image_creation_time = Histogram(
             'flux_image_creation_duration_seconds',
             'Time taken to create an image',

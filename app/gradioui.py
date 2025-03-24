@@ -10,7 +10,7 @@ from app import SessionState
 from .appconfig import AppConfig
 from app.utils.singleton import singleton
 from app.utils.fileIO import save_image_with_timestamp, save_image_as_png, get_date_subfolder
-from app.generators import FluxGenerator, GenerationParameters, ModelConfig, GenericGenerator
+from app.generators import FluxGenerator, GenerationParameters, ModelConfig, StabelDiffusionGenerator
 from app.validators import FaceDetector, PromptRefiner
 from .analytics import Analytics
 import json
@@ -26,9 +26,9 @@ logger = logging.getLogger(__name__)
 class GradioUI():
     def __init__(self, modelconfigs: List[ModelConfig] = None):
         try:
-            self.analytics = Analytics()
             self.interface = None
-            self.modelconfigs=modelconfigs
+            self.modelconfigs = modelconfigs
+            self.analytics = Analytics()
             self.config = AppConfig()
 
             self.__feedback_file = self.config.user_feedback_filestorage
@@ -36,57 +36,42 @@ class GradioUI():
 
             logger.info("Initial token: %i, wait time: %i minutes", self.config.initial_token, self.config.new_token_wait_time)
 
-            self.initialize_database_uploaded_images()
-            self.initialize_upload_ui()
-            self.initialize_examples()
+
 
             # TODO: handover self.modelconfigs or better the selected model
             # rethink the singleton, maybe it's better to have multiple different pipelines
             # singleton only per model?
             selectedmodel = self.config.selected_model
-            #selectedmodelconfig = modelconfigs.get
-            selectedmodelconfig = next((config for config in modelconfigs if config.model == selectedmodel), None)
+            self.selectedmodelconfig = ModelConfig.get_config(model=selectedmodel, configs=modelconfigs)
+
+            if self.selectedmodelconfig is None:
+                logger.critical(f"Could not find model {selectedmodel} specified in env 'GENERATION_MODEL' or 'default' as fallback. Stopping execution")
+                exit(1)
             
-            self.generator = FluxGenerator(modelconfigs=modelconfigs)
-            self.face_analyzer = FaceDetector()
+            #TODO: sanity checks like model.Type, model.path, ...
 
-            logger.info(f"reading apect ratios and generation settings ... ")
-            # TODO: obsolete ist already part of the modelconfig
-            # TODO: add splitting to modelconfig
-            try:
-                #TODO: add unittest which checks env and internal settings
-                ars = os.getenv("GENERATION_ASPECT_SQUARE", "512x512")
-                self.aspect_square_width = int(ars.split("x")[0])
-                self.aspect_square_height = int(ars.split("x")[1])
+            self.initialize_database_uploaded_images()
+            self.initialize_upload_ui()
+            self.initialize_examples()
 
-                arl = os.getenv("GENERATION_ASPECT_LANDSCAPE", "768x512")
-                self.aspect_landscape_width = int(arl.split("x")[0])
-                self.aspect_landscape_height = int(arl.split("x")[1])
-
-                arp = os.getenv("GENERATION_ASPECT_PORTRAIT", "512x768")
-                self.aspect_portrait_width = int(arp.split("x")[0])
-                self.aspect_portrait_height = int(arp.split("x")[1])
-            except Exception as e:
-                logger.error("Error initializing aspect ratios: %s", str(e))
-                logger.debug("Exception details:", exc_info=True)
-                raise e
-
-            self.generation_steps = int(
-                os.getenv("GENERATION_STEPS", 30 if self.generator.is_flux_dev() or self.generator.SDXL else 4))
-            self.generation_guidance_scale = float(
-                os.getenv("GENERATION_GUIDANCE", 7.5 if self.generator.is_flux_dev() or self.generator.SDXL else 0))
-            self.generation_strength = float(
-                os.getenv("GENERATION_STRENGHT", 0.8))
+            if "flux" in self.selectedmodelconfig.model_type:
+                self.generator = FluxGenerator(modelconfig=self.selectedmodelconfig)
+            else:
+                self.generator = StabelDiffusionGenerator(appconfig=self.config, modelconfig=self.selectedmodelconfig)
             
+            if self.config.allow_upload:
+                self.face_analyzer = FaceDetector()
+
             #TODO: create appconfig which is doing the env parsing 
             # appconfig can also contains logic e.g. dependencies between settings
             self.prompt_refiner = None
-            if bool(strtobool(os.getenv("PROMPTMAGIC", "True"))):
+            if self.config.prompt_magic_active:
                 self.prompt_refiner = PromptRefiner()
                 #TODO: self.promptmagic_enabled=self.prompt_refiner.validate_ollama()
             else:
                 logger.warning("NSFW protection via PromptMagic is turned off")
-            logger.info(f"Application succesful initialized")
+
+            logger.info("Application succesful initialized")
 
         except Exception as e:
             logger.error("Error initializing GradioUI: %s", str(e))
@@ -108,20 +93,29 @@ class GradioUI():
         # loading examples TODO: can be changed via modelconfig
         self.examples = []
         try:
-            p = "./msgs/examples.json"
-            # with open(p, "w") as f:
-            #         json.dump(self.examples, f, indent=4)
-            if os.path.exists(p):
-                with open(p, "r") as f:
-                    self.examples = json.load(f)
-            logger.info(f"Initialized examples from '{p}'")
+            if len(self.selectedmodelconfig.examples)>0:
+                self.examples = self.selectedmodelconfig.examples
+                logger.info("Initialized examples from modelconfig")
+            else:
+                p = "./msgs/examples.json"
+                if os.path.exists(p):
+                    with open(p, "r") as f:
+                        self.examples = json.load(f)
+                logger.info(f"Initialized examples from '{p}'")
         except Exception as e:
             logger.error(f"Error while loading examples: {e}")
-
+            self.examples = [
+                [
+                    "A majestic mountain landscape at sunset with snow-capped peaks",
+                    "painting",
+                    "\u25a4 Landscape",
+                    1
+                ]
+            ]
 
     def initialize_database_uploaded_images(self):
         if self.config.allow_upload:
-                # Fallback
+            # Fallback
             basedir = "./output/"
             if self.config.output_directory != None:
                 basedir = self.config.output_directory
@@ -129,7 +123,7 @@ class GradioUI():
                 logger.error("Upload allowed but no output directory specified. Using fallback ./output")
             try:
                 self._uploaded_images = {}
-                    # check maybe it's better to add the data folder as well
+                # check maybe it's better to add the data folder as well
                 self.__uploaded_images_path = os.path.join(basedir, "uploaded_images.json")
                 if os.path.exists(self.__uploaded_images_path):
                     with open(self.__uploaded_images_path, "r") as f:
@@ -209,12 +203,11 @@ class GradioUI():
             session_state.save_last_generation_activity()
 
             # Map aspect ratio selection to dimensions
-            width, height = self.aspect_square_width, self.aspect_square_height
-
-            if "landscape" in aspect_ratio.lower():  # == "▯ Landscape (16:9)"
-                width, height = self.aspect_landscape_width, self.aspect_landscape_height
-            elif "portrait" in aspect_ratio.lower():  # == "▤ Portrait (2:3)"
-                width, height = self.aspect_portrait_width, self.aspect_portrait_height
+            width, height = 512,512 # fallpack
+            for ratio in self.selectedmodelconfig.aspect_ratio.keys():
+                if ratio.lower() in aspect_ratio.lower():
+                    width, height = ModelConfig.split_aspect_ratio(self.selectedmodelconfig.aspect_ratio[ratio])
+                    break
             
             
             prompt = str(prompt.strip()).replace("'", "-")
@@ -243,9 +236,9 @@ class GradioUI():
             generation_details = GenerationParameters(
                 prompt=prompt,
                 negative_prompt=neg_prompt,
-                num_inference_steps=self.generation_steps,
-                guidance_scale=self.generation_guidance_scale,
-                strength=self.generation_strength,
+                num_inference_steps=self.selectedmodelconfig.generation["steps"],  # TODO: make object out of it
+                guidance_scale=self.selectedmodelconfig.generation["guidance"],
+                # FIXME: is that only required form i2i? strength=self.selectedmodelconfig.generation["strength"],
                 num_images_per_prompt=image_count,
                 width=width,
                 height=height
@@ -258,7 +251,7 @@ class GradioUI():
                 logger.debug(f"saving images to {self.config.output_directory}")
                 gen_data = generation_details.to_dict()
                 gen_data["userprompt"] = userprompt
-                gen_data["model"] = self.generator.model
+                gen_data["model"] = self.generator.modelconfig.model
                 for image in images:
                     outdir = os.path.join(self.config.output_directory, get_date_subfolder(),"generation")
                     save_image_with_timestamp(image=image, folder_path=outdir, ignore_errors=True, generation_details=gen_data)
@@ -480,9 +473,15 @@ class GradioUI():
 
                 with gr.Column():
                     # Aspect ratio selection
+                    # TODO dynamic loading
+                    ratios = []
+                    for k in self.selectedmodelconfig.aspect_ratio.keys():
+                        ratios.append(k)
+                    if len(ratios)==0: ratios.append("512x512")
                     aspect_ratio = gr.Radio(
                         choices=["□ Square", "▤ Landscape", "▯ Portrait"],
-                        value="□ Square",
+                        #choices=[ratios],
+                        #value=ratios[0],
                         label="Aspect Ratio",
                         scale=1
                     )

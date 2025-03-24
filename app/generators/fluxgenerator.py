@@ -220,7 +220,7 @@ class FluxGenerator():
                 elif self.is_flux_dev():
                     params = params.prepare_flux_dev()
                 elif self.SDXL:
-                    params = params.prepare_sdxl()
+                    params = params.prepare_stablediffusion_std()
                     if self.sdxl_embedding_positive != None:
                         logger.debug("apply positive embeddings")
                         params.prompt = self.sdxl_embedding_positive + "," + params.prompt

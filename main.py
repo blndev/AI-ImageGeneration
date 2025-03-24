@@ -12,23 +12,6 @@ logger = logging.getLogger("app")
 
 import torch
 
-# # Get the current GPU memory usage
-# def print_gpu_memory_usage():
-#     if torch.cuda.is_available():
-#         # Get the GPU ID
-#         gpu_id = torch.cuda.current_device()
-        
-#         # Get the total and allocated memory
-#         total_memory = torch.cuda.get_device_properties(gpu_id).total_memory
-#         allocated_memory = torch.cuda.memory_allocated(gpu_id)
-#         cached_memory = torch.cuda.memory_reserved(gpu_id)
-        
-#         logger.info(f"Total GPU memory: {total_memory / 1024**3:.2f} GB")
-#         logger.debug(f"Allocated GPU memory: {allocated_memory / 1024**3:.2f} GB")
-#         logger.debug(f"Cached GPU memory: {cached_memory / 1024**3:.2f} GB")
-#     else:
-#         pass
-
 def get_gpu_info():
     # Überprüfen, ob CUDA verfügbar ist
     if torch.cuda.is_available():
@@ -42,7 +25,7 @@ def get_gpu_info():
             total_memory = torch.cuda.get_device_properties(gpu_id).total_memory
             allocated_memory = torch.cuda.memory_allocated(gpu_id)
             cached_memory = torch.cuda.memory_reserved(gpu_id)
-            logger.info(f"using GPU {gpu_id}: {gpu_name} / {total_memory}GB (Available {total_memory - allocated_memory}GB)")
+            logger.info(f"using GPU {gpu_id}: {gpu_name} / {total_memory/ 1024**3:.2f}GB (Available {(total_memory - allocated_memory)/ 1024**3:.2f}GB)")
     else:
         logger.warning("No CUDA GPUs available")
 
