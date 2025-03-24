@@ -124,6 +124,14 @@ class TestModelConfig(unittest.TestCase):
 
         self.assertDictEqual(merged.aspect_ratio, child.aspect_ratio)
 
+    def test_getconfig(self):
+        configs = ModelConfig.create_config_list_from_json(self.sample_json)
+        existing = configs[0]
+
+        found = ModelConfig.get_config(existing.model, configs)
+        self.assertIsNotNone(found, "the model should be found but is not")
+        self.assertEqual(existing.model, found.model)
+        self.assertEqual(existing.description, found.description)
 
 class TestModelConfigMerge(unittest.TestCase):
     def setUp(self):
