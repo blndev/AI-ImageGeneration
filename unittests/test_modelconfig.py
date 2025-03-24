@@ -121,17 +121,36 @@ class TestModelConfig(unittest.TestCase):
 
         self.assertEqual(merged.model, child.model)
         self.assertEqual(merged.description, child.description)
+        self.assertEqual(merged.model_type, parent.model_type)
 
         self.assertDictEqual(merged.aspect_ratio, child.aspect_ratio)
 
     def test_getconfig(self):
         configs = ModelConfig.create_config_list_from_json(self.sample_json)
-        existing = configs[0]
-
-        found = ModelConfig.get_config(existing.model, configs)
+        grandparent = configs[0]
+        parent = ModelConfig.from_dict(
+                {
+                    "Model": "cm",
+                    "Description": "--test--",
+                    "Aspect_Ratio": {
+                        "Square": "1024x1024"
+                    }
+                }
+        )
+        parent.parent = grandparent.model
+        child = ModelConfig.from_dict(
+                {
+                    "Model": "cm2",
+                    "Parent": "cm"
+                }
+        )
+        configs.append(parent)
+        configs.append(child)
+        found = ModelConfig.get_config(child.model, configs)
         self.assertIsNotNone(found, "the model should be found but is not")
-        self.assertEqual(existing.model, found.model)
-        self.assertEqual(existing.description, found.description)
+        self.assertEqual(child.model, found.model)
+        self.assertEqual(parent.description, found.description)
+        self.assertEqual(grandparent.model_type, found.model_type)
 
 class TestModelConfigMerge(unittest.TestCase):
     def setUp(self):

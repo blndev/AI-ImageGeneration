@@ -92,7 +92,7 @@ class ModelConfig:
         data = {
             "Model": self.model,
             "Path": self.path,
-            "Type": self.model_type,
+            "ModelType": self.model_type,
             "Parent": self.parent,
             "Description": self.description,
             "Generation": self.generation,
@@ -109,36 +109,48 @@ class ModelConfig:
     def to_json(self) -> str:
         return json.dumps(self.to_dict(), indent=4)
 
-    def update(self, new_values):
-        if hasattr(new_values, "model") and new_values.model:
-            self.model = new_values.model
-        if hasattr(new_values, "path") and new_values.path:
-            self.path = new_values.path
-        if hasattr(new_values, "model_type") and new_values.model_type:
-            self.model_type = new_values.model_type
-        if hasattr(new_values, "parent") and new_values.parent:
-            self.parent = new_values.parent
-        if hasattr(new_values, "description") and new_values.description:
-            self.description = new_values.description
-        if hasattr(new_values, "generation") and new_values.generation:
-            self.generation = new_values.generation
+    def update(self, priority_values):
+        """used to apply new values to an existing object (mostly used for merge)"""
+        if hasattr(priority_values, "model") and priority_values.model:
+            self.model = priority_values.model
+        if hasattr(priority_values, "path") and priority_values.path:
+            self.path = priority_values.path
+        if hasattr(priority_values, "model_type") and priority_values.model_type:
+            self.model_type = priority_values.model_type
+        if hasattr(priority_values, "parent") and priority_values.parent:
+            self.parent = priority_values.parent
+        if hasattr(priority_values, "description") and priority_values.description:
+            self.description = priority_values.description
+        if hasattr(priority_values, "generation") and priority_values.generation:
+            self.generation = priority_values.generation
 
         # now lists and dicts
-        if hasattr(new_values, "aspect_ratio") and new_values.aspect_ratio:
-            self.aspect_ratio = new_values.aspect_ratio.copy()
-        if hasattr(new_values, "embeddings") and new_values.embeddings:
+        if hasattr(priority_values, "aspect_ratio") and priority_values.aspect_ratio:
+            self.aspect_ratio = priority_values.aspect_ratio.copy()
+        if hasattr(priority_values, "embeddings") and priority_values.embeddings:
             # FIXME: think about splitting in positive and negative, or full merge?
-            if len(new_values.embeddings["positive"]) > 0:
-                self.embeddings["positive"] = new_values.embeddings["positive"].copy()
-            if len(new_values.embeddings["negative"]) > 0:
-                self.embeddings["negative"] = new_values.embeddings["negative"].copy()
+            if len(priority_values.embeddings["positive"]) > 0:
+                self.embeddings["positive"] = priority_values.embeddings["positive"].copy()
+            if len(priority_values.embeddings["negative"]) > 0:
+                self.embeddings["negative"] = priority_values.embeddings["negative"].copy()
 
-        if hasattr(new_values, "loras") and new_values.loras:
-            self.loras = new_values.loras.copy()
+        if hasattr(priority_values, "loras") and priority_values.loras:
+            self.loras = priority_values.loras.copy()
             # FIXME: todo append
-        if hasattr(new_values, "examples") and new_values.examples:
-            if len(new_values.examples) > 0:
-                self.examples = new_values.examples.copy()
+        if hasattr(priority_values, "examples") and priority_values.examples:
+            if len(priority_values.examples) > 0:
+                self.examples = priority_values.examples.copy()
+
+    @classmethod
+    def split_aspect_ratio(aspect_ratio: str) -> tuple:
+        try:
+            # TODO: add unittest
+            width = int(aspect_ratio.split("x")[0])
+            height = int(aspect_ratio.split("x")[1])
+            return width, height
+        except Exception as e:
+            logger.warning(f"Error splitting aspect ratios '{aspect_ratio}': {e}")
+            return 512, 512
 
     @classmethod
     def from_dict(cls, item: dict) -> "ModelConfig":
@@ -210,24 +222,17 @@ class ModelConfig:
             return childconfig
         if childconfig is None:
             return parentconfig
+        logger.debug(f"Merge model {childconfig.model} with {parentconfig.model}")
 
-        # deep copy
+        # deep copy to avoid overwriting parent if multiple childs refrencing to it
         result = cls.from_dict(parentconfig.to_dict())
-        # result= copy.deepcopy(parentconfig)
         result.update(childconfig)
         return result
-
-        p_json = parentconfig.to_json()
-        c_json = childconfig.to_json()
-
-        result = copy.deepcopy(p_json)
-        result.update(c_json)
-        m = cls.create_config_list_from_json(result)[0]
-        return m
 
     @classmethod
     def get_config(cls, model: str, configs: List["ModelConfig"]) -> "ModelConfig":
         """get config include inherit values from parent"""
+        logger.info(f"get inherited config for {model}")
         selectedmodelconfig = next(
             (config for config in configs if config.model == model), None
         )
@@ -245,8 +250,8 @@ class ModelConfig:
                 if parentconfig is None:
                     logger.error(f"Model {model.parent} not found in modelconfigs")
                 else:
-                    merged = cls.merge(parentconfig=parentconfig, childconfig=model)
-                    find_parent(model=parentconfig, configs=configs)
+                    mergedparent = find_parent(model=parentconfig, configs=configs)
+                    merged = cls.merge(parentconfig=mergedparent, childconfig=model)
 
             return merged
 
