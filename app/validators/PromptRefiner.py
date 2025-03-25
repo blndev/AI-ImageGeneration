@@ -4,7 +4,7 @@ import threading
 import logging
 from langchain_ollama import ChatOllama, OllamaLLM
 from langchain_core.messages import AIMessage, SystemMessage, HumanMessage
-
+from ollama import Client
 
 logger = logging.getLogger(__name__)
 # no need for Singleton, as the Ollama Server takes care for model loading
@@ -23,8 +23,10 @@ class PromptRefiner():
         # TODO: find a way to download the model (using ollama API)
 
         self.llm = None
-        #TODO: check that teh model is existing by running test query. if that fails set sel.llm to None
+        #TODO: check that the model is existing by running test query. if that fails set sel.llm to None
         try:
+            olc = Client(self.ollama_server)
+            olc.pull(self.model)
             self.llm = ChatOllama(
                 model=self.model,
                 server=self.ollama_server,
@@ -41,6 +43,25 @@ class PromptRefiner():
             )
         except Exception as e:
             logger.error(f"Initialize llm for PromptRefiner failed {e}")
+
+
+    def validate_refiner_is_ready(self) -> bool:
+        validation = True
+        try:
+            if self.llm is None: raise Exception("llm not initialized")
+            messages = [ 
+                SystemMessage("You answerign only with yes and no." ),
+                HumanMessage("Are you ready to work for me?"),
+            ]
+            ai_msg = self.llm.invoke(messages)
+            logger.debug(f"Validate PromptRefiner-ready state: {ai_msg.content}")
+            if not "yes" in ai_msg.content.lower():
+                raise Exception(f"LLM is not able to work: {ai_msg.content}")
+        except Exception as e:
+            logger.warning(f"Validation of PromptRefiner failed with {e}")
+            validation = False
+        
+        return validation
 
     def is_safe_for_work(self, prompt: str) -> bool:
         return not self.check_contains_nsfw(prompt=prompt)

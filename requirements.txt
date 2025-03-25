@@ -29,4 +29,5 @@ opencv-python           # to prepare PIL images for face detection
 
 ###############################################################
 # Prompt Analyzer
-langchain-ollama
+langchain-ollama        # to query the system
+ollama                  # to pull the correct models
