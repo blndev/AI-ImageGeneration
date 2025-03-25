@@ -26,7 +26,12 @@ class AppConfig:
         self.token_enabled = self.initial_token > 0
         self.new_token_wait_time = int(os.getenv("NEW_TOKEN_WAIT_TIME", 10))
 
+        # FIXME: add token count same way as sharing_new_token
         self.allow_upload = self.getbool("ALLOW_UPLOAD", False)
+
+        self.feature_sharing_new_token = int(os.getenv("FEATURE_SHARING_NEW_TOKEN", 0))
+        self.feature_sharing_links_enabled = self.feature_sharing_new_token>0
+
         self.output_directory = os.getenv("OUTPUT_DIRECTORY", None)
 
         if self.output_directory is None:
