@@ -36,7 +36,7 @@ class AppConfig:
                 self.output_directory, get_date_subfolder(), "feedback.txt"
             )
 
-        self.prompt_magic_active = self.getbool("PROMPTMAGIC", False)
+        self.feature_prompt_magic_enabled = self.getbool("PROMPTMAGIC", False)
 
         self.NO_AI = self.getbool("NO_AI", False)
         self.GPU_ALLOW_ATTENTION_SLICING = self.getbool(

@@ -34,13 +34,8 @@ class GradioUI():
             self.__feedback_file = self.config.user_feedback_filestorage
             logger.info(f"Initialize Feedback file on '{self.__feedback_file}'")
 
-            logger.info("Initial token: %i, wait time: %i minutes", self.config.initial_token, self.config.new_token_wait_time)
+            logger.debug("Initial token: %i, wait time: %i minutes", self.config.initial_token, self.config.new_token_wait_time)
 
-
-
-            # TODO: handover self.modelconfigs or better the selected model
-            # rethink the singleton, maybe it's better to have multiple different pipelines
-            # singleton only per model?
             selectedmodel = self.config.selected_model
             self.selectedmodelconfig = ModelConfig.get_config(model=selectedmodel, configs=modelconfigs)
 
@@ -48,27 +43,23 @@ class GradioUI():
                 logger.critical(f"Could not find model {selectedmodel} specified in env 'GENERATION_MODEL' or 'default' as fallback. Stopping execution")
                 exit(1)
             
-            #TODO: sanity checks like model.Type, model.path, ...
+            # Sanity checks like model.Type, model.path, ...
+            if self.selectedmodelconfig.path.strip() == "" or self.selectedmodelconfig.model_type.strip() == "":
+                logger.error("Configured Model and parents does not contain a path or modeltype. Stop execution.")
+                exit(1)
 
             self.initialize_database_uploaded_images()
             self.initialize_upload_ui()
             self.initialize_examples()
+            self.initialize_image_generator()
 
-            if "flux" in self.selectedmodelconfig.model_type:
-                self.generator = FluxGenerator(modelconfig=self.selectedmodelconfig)
-            else:
-                self.generator = StabelDiffusionGenerator(appconfig=self.config, modelconfig=self.selectedmodelconfig)
-            
-            if self.config.allow_upload:
-                self.face_analyzer = FaceDetector()
-
-            #TODO: create appconfig which is doing the env parsing 
-            # appconfig can also contains logic e.g. dependencies between settings
             self.prompt_refiner = None
-            if self.config.prompt_magic_active:
+            self.promptmagic_enabled = False
+            if self.config.feature_prompt_magic_enabled:
                 self.prompt_refiner = PromptRefiner()
-                #TODO: self.promptmagic_enabled=self.prompt_refiner.validate_ollama()
-            else:
+                self.promptmagic_enabled=self.prompt_refiner.validate_refiner_is_ready()
+            
+            if not self.promptmagic_enabled:
                 logger.warning("NSFW protection via PromptMagic is turned off")
 
             logger.info("Application succesful initialized")
@@ -77,6 +68,15 @@ class GradioUI():
             logger.error("Error initializing GradioUI: %s", str(e))
             logger.debug("Exception details:", exc_info=True)
             raise e
+
+    def initialize_image_generator(self):
+        if "flux" in self.selectedmodelconfig.model_type:
+            self.generator = FluxGenerator(modelconfig=self.selectedmodelconfig)
+        else:
+            self.generator = StabelDiffusionGenerator(appconfig=self.config, modelconfig=self.selectedmodelconfig)
+            
+        if self.config.allow_upload:
+            self.face_analyzer = FaceDetector()
 
     def initialize_upload_ui(self):
         try:
