@@ -142,7 +142,7 @@ class ModelConfig:
                 self.examples = priority_values.examples.copy()
 
     @classmethod
-    def split_aspect_ratio(aspect_ratio: str) -> tuple:
+    def split_aspect_ratio(cls, aspect_ratio: str) -> tuple:
         try:
             # TODO: add unittest
             width = int(aspect_ratio.split("x")[0])
