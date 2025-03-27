@@ -240,13 +240,13 @@ class GradioUI():
                 logger.debug(f"session reference saved for reference: {share_value}")
             
             # Map aspect ratio selection to dimensions
-            width, height = 512,512 # fallpack
-            for ratio in self.selectedmodelconfig.aspect_ratio.keys():
-                if ratio.lower() in aspect_ratio.lower():
-                    width, height = ModelConfig.split_aspect_ratio(self.selectedmodelconfig.aspect_ratio[ratio])
+            width, height = 512, 512 # fallpack
+            for supported_ratio in self.selectedmodelconfig.aspect_ratio.keys():
+                if supported_ratio.lower() in aspect_ratio.lower():
+                    ratio = self.selectedmodelconfig.aspect_ratio[supported_ratio]
+                    width, height = ModelConfig.split_aspect_ratio(ratio)
                     break
-            
-            
+                        
             prompt = str(prompt.strip()).replace("'", "-")
             userprompt = prompt
             neg_prompt = neg_prompt.strip()
@@ -514,15 +514,14 @@ class GradioUI():
 
                 with gr.Column():
                     # Aspect ratio selection
-                    # TODO dynamic loading
                     ratios = []
                     for k in self.selectedmodelconfig.aspect_ratio.keys():
                         ratios.append(k)
-                    if len(ratios)==0: ratios.append("512x512")
+                    if len(ratios)==0: ratios.append("default")
                     aspect_ratio = gr.Radio(
-                        choices=["□ Square", "▤ Landscape", "▯ Portrait"],
-                        #choices=[ratios],
-                        #value=ratios[0],
+                        #choices=["□ Square", "▤ Landscape", "▯ Portrait"],
+                        choices=ratios,
+                        value=ratios[0],
                         label="Aspect Ratio",
                         scale=1
                     )
