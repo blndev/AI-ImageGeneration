@@ -6,6 +6,7 @@ from .utils.singleton import singleton
 import logging
 logger = logging.getLogger(__name__)
 
+
 @singleton
 class AppConfig:
     def __init__(self):
@@ -21,6 +22,7 @@ class AppConfig:
         self.modelconfig_json = os.getenv("MODELCONFIG", "./modelconfig.json")
         self.selected_model = os.getenv("GENERATION_MODEL", "default")
         self.model_cache_dir = os.getenv("MODEL_DIRECTORY", "./models/")
+        self.free_memory_after_minutes_inactivity = int(os.getenv("FREE_MEMORY_AFTER_MINUTES_INACTIVITY", 15))
 
         self.initial_token = int(os.getenv("INITIAL_GENERATION_TOKEN", 0))
         self.token_enabled = self.initial_token > 0
@@ -30,7 +32,7 @@ class AppConfig:
         self.allow_upload = self.getbool("ALLOW_UPLOAD", False)
 
         self.feature_sharing_new_token = int(os.getenv("FEATURE_SHARING_NEW_TOKEN", 0))
-        self.feature_sharing_links_enabled = self.feature_sharing_new_token>0
+        self.feature_sharing_links_enabled = self.feature_sharing_new_token > 0
 
         self.output_directory = os.getenv("OUTPUT_DIRECTORY", None)
 

@@ -1,62 +1,64 @@
 from prometheus_client import Counter, Histogram, Gauge, start_http_server
-import time, logging
+import time
+import logging
 
 from user_agents import parse as parse_user_agent   # Split OS. Browser etc.
 from app.utils.singleton import singleton
 
 logger = logging.getLogger(__name__)
 
+
 @singleton
 class Analytics():
     def __init__(self):
         logger.info("Initializing Analytics")
         # Initialize Prometheus metrics
-        self.image_creations = Counter(
+        self._image_creations = Counter(
             'flux_image_creations_total',
             'Total number of images created',
             labelnames=('model', 'content')
         )
-        
-        self.sessions = Counter(
+
+        self._sessions = Counter(
             'flux_sessions_total',
             'Total number of user sessions',
             labelnames=('device_type', 'os', 'browser', 'language')
         )
-        
-        self.image_creations_by_reference = Counter(
+
+        self._image_creations_by_reference = Counter(
             'flux_image_creations_total_reference',
-            'Total number of images created via reference', 
+            'Total number of images created via reference',
             labelnames=('reference_code',)
         )
 
-        self.active_sessions = Gauge(
-            'flux_active_sessions_total',
+        self._active_sessions = Gauge(
+            'flux_active_sessions',
             'Amount of users active in the last 30 minutes'
         )
 
-        self.image_creation_time = Histogram(
+        self._image_creation_time = Histogram(
             'flux_image_creation_duration_seconds',
             'Time taken to create an image',
             buckets=[1, 2, 5, 10, 20, 30, 60]  # buckets in seconds
         )
-        
-        self.user_tokens = Gauge(
+
+        self._user_tokens = Gauge(
             'flux_user_tokens',
             'Current number of tokens available to users',
             ['user_id']
         )
-        
+
         # Start Prometheus HTTP server on port 9101
         start_http_server(9101)
-    
-    def record_image_creation(self, model:str=None, content: str = None):
+
+    def record_image_creation(self, count: int = 1, model: str = None, content: str = None):
         """Record a new image creation"""
-        self.image_creations.labels(model=model, country=content).inc()
-    
-    def record_image_creation_by_reference(self, reference:str=None):
+        self._image_creations.labels(model=model, content=content).inc(amount=count)
+
+    def record_image_creation_by_reference(self, count: int = 1, reference: str = None):
         """Record a new image creation"""
-        self.image_creations_by_reference.labels(reference_code=reference).inc()
-    
+        self._image_creations_by_reference.labels(reference_code=reference).inc(amount=count)
+
     def parse_user_agent(self, user_agent, languages):
         """Parse user agent string to extract OS, browser, device type, and language"""
         os = 'Unknown'
@@ -66,7 +68,7 @@ class Analytics():
 
         if user_agent:
             ua = parse_user_agent(user_agent)
-            os =  ua.os.family
+            os = ua.os.family
             browser = ua.browser.family
             device_type = ua.device.family
             if device_type == 'Other':
@@ -79,30 +81,34 @@ class Analytics():
 
         return os, browser, device_type, language
 
-    def record_new_session(self, user_agent: str = None, languages: str=None):
+    def record_new_session(self, user_agent: str = None, languages: str = None):
         """Record a new user session"""
         try:
             os, browser, dt, lng = self.parse_user_agent(user_agent, languages)
-            self.sessions.labels(os=os, browser=browser, device_type=dt, language=lng).inc()
-            #logger.debug(f"New user session recorded. Now: {self.sessions._value.get()}")
+            self._sessions.labels(os=os, browser=browser, device_type=dt, language=lng).inc()
         except Exception as e:
             logger.warning(f"Error while recording new session: {e}")
-    
-    def start_image_creation_timer(self):
+
+    def update_active_sessions(self, sessioncount: int):
+        """Update the token count for a user"""
+        self._active_sessions.set(sessioncount)
+
+    def start_image_creation_timer(self) -> time.time:
         """Start timing an image creation"""
         return time.time()
-    
+
     def stop_image_creation_timer(self, start_time):
         """Stop timing an image creation and record the duration"""
+        if start_time is None: return
         try:
             duration = time.time() - start_time
-            self.image_creation_time.observe(duration)
+            self._image_creation_time.observe(duration)
         except Exception as e:
             logger.warning(f"Error while stopping image creation timer and posting result: {e}")
-    
+
     def update_user_tokens(self, user_id: str, tokens: int):
         """Update the token count for a user"""
-        self.user_tokens.labels(user_id=user_id).set(tokens)
+        self._user_tokens.labels(user_id=user_id).set(tokens)
 
 # # Initialize analytics when module is imported
 # analytics = Analytics()

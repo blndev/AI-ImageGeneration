@@ -47,7 +47,7 @@ class BaseGenerator():
 
     def __del__(self):
         logger.info("free memory used for Generator pipeline")
-        self._unload_model()
+        self.unload_model()
 
     def check_safety(self, x_image):
         """Support function to check if the image is NSFW."""
@@ -116,8 +116,8 @@ class BaseGenerator():
         else:
             pass
 
-    def _unload_model(self):
-        # TODO: unload after a preiod of time without generation
+    def unload_model(self):
+        #  unload after a period of time without generation is triggered from ui, as this knows what will happen next
         try:
             logger.info("unload image generation model")
             if self._cached_generation_pipeline:

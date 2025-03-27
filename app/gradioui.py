@@ -1,8 +1,11 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 from hashlib import sha1
+from time import sleep
+from typing import List
 import os
 import gradio as gr
-from typing import List
+from apscheduler.schedulers.background import BackgroundScheduler
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from PIL import Image, ExifTags
 import logging
 from app import SessionState
@@ -29,8 +32,9 @@ class GradioUI():
             self.modelconfigs = modelconfigs
             self.analytics = Analytics()
             self.config = AppConfig()
-            self.existing_sessions = {}  # key=sessionid, value = timestamp of last token refresh
+            self.active_sessions = {}  # key=sessionid, value = timestamp of last token refresh
             self.session_references = {}  # key=referencID, value = int count(image created via reference)
+            self.last_generation = datetime.now()
 
             self.__feedback_file = self.config.user_feedback_filestorage
             logger.info(f"Initialize Feedback file on '{self.__feedback_file}'")
@@ -65,12 +69,20 @@ class GradioUI():
             if not self.promptmagic_enabled:
                 logger.warning("NSFW protection via PromptMagic is turned off")
 
+            self.scheduler = BackgroundScheduler()
+            self.scheduler.add_job(self.interval_cleanup_and_analytics, 'interval', max_instances=1, minutes=1, id="memory management")
+            
             logger.info("Application succesful initialized")
 
         except Exception as e:
             logger.error("Error initializing GradioUI: %s", str(e))
             logger.debug("Exception details:", exc_info=True)
             raise e
+
+    def __del__(self):
+        logger.info("cleanup ressources")
+        if self.scheduler:
+            self.scheduler.shutdown(wait=False)
 
     def initialize_image_generator(self):
         if "flux" in self.selectedmodelconfig.model_type:
@@ -153,6 +165,39 @@ class GradioUI():
             except Exception as e:
                 logger.error(f"Error while loading created_images.json: {e}")
 
+    def interval_cleanup_and_analytics(self):
+        """is called every 60 secdonds and:
+        * updates monitoring information
+        * refreshes configuration
+        * unloading unused models
+        """
+        logger.debug("tick - cleanup interval")
+        timeout_minutes = self.config.free_memory_after_minutes_inactivity
+        x15_minutes_ago = datetime.now() - timedelta(minutes=timeout_minutes)
+        to_be_removed = []
+        for key, last_active in self.active_sessions.items():
+            if last_active < x15_minutes_ago:
+                to_be_removed.append(key)
+
+        if len(to_be_removed)>0:
+            logger.info(f"remove {len(to_be_removed)} sessions as they are inactive for {timeout_minutes} minutes")
+
+        for ktr in to_be_removed:
+            self.active_sessions.pop(ktr)
+
+        self.analytics.update_active_sessions(len(self.active_sessions))
+
+        if len(self.active_sessions) == 0 and self.last_generation < x15_minutes_ago and self.generator:
+            # no active user for 15 minutes, we can unload the model to free memory
+            logger.info(f"No active user for {timeout_minutes} minutes. Unloading Generator Models from Memory")
+            self.generator.unload_model()
+            # TODO: onload also other models if possible like Validators.FaceDetector
+
+    def record_session_as_active(self, session_state):
+        """record the session as active with timestamp in local session state dictionary"""
+        if self.active_sessions is not None:
+            self.active_sessions[session_state.session] = datetime.now()
+
     def action_session_initialized(self, request: gr.Request, session_state: SessionState):
         """Initialize analytics session when app loads.
 
@@ -164,6 +209,8 @@ class GradioUI():
                     session_state.session, session_state.token, request.client.host)
 
         self.analytics.record_new_session(user_agent=request.headers["user-agent"], languages=request.headers["accept-language"])
+        self.record_session_as_active(session_state)
+        self.analytics.update_active_sessions(len(self.active_sessions))
 
     def uiaction_timer_check_token(self, gradio_state: str):
         if gradio_state is None:
@@ -192,15 +239,13 @@ class GradioUI():
                         f"""Congratulation, other Users used your shared link to generate images.
                         You received {new_token} new generation token!""", duration=0)
                     logger.info(f"session {session_state.session} received {new_token} new token for references")
-                    # FIXME: could be not thread safe:
+                    # FIXME: potentially not thread safe, needs to be checked
                     self.session_references[session_state.reference_code] = 0
             except Exception as e:
                 logger.warning(f"Reference count handling failed: {e}")
 
-        # record the session as active with timestamp in local session state dictionary
-        if self.existing_sessions is not None:
-            self.existing_sessions[session_state.session, datetime.now()]
-
+        self.record_session_as_active(session_state)
+        self.analytics.update_user_tokens(session_state.session, session_state.token)
         return session_state
 
     def uiaction_generate_images(self, request: gr.Request, gr_state, prompt, aspect_ratio, neg_prompt, image_count, promptmagic_active):
@@ -213,7 +258,9 @@ class GradioUI():
             image_count (int): The number of images to generate
         """
         session_state = SessionState.from_gradio_state(gr_state)
-
+        self.record_session_as_active(session_state)
+        self.last_generation = datetime.now()
+        analytics_image_creation_duration_start_time = None
         try:
             if self.config.token_enabled and session_state.token < image_count:
                 msg = f"Not enough generation token available.\n\nPlease wait {self.config.new_token_wait_time} minutes"
@@ -224,20 +271,20 @@ class GradioUI():
                 gr.Warning(msg, title="Image generation failed", duration=30)
                 return None, session_state
 
+            analytics_image_creation_duration_start_time = self.analytics.start_image_creation_timer()
             session_state.save_last_generation_activity()
-
             # preparation for ?share=CODE
             # TODO: add to session state and to reference list shared[share_code]+=1
             # then the originated user can receive the token
             # every 600 seconds 1 token = 10 images per hour if activated
             # shoudl be in create image
-            share_value = request.query_params.get("share")
-            if share_value is not None and share_value != "":
+            shared_reference_key = request.query_params.get("share")
+            if shared_reference_key is not None and shared_reference_key != "":
                 # url = request.url
-                v = self.session_references.get(share_value, 0)
+                v = self.session_references.get(shared_reference_key, 0)
                 v += image_count
-                self.session_references[share_value] = v
-                logger.debug(f"session reference saved for reference: {share_value}")
+                self.session_references[shared_reference_key] = v
+                logger.debug(f"session reference saved for reference: {shared_reference_key}")
 
             # Map aspect ratio selection to dimensions
             width, height = 512, 512  # fallpack
@@ -296,6 +343,14 @@ class GradioUI():
 
             if session_state.token <= 1:
                 logger.warning(f"session {session_state.session} running out of token ({session_state.token}) left")
+            try:
+                # TODO: create useful values for "content" eg. main focus (describe the main object create in the image in one word")
+                self.analytics.record_image_creation(count=image_count, model=self.generator.modelconfig.model, content="")
+                if shared_reference_key:
+                    self.analytics.record_image_creation_by_reference(count=image_count, reference=shared_reference_key)
+            except Exception as e:
+                logger.debug(f"error while recording sucessful image generation for stats: {e}")
+                pass
 
             return images, session_state
         except Exception as e:
@@ -305,6 +360,8 @@ class GradioUI():
             logger.debug("Exception details:", exc_info=True)
 
             gr.Warning(f"Error while generating the image: {e}", title="Image generation failed", duration=30)
+        finally:
+            self.analytics.stop_image_creation_timer(analytics_image_creation_duration_start_time)
         return None, session_state
 
     def uiaction_image_upload(self, gradio_state: str, image_path):
@@ -316,6 +373,8 @@ class GradioUI():
             image (PIL.Image): The uploaded image
         """
         logger.debug("starting image upload handler")
+        session_state = SessionState.from_gradio_state(gradio_state)
+        self.record_session_as_active(session_state)
 
         if self.config.output_directory is None:
             logger.debug("output directory not configured, skipping upload")
@@ -328,7 +387,7 @@ class GradioUI():
             logger.debug(f"image type: {type(image_path)} with value {image_path}")
             image = Image.open(image_path)
             filename = os.path.basename(image_path)
-            session_state = SessionState.from_gradio_state(gradio_state)
+
             image_sha1 = sha1(image.tobytes()).hexdigest()
             logger.info(f"UPLOAD from {session_state.session} with ID: {image_sha1}")
             if self._uploaded_images.get(image_sha1) is not None:
@@ -355,13 +414,14 @@ class GradioUI():
         Handle token generation for image upload
         """
         if image_path is None:
-            logger.error("Image received a token generation is none")
+            logger.error("No Image received, path is none")
             return gradio_state, gr.Button(interactive=False), None
 
+        session_state = SessionState.from_gradio_state(gradio_state)
+        self.record_session_as_active(session_state)
         try:
             logger.debug(f"image type: {type(image_path)} with value {image_path}")
             image = Image.open(image_path)
-            session_state = SessionState.from_gradio_state(gradio_state)
             logger.info(f"Analyze upload to receive TOKEN from {session_state.session}")
             token = 25  # TODO: load from config
             msg = ""
@@ -691,6 +751,11 @@ class GradioUI():
                 inputs=[user_session_storage],
                 outputs=[user_session_storage],
                 concurrency_id="check_token",
+            ).then(
+                # enable feedback again
+                fn=lambda: (sleep(2)),
+                inputs=[],
+                outputs=[]
             )
 
             # Make button interactive only when prompt has text
@@ -778,6 +843,7 @@ class GradioUI():
     def launch(self, **kwargs):
         if self.interface is None:
             self.create_interface()
+        self.scheduler.start()
         self.interface.launch(**kwargs)
         # self.generator.warmup()
         # gr.Interface.from_pipeline(self.generator._cached_generation_pipeline).launch()

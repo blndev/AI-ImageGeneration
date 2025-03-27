@@ -63,6 +63,7 @@ class StabelDiffusionGenerator(BaseGenerator):
                 logger.info(
                     f"Using 'from_pretrained' option to load model {modelpath} from hugging face or local cache"
                 )
+                #TODO: use dict for parameters of both
                 pipeline = pt.from_pretrained(
                     modelpath,
                     token=self._hftoken,
@@ -157,7 +158,7 @@ class StabelDiffusionGenerator(BaseGenerator):
                 logger.error(f"Error while generating Images: {e}")
                 try:
                     torch.cuda.empty_cache()
-                    self._unload_model()
+                    self.unload_model()
                 except Exception as e:
                     logger.debug(f"free cuda or unload model failed with {e}")
                 raise Exception("Internal error while creating the image.")

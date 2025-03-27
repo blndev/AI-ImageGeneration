@@ -61,6 +61,8 @@ def setup_logging():
     logging.getLogger('matplotlib').setLevel(logging.WARNING)
     logging.getLogger('filelock').setLevel(logging.WARNING)
     logging.getLogger('urllib3.connectionpool').setLevel(logging.WARNING)
+    logging.getLogger('apscheduler.executors.default').setLevel(logging.WARNING)
+    logging.getLogger('apscheduler.scheduler').setLevel(logging.WARNING)
 
     log_directory = "logs"
     if not os.path.exists(log_directory):
