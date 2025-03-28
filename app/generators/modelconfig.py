@@ -197,6 +197,78 @@ class ModelConfig:
 
         return config
 
+    def sanity_check(self) -> bool:
+        """
+        Performs a sanity check on the ModelConfig instance to ensure all required fields are present
+        and properly structured.
+
+        Returns:
+            bool: True if all checks pass, False otherwise
+
+        The method checks:
+        - Model name is present and not empty
+        - Path is present and not empty
+        - Aspect ratio dictionary exists and contains at least one entry
+        - Generation dictionary exists
+        - Embeddings dictionary exists and contains both 'positive' and 'negative' keys
+        - Loras list exists
+        - Examples list exists
+        """
+        try:
+            # Check model name
+            if not self.model or not isinstance(self.model, str):
+                logger.warning(f"Model {self.model} has invalid model name")
+                return False
+
+            # Check path
+            if not self.path or not isinstance(self.path, str):
+                logger.warning(f"Model {self.model} has invalid path")
+                return False
+
+            # Check aspect ratio
+            if not isinstance(self.aspect_ratio, dict):
+                logger.warning(f"Model {self.model} has invalid aspect_ratio type")
+                return False
+
+            if len(self.aspect_ratio) == 0:
+                logger.warning(f"Model {self.model} has no aspect ratios defined")
+                return False
+
+            # Check generation dictionary
+            if not isinstance(self.generation, dict):
+                logger.warning(f"Model {self.model} has invalid generation settings type")
+                return False
+
+            # Check embeddings
+            if not isinstance(self.embeddings, dict):
+                logger.warning(f"Model {self.model} has invalid embeddings type")
+                return False
+
+            if 'positive' not in self.embeddings or 'negative' not in self.embeddings:
+                logger.warning(f"Model {self.model} is missing positive or negative embeddings")
+                return False
+
+            if not isinstance(self.embeddings['positive'], list) or \
+                    not isinstance(self.embeddings['negative'], list):
+                logger.warning(f"Model {self.model} has invalid embeddings list type")
+                return False
+
+            # Check loras
+            if not isinstance(self.loras, list):
+                logger.warning(f"Model {self.model} has invalid loras type")
+                return False
+
+            # Check examples
+            if not isinstance(self.examples, list):
+                logger.warning(f"Model {self.model} has invalid examples type")
+                return False
+
+            return True
+
+        except Exception as e:
+            logger.warning(f"Sanity check failed for model {self.model}: {str(e)}")
+            return False
+
     @classmethod
     def create_config_list_from_json(cls, json_str: str) -> List["ModelConfig"]:
         data = json.loads(json_str)

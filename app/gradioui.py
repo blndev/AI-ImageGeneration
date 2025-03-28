@@ -50,7 +50,7 @@ class GradioUI():
                 exit(1)
 
             # Sanity checks like model.Type, model.path, ...
-            if self.selectedmodelconfig.path.strip() == "" or self.selectedmodelconfig.model_type.strip() == "":
+            if self.selectedmodelconfig.sanity_check() == False:
                 logger.error("Configured Model and parents does not contain a path or modeltype. Stop execution.")
                 exit(1)
 
