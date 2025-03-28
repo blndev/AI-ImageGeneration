@@ -71,7 +71,7 @@ class GradioUI():
 
             self.scheduler = BackgroundScheduler()
             self.scheduler.add_job(self.interval_cleanup_and_analytics, 'interval', max_instances=1, minutes=1, id="memory management")
-            
+
             logger.info("Application succesful initialized")
 
         except Exception as e:
@@ -179,7 +179,7 @@ class GradioUI():
             if last_active < x15_minutes_ago:
                 to_be_removed.append(key)
 
-        if len(to_be_removed)>0:
+        if len(to_be_removed) > 0:
             logger.info(f"remove {len(to_be_removed)} sessions as they are inactive for {timeout_minutes} minutes")
 
         for ktr in to_be_removed:
@@ -208,7 +208,12 @@ class GradioUI():
         logger.info("Session - %s - initialized with %i token for: %s",
                     session_state.session, session_state.token, request.client.host)
 
-        self.analytics.record_new_session(user_agent=request.headers["user-agent"], languages=request.headers["accept-language"])
+        shared_reference_key = self.get_reference_code(request)
+        self.analytics.record_new_session(
+            user_agent=request.headers["user-agent"],
+            languages=request.headers["accept-language"],
+            reference=shared_reference_key)
+
         self.record_session_as_active(session_state)
         self.analytics.update_active_sessions(len(self.active_sessions))
 
@@ -278,7 +283,7 @@ class GradioUI():
             # then the originated user can receive the token
             # every 600 seconds 1 token = 10 images per hour if activated
             # shoudl be in create image
-            shared_reference_key = request.query_params.get("share")
+            shared_reference_key = self.get_reference_code(request)
             if shared_reference_key is not None and shared_reference_key != "":
                 # url = request.url
                 v = self.session_references.get(shared_reference_key, 0)
@@ -345,9 +350,11 @@ class GradioUI():
                 logger.warning(f"session {session_state.session} running out of token ({session_state.token}) left")
             try:
                 # TODO: create useful values for "content" eg. main focus (describe the main object create in the image in one word")
-                self.analytics.record_image_creation(count=image_count, model=self.generator.modelconfig.model, content="")
-                if shared_reference_key:
-                    self.analytics.record_image_creation_by_reference(count=image_count, reference=shared_reference_key)
+                self.analytics.record_image_creation(
+                    count=image_count,
+                    model=self.generator.modelconfig.model,
+                    content="",
+                    reference=shared_reference_key)
             except Exception as e:
                 logger.debug(f"error while recording sucessful image generation for stats: {e}")
                 pass
@@ -363,6 +370,10 @@ class GradioUI():
         finally:
             self.analytics.stop_image_creation_timer(analytics_image_creation_duration_start_time)
         return None, session_state
+
+    def get_reference_code(self, request):
+        shared_reference_key = request.query_params.get("share")
+        return shared_reference_key
 
     def uiaction_image_upload(self, gradio_state: str, image_path):
         """

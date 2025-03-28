@@ -16,19 +16,13 @@ class Analytics():
         self._image_creations = Counter(
             'flux_image_creations_total',
             'Total number of images created',
-            labelnames=('model', 'content')
+            labelnames=('model', 'content', 'reference_code')
         )
 
         self._sessions = Counter(
             'flux_sessions_total',
             'Total number of user sessions',
-            labelnames=('device_type', 'os', 'browser', 'language')
-        )
-
-        self._image_creations_by_reference = Counter(
-            'flux_image_creations_total_reference',
-            'Total number of images created via reference',
-            labelnames=('reference_code',)
+            labelnames=('device_type', 'os', 'browser', 'language', 'reference_code')
         )
 
         self._active_sessions = Gauge(
@@ -51,13 +45,9 @@ class Analytics():
         # Start Prometheus HTTP server on port 9101
         start_http_server(9101)
 
-    def record_image_creation(self, count: int = 1, model: str = None, content: str = None):
+    def record_image_creation(self, count: int = 1, model: str = None, content: str = None, reference: str = None):
         """Record a new image creation"""
-        self._image_creations.labels(model=model, content=content).inc(amount=count)
-
-    def record_image_creation_by_reference(self, count: int = 1, reference: str = None):
-        """Record a new image creation"""
-        self._image_creations_by_reference.labels(reference_code=reference).inc(amount=count)
+        self._image_creations.labels(model=model, content=content, reference_code=reference).inc(amount=count)
 
     def parse_user_agent(self, user_agent, languages):
         """Parse user agent string to extract OS, browser, device type, and language"""
@@ -81,11 +71,11 @@ class Analytics():
 
         return os, browser, device_type, language
 
-    def record_new_session(self, user_agent: str = None, languages: str = None):
+    def record_new_session(self, user_agent: str = None, languages: str = None, reference: str = None):
         """Record a new user session"""
         try:
             os, browser, dt, lng = self.parse_user_agent(user_agent, languages)
-            self._sessions.labels(os=os, browser=browser, device_type=dt, language=lng).inc()
+            self._sessions.labels(os=os, browser=browser, device_type=dt, language=lng, reference_code=reference).inc()
         except Exception as e:
             logger.warning(f"Error while recording new session: {e}")
 
