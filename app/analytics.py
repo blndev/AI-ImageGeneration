@@ -47,6 +47,7 @@ class Analytics():
 
     def record_image_creation(self, count: int = 1, model: str = None, content: str = None, reference: str = None):
         """Record a new image creation"""
+        if not reference: reference = ""
         self._image_creations.labels(model=model, content=content, reference_code=reference).inc(amount=count)
 
     def parse_user_agent(self, user_agent, languages):
@@ -75,6 +76,7 @@ class Analytics():
         """Record a new user session"""
         try:
             os, browser, dt, lng = self.parse_user_agent(user_agent, languages)
+            if not reference: reference = ""
             self._sessions.labels(os=os, browser=browser, device_type=dt, language=lng, reference_code=reference).inc()
         except Exception as e:
             logger.warning(f"Error while recording new session: {e}")
