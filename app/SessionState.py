@@ -26,11 +26,12 @@ class SessionState:
             raise TypeError(f"session must be of type str, but {type(value).__name__} was assigned.")
         return value
 
-    def __init__(self, token: int = 0, session: str = None, last_generation: str = None, reference_code: str =None):
+    def __init__(self, token: int = 0, session: str = None, last_generation: str = None, nsfw: bool = False, reference_code: str = None):
         """State object for storing application data in browser."""
         self.token: int = token
         self.session: str = str(uuid.uuid4()) if session == None else session
         self.last_generation = last_generation
+        self.nsfw = nsfw
         self.reference_code = reference_code
 
     def __str__(self) -> str:
@@ -52,6 +53,7 @@ class SessionState:
             'token': self.token,
             'session': str(self.session),
             'last_generation': self.last_generation,
+            'nsfw': self.nsfw,
             'reference_code': self.reference_code
         }
 
@@ -77,13 +79,13 @@ class SessionState:
     def has_reference_code(self) -> bool:
         """Check if reference code is set."""
         return self.reference_code is not None and self.reference_code != ""
-    
+
     def get_reference_code(self) -> str:
         """Get reference code."""
         if self.reference_code is None:
             self.reference_code = str(uuid.uuid4())
         return self.reference_code
-    
+
     @classmethod
     def from_dict(cls, data: Optional[dict]) -> 'SessionState':
         """Create SessionState from dictionary after deserialization."""
@@ -93,6 +95,7 @@ class SessionState:
             token=data.get('token', 0),
             session=data.get('session', str(uuid.uuid4())),
             last_generation=data.get('last_generation', None),
+            nsfw=data.get('nsfw', False),
             reference_code=data.get('reference_code', None)
         )
 
