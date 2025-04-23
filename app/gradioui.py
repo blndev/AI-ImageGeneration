@@ -13,7 +13,7 @@ from .appconfig import AppConfig
 from app.utils.singleton import singleton
 from app.utils.fileIO import save_image_with_timestamp, get_date_subfolder
 from app.generators import FluxGenerator, GenerationParameters, ModelConfig, StabelDiffusionGenerator
-from app.validators import FaceDetector, PromptRefiner
+from app.validators import ExifScanner, FaceDetector, PromptRefiner
 from .analytics import Analytics
 import json
 import shutil
@@ -238,7 +238,7 @@ class GradioUI():
             try:
                 reference_count = self.session_references.get(session_state.reference_code, 0)
                 if reference_count > 0:
-                    new_token = reference_count * self.config.feature_sharing_new_token
+                    new_token = reference_count * self.config.feature_sharing_link_new_token
                     session_state.token += new_token
                     gr.Info(
                         f"""Congratulation, other Users used your shared link to generate images.
@@ -292,7 +292,7 @@ class GradioUI():
                 logger.debug(f"session reference saved for reference: {shared_reference_key}")
 
             # Map aspect ratio selection to dimensions
-            width, height = 512, 512  # fallpack
+            width, height = 512, 512  # fallback
             for supported_ratio in self.selectedmodelconfig.aspect_ratio.keys():
                 if supported_ratio.lower() in aspect_ratio.lower():
                     ratio = self.selectedmodelconfig.aspect_ratio[supported_ratio]
@@ -304,21 +304,21 @@ class GradioUI():
             neg_prompt = neg_prompt.strip()
             # make default only sfw, TODO add ehancement (upload required for NSFW)
             # TODO: feature switch in config to enable NSFW and NSFW_AFTER_UPLOAD
-            if self.prompt_refiner:
-                if self.prompt_refiner.check_contains_nsfw(prompt):  # TODO: and config and not enabled for user
+            if session_state.nsfw is False and self.prompt_refiner:
+                if self.prompt_refiner.check_contains_nsfw(prompt):
                     logger.info(f"Convert NSFW prompt to SFW. User Prompt: '{prompt}'")
                     prompt = self.prompt_refiner.make_prompt_sfw(prompt, True)
                 else:
                     logger.debug("prompt is SFW")
 
-            # TODO: check for exclusion
-            if self.prompt_refiner != None:
+            if session_state.nsfw is False:
                 neg_prompt = "nude, naked, nsfw, porn," + neg_prompt
 
             if self.prompt_refiner and promptmagic_active:
-                logger.info(f"Apply Prompt-Magic")
+                logger.info("Apply Prompt-Magic")
                 prompt = self.prompt_refiner.magic_enhance(prompt, 70)
-                prompt = self.prompt_refiner.make_prompt_sfw(prompt)
+                if session_state.nsfw is False:
+                    prompt = self.prompt_refiner.make_prompt_sfw(prompt)
 
             logger.info(
                 f"generating image for {session_state.session} with {session_state.token} token available.\n - prompt: '{prompt}'")
@@ -326,7 +326,7 @@ class GradioUI():
             generation_details = GenerationParameters(
                 prompt=prompt,
                 negative_prompt=neg_prompt,
-                num_inference_steps=int(self.selectedmodelconfig.generation.get("steps", 30)),  # TODO: make object out of it
+                num_inference_steps=int(self.selectedmodelconfig.generation.get("steps", 30)),
                 guidance_scale=float(self.selectedmodelconfig.generation.get("guidance", 1)),
                 # FIXME: is that only required form i2i? strength=self.selectedmodelconfig.generation["strength"],
                 num_images_per_prompt=image_count,
@@ -350,6 +350,7 @@ class GradioUI():
                 logger.warning(f"session {session_state.session} running out of token ({session_state.token}) left")
             try:
                 # TODO: create useful values for "content" eg. main focus (describe the main object create in the image in one word")
+                # use blib or ollama image descibe
                 self.analytics.record_image_creation(
                     count=image_count,
                     model=self.generator.modelconfig.model,
@@ -405,16 +406,15 @@ class GradioUI():
                 logger.warning(f"Image {image_sha1} already uploaded, cancel save to disk")
                 # we keep upload button true as the whole logic is behind it
                 # could happen that it was not uploaded by same user and get few points
+                # upload means in somehow "analyze"
                 return gr.Button(interactive=True)
 
             dir = self.config.output_directory
             dir = os.path.join(dir, get_date_subfolder(), "upload")
-            targetpath = os.path.join(dir, image_sha1 + "_" + filename)
-            # copy file from source  to outdir
+            targetpath = os.path.join(dir, str(session_state.session) + '_' + image_sha1 + "_" + filename)
+            # copy file from source to outdir
             os.makedirs(dir, exist_ok=True)
             shutil.copy(image_path, targetpath)
-            # fn = str(session_state.session)+"_" + image_sha1+".png"
-            # input_file_path = save_image_as_png(image, dir, filename=fn)
             logger.info(f"Image saved to {targetpath}")
         except Exception as e:
             logger.error(f"save image failed: {e}")
@@ -434,7 +434,7 @@ class GradioUI():
             logger.debug(f"image type: {type(image_path)} with value {image_path}")
             image = Image.open(image_path)
             logger.info(f"Analyze upload to receive TOKEN from {session_state.session}")
-            token = 25  # TODO: load from config
+            token = self.config.feature_upload_images_token_reward
             msg = ""
             image_sha1 = sha1(image.tobytes()).hexdigest()
             uploadstate = self._uploaded_images.get(image_sha1)
@@ -447,64 +447,22 @@ class GradioUI():
                     gr.Warning(msg, title="Upload failed")
                     return session_state, gr.Button(interactive=False), None
             else:
+                # prepare upload state, will be adapted later
                 self._uploaded_images[image_sha1] = {session_state.session: {"token": token, "msg": ""}}
 
                 try:
-                    img_info = image.info
-                    if img_info is None:
-                        logger.debug("No image info found")
-                        img_info = {}
-                    for key, value in img_info.items():
-                        print(f"IMG.Info: {key}: {value}")
-
-                    # check for an face and ai
-                    # TODO: exif is not working, refactor to extra function and create tests
-                    exif_data = image.getexif()
-                    if exif_data is not None:
-                        logger.debug(f"{len(exif_data)} EXIF data found")
-                        if len(exif_data) > 0:
-                            for key, val in exif_data.items():
-                                print(f'{key}:{val}')
-                                if key in ExifTags.TAGS:
-                                    print(f'{ExifTags.TAGS[key]}:{val}')
-
-                            actions_description = exif_data.get('Actions Description')
-                            if actions_description:
-                                print(f"Actions Description: {actions_description}")
-                            else:
-                                print("Actions Description nicht gefunden.")
-
-                            gps_ifd = exif_data.get_ifd(ExifTags.IFD.GPSInfo)
-                            if gps_ifd is not None and len(gps_ifd) > 0:
-                                logger.debug("Image probably contains GPS data, so no AI")
-                            elif "Generator" in exif_data:
-                                msg = "Image probably AI generated"
-                                logger.warning(msg)
-                                token = 5
-                            elif exif_data[ExifTags.Base.Software] == "PIL" or exif_data[ExifTags.Base.HostComputer]:
-                                msg = "Image probably generated or edited"
-                                logger.warning(msg)
-                                token = 5
-                            elif exif_data[ExifTags.Base.Copyright] != None:
-                                msg = "Image is copyright protected"
-                                logger.warning(msg)
-                                token = 10
-                        # elif exif_data[]==:
-                        #     msg = "Image is copyright protected"
-                        #     logger.warning(msg)
-                        #     token = 10
-                    else:
-                        logger.debug("No EXIF data found")
-                except Exception as e:
-                    logger.error(f"Error while checking image EXIF data: {e}")
-
-                try:
                     faces, cv2 = self.face_analyzer.get_faces(image)
-                    if len(faces) == 0:
+                    exifscanner = ExifScanner()
+                    if exifscanner.is_photo(image) is False:
+                        msg = "Image probably AI generated"
+                        logger.warning(msg)
+                        token = 5
+                    elif len(faces) == 0:
                         msg = """No face detected in the image. Could happen that the face is to narrow or the resoltution is too small.
-                                 Try another pictrue to get more token!"""
+                                Try another pictrue to get more token!"""
                         token = 5
                         logger.warning(f"No Face detected on image {image_sha1} from {session_state.session}")
+
                     else:
                         # prepare for auto removal of critical images
                         logger.info(f"{len(faces)} Face(s) detected on upload from {session_state.session}")
@@ -512,7 +470,7 @@ class GradioUI():
                         for face in faces:
                             if face.age:
                                 ages += str(face.age) + ","
-                                if face.age < 18 and self.config.output_directory != None:
+                                if face.age < 18 and self.config.output_directory is not None:
                                     fn = os.path.join(self.config.output_directory, "warning", get_date_subfolder())
                                     fn = os.path.join(fn, f"{image_sha1}-{face.age}.jpg")
                                     self.face_analyzer.get_face_picture(cv2, face, filename=fn)
@@ -520,8 +478,13 @@ class GradioUI():
                         logger.debug(f"Ages on the image {image_sha1}: {ages[:-1]}")
 
                 except Exception as e:
-                    logger.error(f"Error while detecting face: {e}")
+                    logger.error(f"Error while analyzing uploaded image: {e}")
 
+                try:
+                    pass
+                    # TODO: Feature for V2 - use OllamaImageAnalyzer
+                except Exception as e:
+                    logger.error(f"Error while checking special rules: {e}")
             if (token > 0):
                 session_state.token += token
                 if msg != "":
@@ -531,9 +494,10 @@ class GradioUI():
 
             else:
                 gr.Warning(msg, title="Upload failed")
+
             # if token = 0, it was already claimed or it's failing the checks
             if not self._uploaded_images[image_sha1].get(session_state.session):
-                # split creation and assignment as old data might be in the object we ant to keep
+                # split creation and assignment as old data might be in the object we want to keep
                 self._uploaded_images[image_sha1][session_state.session] = {}
 
             self._uploaded_images[image_sha1][session_state.session]["token"] = token
