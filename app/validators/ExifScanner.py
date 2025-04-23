@@ -1,5 +1,5 @@
 class ExifScanner():
-    def is_photo(Image):
+    def is_photo(self, Image):
         # TODO: implement and unit tests
         return True
 
