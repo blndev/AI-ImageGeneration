@@ -11,7 +11,7 @@ class TestGradioUISessionState(unittest.TestCase):
         self.nsfw_prompts = [
              "naked image of a man and a woman",
              "image of a woman without clothes",
-             "show her naked butt in the mirror",
+             "girl show her naked butt in the mirror",
              "killed people in a house",
              #"na**d people", difficult to detect, same as p0rn FIXME
              "bloody brain",
