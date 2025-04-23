@@ -90,7 +90,7 @@ class GradioUI():
         else:
             self.generator = StabelDiffusionGenerator(appconfig=self.config, modelconfig=self.selectedmodelconfig)
 
-        if self.config.allow_upload:
+        if self.config.feature_upload_images_for_new_token_enabled:
             self.face_analyzer = FaceDetector()
 
     def initialize_upload_ui(self):
@@ -128,7 +128,7 @@ class GradioUI():
             ]
 
     def initialize_database_uploaded_images(self):
-        if self.config.allow_upload:
+        if self.config.feature_upload_images_for_new_token_enabled:
             # Fallback
             basedir = "./output/"
             if self.config.output_directory:
@@ -147,7 +147,7 @@ class GradioUI():
                 logger.error(f"Error while loading uploaded_images.json: {e}")
 
     def initialize_database_created_images(self):
-        if self.config.allow_upload:
+        if self.config.feature_upload_images_for_new_token_enabled:
             # Fallback
             basedir = "./output/"
             if self.config.output_directory:
@@ -269,7 +269,7 @@ class GradioUI():
         try:
             if self.config.token_enabled and session_state.token < image_count:
                 msg = f"Not enough generation token available.\n\nPlease wait {self.config.new_token_wait_time} minutes"
-                if self.config.allow_upload:
+                if self.config.feature_upload_images_for_new_token_enabled:
                     msg += ", or get new token by sharing images for training"
                 if self.config.feature_sharing_links_enabled:
                     msg += ", or share the application link to other users"
@@ -608,7 +608,7 @@ class GradioUI():
                     )
 
             # Upload to get Token row
-            with gr.Row(visible=(self.config.output_directory and self.config.allow_upload)):
+            with gr.Row(visible=(self.config.output_directory and self.config.feature_upload_images_for_new_token_enabled)):
                 with gr.Accordion("Get more Token", open=False):
                     with gr.Row():
                         with gr.Column(scale=2):
