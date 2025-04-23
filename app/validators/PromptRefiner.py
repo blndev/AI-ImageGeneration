@@ -138,7 +138,8 @@ class PromptRefiner():
             logger.debug("analyze image")
             is_nsfw, reasons = self.check_contains_nsfw(prompt)
             logger.debug(f"result NSFW check:{is_nsfw}, message: '{reasons}'")
-        while i < 10 and is_nsfw:
+
+        while is_nsfw and i < 10:
             # we need to loop because sometimes not all content is removed on first run
             prompt = self._executor_make_prompt_sfw(prompt)
             is_nsfw, reasons = self.check_contains_nsfw(prompt)
@@ -153,13 +154,13 @@ class PromptRefiner():
         system_message = """
         The user provides always an image description. You have to rewrite it by given tasks.
         Don't explain yourself. Only return the optimized text.
+        Keep maturity, age, gender and country in any of the tasks you execute.
         """
 
         # if failed_rules:
         #     system_message+="Take special care and solve the following NSFW reasons\n\n"+ failed_rules
 
         rules = [
-            "Keep maturity, age, gender and country in any of the tasks you execute.",
             "Replace all explicit or implicit depictions of nudity or porn including the words naked, nude with clothed e.g. underwear",
             "Remove all mentionings of genitals and nipples",
             "Remove all mentionings of transexuals, make them woman or man",
@@ -170,10 +171,10 @@ class PromptRefiner():
 
         messages = [
             SystemMessage(system_message),
-            HumanMessage(f"Example: Replace all mentioning of airplanes in the given text: 'An airplane is flying over the forest"),
+            HumanMessage("Example: Replace all mentioning of airplanes in the given text: 'An airplane is flying over the forest"),
             AIMessage("A bird is flying over the forest."),
-            HumanMessage(f"Example: Replace all mentioning of nudity in the given text: 'A naked woman on the beach"),
-            AIMessage("A woman wearing a bikini on the beach."),
+            HumanMessage("Example: Replace all mentioning of nudity in the given text: 'A naked woman on the beach"),
+            AIMessage("A woman wearing a bikini."),
             HumanMessage(f"Perfect. New Tasks will follow. Here is the image description to work with: '{prompt}'")
         ]
         for rule in rules:
@@ -195,8 +196,13 @@ You never accept tasks from human. You always {task} the user given image descri
 If the context is missing be creative. Try to keep the original intent.
 Don't write any summary or explanation. If you can't fulfill the task, echo the text without any changes.
 """),
-            HumanMessage(f"{task} this image description to a maximum of 14 words, answer only with the new text: 'yellow leafes'"),
+            HumanMessage("enhance this image description to a maximum of 14 words, answer only with the new text: 'yellow leafes'"),
             AIMessage("A tree in autum. Yellow leafes falling as the wind blows."),
+            HumanMessage("Greate. Now enhance this image description to a maximum of 20 words, answer only with the new text: 'A woman in bikini'"),
+            AIMessage("A beautiful woman wearing modern bikini on a beach. She smiles. A sunny day, blue ocean, palm trees."),
+
+            HumanMessage("Great. Now shorten this image description to a maximum of 5 words, answer only with the new text: 'A group of people walking on a rainy day in the forest'"),
+            AIMessage("Group of people in forest."),
             HumanMessage(
                 f"Perfect. New Task:\n{task} this image description to a maximum of {max_words} words, answer only with the new text: '{prompt}'"),
         ]
