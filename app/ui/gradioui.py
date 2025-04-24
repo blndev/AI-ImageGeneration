@@ -485,12 +485,17 @@ class GradioUI():
                 token = 5
                 if already_used.get(session_state.session):
                     msg = "You've already submitted this image, and it won't generate any tokens."
-                    gr.Warning(msg, title="Upload failed")
-                    return session_state, gr.Button(interactive=False), None
+                    token = 0
+                    #gr.Warning(msg, title="Upload failed")
+                    #return session_state, gr.Button(interactive=False), None
             elif self._created_images_history.get(image_sha1):
                 msg = "This image is already known, and it won't generate any tokens."
-                gr.Warning(msg, title="Upload failed")
-                return session_state, gr.Button(interactive=False), None
+                token = 0
+                #gr.Warning(msg, title="Upload failed")
+                #return session_state, gr.Button(interactive=False), None
+            elif image.width <= 768 or image.height <= 768:
+                msg = "This image is too small to be used for training. Pleas use a larger resolution to get more tokens."
+                token = 1
             else:
                 # prepare upload state, will be adapted later
                 self._uploaded_images[image_sha1] = {session_state.session: {"token": token, "msg": ""}}
@@ -502,9 +507,9 @@ class GradioUI():
                     if is_ai_image:
                         msg = "Image probably AI generated"
                         logger.warning(msg + " Reason: " + reason)
-                        token = 5
+                        token = 1
                     elif len(faces) == 0:
-                        msg = """No face detected in the image. Could happen that the face is to narrow or the resoltution is too small.
+                        msg = """No face detected in the image. Could happen that the face is to narrow or the resolution is too low.
                                 Try another pictrue to get more token!"""
                         token = 5
                         logger.warning(f"No Face detected on image {image_sha1} from {session_state.session}")
@@ -539,15 +544,10 @@ class GradioUI():
                 except Exception as e:
                     logger.error(f"Error while analyzing uploaded image: {e}")
 
-                try:
-                    pass
-                    # TODO: Feature for V2 - use OllamaImageAnalyzer
-                except Exception as e:
-                    logger.error(f"Error while checking special rules: {e}")
             if (token > 0):
                 session_state.token += token
                 if msg != "":
-                    gr.Info(f"You received {token} new generation token! \n\nNotes: {msg}", duration=30)
+                    gr.Info(f"You received {token} new generation token! \n\nNote: {msg}", duration=30)
                 else:
                     gr.Info(f"Congratulation, you received {token} new generation token!", duration=30)
 
@@ -555,6 +555,8 @@ class GradioUI():
                 gr.Warning(msg, title="Upload failed")
 
             # if token = 0, it was already claimed or it's failing the checks
+            if not self._uploaded_images.get(image_sha1):
+                self._uploaded_images[image_sha1] = {}
             if not self._uploaded_images[image_sha1].get(session_state.session):
                 # split creation and assignment as old data might be in the object we want to keep
                 self._uploaded_images[image_sha1][session_state.session] = {}
