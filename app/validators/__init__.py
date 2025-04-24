@@ -1,6 +1,7 @@
 from .FaceDetector import FaceDetector
 from .PromptRefiner import PromptRefiner
 from .ExifScanner import ExifScanner
-#from .OllamaImageAnalyzer import OllamaImageAnalyzer
+from .nsfw_detector import NSFWDetector, NSFWCategory, NSFWDetectionResult
+# from .OllamaImageAnalyzer import OllamaImageAnalyzer
 
-__all__ = ["FaceDetector","PromptRefiner", "ExifScanner"]
+__all__ = ["FaceDetector", "PromptRefiner", "ExifScanner", "NSFWDetector", "NSFWCategory", "NSFWDetectionResult"]
