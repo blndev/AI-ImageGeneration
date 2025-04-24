@@ -99,12 +99,12 @@ class ExifScanner:
             if any(sig in maker_note for sig in self.AI_GENERATOR_SIGNATURES):
                 indicators.append("AI signature in MakerNote")
 
-        # Check for missing typical camera metadata
-        if not any(key in metadata for key in [
-            'Make', 'Model', 'ExifImageWidth', 'ExifImageHeight', 
-            'DateTimeOriginal', 'ExposureTime', 'FNumber'
-        ]):
-            indicators.append("Missing typical camera metadata")
+        # # Check for missing typical camera metadata
+        # if not any(key in metadata for key in [
+        #     'Make', 'Model', 'ExifImageWidth', 'ExifImageHeight', 
+        #     'DateTimeOriginal', 'ExposureTime', 'FNumber'
+        # ]):
+        #     indicators.append("Missing typical camera metadata")
 
         return indicators
 
