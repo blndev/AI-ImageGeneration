@@ -32,13 +32,13 @@ class StabelDiffusionGenerator(BaseGenerator):
             logger.debug(f"Loading model {modelpath}, using cache '{self.appconfig.model_cache_dir}'")
             pipeline = None
 
-            pt = None
+            pipelinetype = None
             if "1.5" in self.modelconfig.model_type:
-                pt = StableDiffusionPipeline
+                pipelinetype = StableDiffusionPipeline
             elif "sdxl" in self.modelconfig.model_type.lower():
-                pt = StableDiffusionXLPipeline
+                pipelinetype = StableDiffusionXLPipeline
 
-            if pt is None:
+            if pipelinetype is None:
                 raise ModelConfigException(
                     f"Unsupported model type for StabelDiffusion Generator '{self.modelconfig.model_type}'. It must contain 1.5 or sdxl"
                 )
@@ -46,7 +46,7 @@ class StabelDiffusionGenerator(BaseGenerator):
                 logger.info(
                     f"Using 'from_single_file' to load model {modelpath} from local folder"
                 )
-                pipeline = pt.from_single_file(
+                pipeline = pipelinetype.from_single_file(
                     modelpath,
                     token=self._hftoken,
                     local_files_only=True,
@@ -64,14 +64,12 @@ class StabelDiffusionGenerator(BaseGenerator):
                     f"Using 'from_pretrained' option to load model {modelpath} from hugging face or local cache"
                 )
                 #TODO: use dict for parameters of both
-                pipeline = pt.from_pretrained(
+                pipeline = pipelinetype.from_pretrained(
                     modelpath,
                     token=self._hftoken,
                     cache_dir=self.appconfig.model_cache_dir,
                     torch_dtype=self.torch_dtype,
                     safety_checker=None,  # TODO: use function callback with llava
-                    requires_safety_checker=False,
-                    device_map="auto",
                 )
 
             logger.debug("diffuser initiated")
