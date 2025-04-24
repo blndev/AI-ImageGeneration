@@ -10,6 +10,81 @@ class ExifScanner:
         'neural', 'gan', 'artificial', 'synthesized', 'generated'
     }
 
+    # Common AI generator image sizes (width, height)
+    AI_COMMON_SIZES = {
+        # Stable Diffusion default sizes
+        (512, 512),    # SD default square
+        (768, 768),    # SD higher quality square
+        (1024, 1024),  # SD high quality square
+        (512, 768),    # SD default portrait
+        (768, 512),    # SD default landscape
+        (704, 704),    # SD alternative square
+        (648, 648),    # SD alternative square
+        
+        # Midjourney common sizes
+        (1024, 1024),  # Default square
+        (1664, 1024),  # Wide
+        (1024, 1664),  # Tall
+        (1456, 1456),  # Alternative square
+        
+        # DALL-E sizes
+        (256, 256),    # DALL-E mini
+        (512, 512),    # DALL-E 2 default
+        (1024, 1024),  # DALL-E 2 high quality
+        
+        # Other common AI sizes
+        (640, 640),
+        (896, 896),
+        (1280, 1280),
+        (1536, 1536),
+        (2048, 2048),  # High-end generations
+        
+        # Common aspect ratio variants
+        (512, 1024),   # 1:2 portrait
+        (1024, 512),   # 2:1 landscape
+        (768, 1024),   # 3:4 portrait
+        (1024, 768),   # 4:3 landscape
+    }
+
+    # Size tolerance for comparison (pixels)
+    SIZE_TOLERANCE = 4
+
+    def is_common_ai_size(self, width: int, height: int, tolerance: int = None) -> Tuple[bool, str]:
+        """
+        Check if image dimensions match common AI generator output sizes
+        
+        Args:
+            width: Image width in pixels
+            height: Image height in pixels
+            tolerance: Pixel tolerance for size comparison (default: self.SIZE_TOLERANCE)
+            
+        Returns:
+            Tuple[bool, str]: (is_ai_size, reason)
+        """
+        if tolerance is None:
+            tolerance = self.SIZE_TOLERANCE
+
+        # Check exact matches first
+        if (width, height) in self.AI_COMMON_SIZES:
+            return True, f"Exact match for AI generation size: {width}x{height}"
+
+        # Check with tolerance
+        for ai_width, ai_height in self.AI_COMMON_SIZES:
+            if (abs(width - ai_width) <= tolerance and 
+                abs(height - ai_height) <= tolerance):
+                return True, f"Close match to AI generation size: {ai_width}x{ai_height} (within {tolerance}px)"
+
+        # Check common multiples (0.5x, 2x, 4x)
+        multipliers = [0.5, 2, 4]
+        for ai_width, ai_height in self.AI_COMMON_SIZES:
+            for multiplier in multipliers:
+                scaled_width = ai_width * multiplier
+                scaled_height = ai_height * multiplier
+                if (abs(width - scaled_width) <= tolerance and 
+                    abs(height - scaled_height) <= tolerance):
+                    return True, f"Scaled match ({multiplier}x) to AI size: {ai_width}x{ai_height}"
+
+        return False, "No match to common AI generation sizes"
 
     def is_photo(self, image):
         """
@@ -49,18 +124,34 @@ class ExifScanner:
         """
         try:
             with Image.open(image_path) as img:
+                # Check dimensions first
+                width, height = img.size
+                is_ai_size, size_reason = self.is_common_ai_size(width, height)
+                
+                # check metadata
                 metadata = self.get_metadata(img)
-                
-                # Check for common indicators
                 indicators = self._analyze_metadata(metadata)
-                
+
+                # Combine results
+                reasons = []
+
+                if is_ai_size:
+                    reasons.append(size_reason)
+                   
                 if not metadata:
-                    return True, "No metadata found - possible AI generation or stripped metadata"
+                    reasons.append("No metadata found - possible AI generation or stripped metadata")
                     
                 if indicators:
-                    return True, f"Potential AI indicators found: {', '.join(indicators)}"
+                    reasons.append(f"Potential AI indicators found: {', '.join(indicators)}")
                 
-                return False, "No clear AI generation indicators found"
+                # Determine if likely AI generated
+                is_likely_ai = is_ai_size or bool(indicators) or not metadata
+                
+                if not reasons:
+                    return False, "No clear AI generation indicators found"
+                    
+                return is_likely_ai, " | ".join(reasons)
+
                 
         except Exception as e:
             return None, f"Error analyzing image: {str(e)}"
