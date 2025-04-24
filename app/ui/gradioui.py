@@ -9,11 +9,12 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from PIL import Image, ExifTags
 import logging
 from app import SessionState
+from app.validators.nsfw_detector import CensorMethod, NSFWCategory
 from ..appconfig import AppConfig
 from app.utils.singleton import singleton
 from app.utils.fileIO import save_image_with_timestamp, get_date_subfolder
 from app.generators import FluxGenerator, GenerationParameters, ModelConfig, StabelDiffusionGenerator
-from app.validators import ExifScanner, FaceDetector, PromptRefiner
+from app.validators import ExifScanner, FaceDetector, PromptRefiner, NSFWDetector
 from ..analytics import Analytics
 import json
 import shutil
@@ -32,6 +33,7 @@ class GradioUI():
             self.modelconfigs = modelconfigs
             self.analytics = Analytics()
             self.config = AppConfig()
+            self.nsfw_detector = NSFWDetector(confidence_threshold=0.7)
             self.active_sessions = {}  # key=sessionid, value = timestamp of last token refresh
             self.session_references = {}  # key=referencID, value = int count(image created via reference)
             self.last_generation = datetime.now()
@@ -304,21 +306,22 @@ class GradioUI():
             neg_prompt = neg_prompt.strip()
             # make default only sfw, TODO add ehancement (upload required for NSFW)
             # TODO: feature switch in config to enable NSFW and NSFW_AFTER_UPLOAD
-            if session_state.nsfw is False and self.prompt_refiner:
+            if session_state.nsfw <= 0 and self.prompt_refiner:
                 if self.prompt_refiner.check_contains_nsfw(prompt):
                     logger.info(f"Convert NSFW prompt to SFW. User Prompt: '{prompt}'")
                     prompt = self.prompt_refiner.make_prompt_sfw(prompt, True)
                 else:
                     logger.debug("prompt is SFW")
 
-            if session_state.nsfw is False:
-                neg_prompt = "nude, naked, nsfw, porn," + neg_prompt
-
+            
             if self.prompt_refiner and promptmagic_active:
                 logger.info("Apply Prompt-Magic")
                 prompt = self.prompt_refiner.magic_enhance(prompt, 70)
-                if session_state.nsfw is False:
+                if session_state.nsfw <= 0:
                     prompt = self.prompt_refiner.make_prompt_sfw(prompt)
+            
+            if session_state.nsfw == 0:
+                neg_prompt = "nude, naked, nsfw, porn," + neg_prompt
 
             logger.info(
                 f"generating image for {session_state.session} with {session_state.token} token available.\n - prompt: '{prompt}'")
@@ -334,17 +337,37 @@ class GradioUI():
                 height=height
             )
 
-            images = self.generator.generate_images(params=generation_details)
+            generated_images = self.generator.generate_images(params=generation_details)
+            
             session_state.token -= image_count
-            logger.debug(f"received {len(images)} image(s) from generator")
+            logger.debug(f"received {len(generated_images)} image(s) from generator")
             if self.config.output_directory is not None:
                 logger.debug(f"saving images to {self.config.output_directory}")
                 gen_data = generation_details.to_dict()
                 gen_data["userprompt"] = userprompt
                 gen_data["model"] = self.generator.modelconfig.model
-                for image in images:
+                for image in generated_images:
                     outdir = os.path.join(self.config.output_directory, get_date_subfolder(), "generation")
                     save_image_with_timestamp(image=image, folder_path=outdir, ignore_errors=True, generation_details=gen_data)
+
+            result_images = []
+            try:
+                for image in generated_images:
+                    nsfw_check =  self.nsfw_detector.detect(image)
+                    if not nsfw_check.is_safe and session_state.nsfw<=0:
+                        result_images.append(
+                            self.nsfw_detector.censor_detected_regions(
+                                image = image, 
+                                detection_result= nsfw_check,
+                                labels_to_censor = self.nsfw_detector.EXPLICIT_LABELS,
+                                method=CensorMethod.PIXELATE)
+                        )
+                    else:
+                        result_images.append(image)
+                        session_state.nsfw -= 1
+            except Exception as e:
+                logger.warning(f"Error while NSFW check: {e}")
+                result_images = generated_images
 
             if session_state.token <= 1:
                 logger.warning(f"session {session_state.session} running out of token ({session_state.token}) left")
@@ -360,7 +383,7 @@ class GradioUI():
                 logger.debug(f"error while recording sucessful image generation for stats: {e}")
                 pass
 
-            return images, session_state
+            return result_images, session_state
         except Exception as e:
             logger.error(f"image generation failed: {e}")
             # log Exceptiondetails as debug
@@ -437,12 +460,12 @@ class GradioUI():
             token = self.config.feature_upload_images_token_reward
             msg = ""
             image_sha1 = sha1(image.tobytes()).hexdigest()
-            uploadstate = self._uploaded_images.get(image_sha1)
-            if (uploadstate):
+            already_used = self._uploaded_images.get(image_sha1)
+            if (already_used):
                 msg = """The image signature matches a previous submission, so the full token reward isn't possible.
                 We’re awarding you 5 tokens as a thank you for your involvement."""
                 token = 5
-                if uploadstate.get(session_state.session):
+                if already_used.get(session_state.session):
                     msg = "You've already submitted this image, and it won't generate any tokens."
                     gr.Warning(msg, title="Upload failed")
                     return session_state, gr.Button(interactive=False), None
@@ -452,10 +475,11 @@ class GradioUI():
 
                 try:
                     faces, cv2 = self.face_analyzer.get_faces(image)
-                    exifscanner = ExifScanner()
-                    if exifscanner.is_photo(image) is False:
+                    exifscanner = ExifScanner()  # TODO: move to self....
+                    is_ai_image, reason = exifscanner.check_image(image_path)
+                    if is_ai_image:
                         msg = "Image probably AI generated"
-                        logger.warning(msg)
+                        logger.warning(msg + " Reason: " + reason)
                         token = 5
                     elif len(faces) == 0:
                         msg = """No face detected in the image. Could happen that the face is to narrow or the resoltution is too small.
@@ -476,6 +500,19 @@ class GradioUI():
                                     self.face_analyzer.get_face_picture(cv2, face, filename=fn)
                                     logger.warning(f"Suspected age detected on image {image_sha1}")
                         logger.debug(f"Ages on the image {image_sha1}: {ages[:-1]}")
+
+                        nsfw_result = self.nsfw_detector.detect(image)
+                        if not nsfw_result.is_safe:
+                            # no check required if user is prooved adult
+                            logger.info(f"Upload NSFW check: {nsfw_result.category}")
+                            if nsfw_result.category == NSFWCategory.EXPLICIT:
+                                token += 6
+                                msg += "NSFW enabled for 6 generations."
+                                session_state.nsfw += 6
+                            if nsfw_result.category == NSFWCategory.SUGGESTIVE:
+                                token += 3
+                                msg += "NSFW enabled for 3 generations."
+                                session_state.nsfw += 3
 
                 except Exception as e:
                     logger.error(f"Error while analyzing uploaded image: {e}")
@@ -794,7 +831,7 @@ class GradioUI():
                 file_path = selection.value['image']['path']
                 # timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
                 # custom_filename = f"generated_image_{timestamp}.png"
-                return gr.DownloadButton(label=f"Download", value=file_path, visible=True)
+                return gr.DownloadButton(label="Download", value=file_path, visible=True)
 
             gallery.select(
                 fn=prepare_download,
