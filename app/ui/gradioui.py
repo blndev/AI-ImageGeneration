@@ -676,7 +676,7 @@ class GradioUI():
 
             # Upload to get Token row
             with gr.Row(visible=(self.config.output_directory and self.config.feature_upload_images_for_new_token_enabled)):
-                with gr.Accordion("Get more Token", open=False):
+                with gr.Accordion("Get more Token or activate NSFW", open=False):
                     with gr.Row():
                         with gr.Column(scale=2):
                             gr.Markdown(self.msg_share_image)
