@@ -532,8 +532,9 @@ class GradioUI():
                         if not nsfw_result.is_safe:
                             # no check required if user is prooved adult
                             logger.info(f"Upload NSFW check: {nsfw_result.category}")
+                            if session_state.nsfw < 0: session_state.nsfw = 0
                             nsfwtoken = token // 2
-                            if nsfw_result.category == NSFWCategory.EXPLICIT: nsfwtoken = 6
+                            if nsfw_result.category == NSFWCategory.EXPLICIT: nsfwtoken = token - 2
                             if nsfw_result.category == NSFWCategory.SUGGESTIVE: nsfwtoken = 3
 
                             token += nsfwtoken
