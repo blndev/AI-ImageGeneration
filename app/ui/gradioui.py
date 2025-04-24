@@ -9,12 +9,12 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from PIL import Image, ExifTags
 import logging
 from app import SessionState
-from .appconfig import AppConfig
+from ..appconfig import AppConfig
 from app.utils.singleton import singleton
 from app.utils.fileIO import save_image_with_timestamp, get_date_subfolder
 from app.generators import FluxGenerator, GenerationParameters, ModelConfig, StabelDiffusionGenerator
 from app.validators import ExifScanner, FaceDetector, PromptRefiner
-from .analytics import Analytics
+from ..analytics import Analytics
 import json
 import shutil
 
@@ -517,6 +517,12 @@ class GradioUI():
 
     def create_interface(self):
 
+        # TODO: sowas wie
+        #         # Create components
+        # self.image_generator.create_interface_elements(gr)
+        # self.upload_handler.create_interface_elements(gr)
+        # self.feedback.create_interface_elements(gr)
+    
         # Create the interface components
         with gr.Blocks(
             title="Image Generator",

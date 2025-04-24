@@ -1,5 +1,5 @@
 from .SessionState import SessionState
-from .gradioui import GradioUI
+from .ui.gradioui import GradioUI
 from .logging import setup_logging
 from .appconfig import AppConfig
 #from .OllamaImageAnalyzer import OllamaImageAnalyzer
