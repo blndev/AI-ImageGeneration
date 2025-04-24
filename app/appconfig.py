@@ -34,6 +34,7 @@ class AppConfig:
 
         self.feature_upload_images_token_reward = int(os.getenv("FEATURE_UPLOAD_IMAGE_NEW_TOKEN", 0))
         self.feature_upload_images_for_new_token_enabled = self.feature_upload_images_token_reward > 0
+        self.feature_use_upload_for_age_check = self.getbool("FEATURE_USE_UPLOAD_FOR_AGE_CHECK", False)
 
         self.output_directory = os.getenv("OUTPUT_DIRECTORY", None)
 

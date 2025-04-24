@@ -532,14 +532,13 @@ class GradioUI():
                         if not nsfw_result.is_safe:
                             # no check required if user is prooved adult
                             logger.info(f"Upload NSFW check: {nsfw_result.category}")
-                            if nsfw_result.category == NSFWCategory.EXPLICIT:
-                                token += 6
-                                msg += "NSFW enabled for 6 generations."
-                                session_state.nsfw += 6
-                            if nsfw_result.category == NSFWCategory.SUGGESTIVE:
-                                token += 3
-                                msg += "NSFW enabled for 3 generations."
-                                session_state.nsfw += 3
+                            nsfwtoken = token // 2
+                            if nsfw_result.category == NSFWCategory.EXPLICIT: nsfwtoken = 6
+                            if nsfw_result.category == NSFWCategory.SUGGESTIVE: nsfwtoken = 3
+
+                            token += nsfwtoken
+                            session_state.nsfw += nsfwtoken
+                            if self.config.feature_use_upload_for_age_check: msg += f"NSFW enabled for {nsfwtoken} generations."
 
                 except Exception as e:
                     logger.error(f"Error while analyzing uploaded image: {e}")
@@ -676,7 +675,7 @@ class GradioUI():
 
             # Upload to get Token row
             with gr.Row(visible=(self.config.output_directory and self.config.feature_upload_images_for_new_token_enabled)):
-                with gr.Accordion("Get more Token or activate NSFW", open=False):
+                with gr.Accordion("Get more Token" + " or activate NSFW" if self.config.feature_use_upload_for_age_check else "", open=False):
                     with gr.Row():
                         with gr.Column(scale=2):
                             gr.Markdown(self.msg_share_image)
@@ -766,10 +765,14 @@ class GradioUI():
 
             def update_token_info(gradio_state):
                 # logger.debug("local_storage changed: SessionState: %s", gradio_state)
-                token = SessionState.from_gradio_state(gradio_state).token
+                ss = SessionState.from_gradio_state(gradio_state)
+                token = ss.token
                 if self.config.token_enabled is False:
                     token = "unlimited"
-                return f"Generations left: {token}"
+                n = ""
+                if self.config.feature_use_upload_for_age_check and ss.nsfw > 0:
+                    n = f"(NSFW: {ss.nsfw})"
+                return f"Generations left: {token} {n}"
             user_session_storage.change(
                 # update the UI with current token count
                 fn=update_token_info,
