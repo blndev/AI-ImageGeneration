@@ -49,6 +49,3 @@ class AppConfig:
         self.feature_prompt_magic_enabled = self.getbool("PROMPTMAGIC", False)
 
         self.NO_AI = self.getbool("NO_AI", False)
-        self.GPU_ALLOW_ATTENTION_SLICING = self.getbool("GPU_ALLOW_ATTENTION_SLICING", False)
-        self.GPU_ALLOW_XFORMERS = self.getbool("GPU_ALLOW_XFORMERS", False)
-        self.GPU_ALLOW_MEMORY_OFFLOAD = self.getbool("GPU_ALLOW_MEMORY_OFFLOAD", False)

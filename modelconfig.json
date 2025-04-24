@@ -11,6 +11,12 @@
         "Model": "flux",
         "Parent": "",
         "ModelType": "flux",
+        "Generation": {
+            "MAX_IMAGES": 2,
+            "GPU_ALLOW_XFORMERS": "False",
+            "GPU_ALLOW_ATTENTION_SLICING": "True",
+            "GPU_ALLOW_MEMORY_OFFLOAD": "True"
+        },        
         "Aspect_Ratio": {
             "Square": "1024x1024",
             "Landscape": "1152x768",
