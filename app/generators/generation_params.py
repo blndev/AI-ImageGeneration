@@ -94,8 +94,7 @@ class GenerationParameters:
             "guidance_scale": self.guidance_scale,
             "width": self.width,
             "height": self.height,
-            "num_images_per_prompt": self.num_images_per_prompt,
-            "guidance_scale": self.guidance_scale,
+            "num_images_per_prompt": self.num_images_per_prompt
         }
 
         if self.negative_prompt:
@@ -117,7 +116,7 @@ class GenerationParameters:
         Adjusts parameters specifically for FLUX-SCHNELL model.
         Returns a new FluxParameters instance with optimized settings.
         """
-        params = GenerationParameters(**self.__dict__)  # Create a copy
+        params = GenerationParameters(**self.to_dict())  # Create a copy
 
         # Enforce FLUX-SCHNELL specific constraints
         if params.num_inference_steps > 10:

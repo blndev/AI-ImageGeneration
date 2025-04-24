@@ -59,22 +59,22 @@ class BaseGenerator():
 
     def memory_optimization(self, pipeline):
         # cpu offload will not work with pipeline.to(cuda)
-        if self.appconfig.GPU_ALLOW_ATTENTION_SLICING:
-            logger.info("attention slicing activated")
+        if self.modelconfig.generation.get("GPU_ALLOW_ATTENTION_SLICING", False):
+            logger.warning("attention slicing activated")
             pipeline.enable_attention_slicing(slice_size="auto")
 
-        if self.appconfig.GPU_ALLOW_XFORMERS:
+        if self.modelconfig.generation.get("GPU_ALLOW_XFORMERS", False):
             logger.info("xformers activated")
             pipeline.enable_xformers_memory_efficient_attention()
 
-        if self.device == "cuda":
+        if self.device == "cuda" and not self.modelconfig.generation.get("GPU_ALLOW_MEMORY_OFFLOAD", False):
             logger.info("checking embeddings")
             torch.cuda.empty_cache()
 
             try:
                 # both vars used later, import to have them as None
-                self.sdxl_embedding_positive = None
-                self.sdxl_embedding_negative = None
+                self.embedding_positive = None
+                self.embedding_negative = None
 
                 for embedding in self.modelconfig.embeddings["positive"]:
                     pipeline.load_textual_inversion(
@@ -89,9 +89,7 @@ class BaseGenerator():
             except Exception as e:
                 logger.error(f"Loading embeddings failed {e}")
 
-
-        # TODO: refactor env handling to a utils class
-        if self.appconfig.GPU_ALLOW_MEMORY_OFFLOAD:
+        if self.modelconfig.generation.get("GPU_ALLOW_MEMORY_OFFLOAD", False):
             logger.warning("gpu offload activated")
             pipeline.enable_model_cpu_offload()
         else:

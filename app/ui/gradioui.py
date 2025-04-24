@@ -83,12 +83,13 @@ class GradioUI():
 
     def __del__(self):
         logger.info("cleanup ressources")
-        if self.scheduler:
-            self.scheduler.shutdown(wait=False)
+        if hasattr(self, "scheduler"):
+            if self.scheduler:
+                self.scheduler.shutdown(wait=False)
 
     def initialize_image_generator(self):
         if "flux" in self.selectedmodelconfig.model_type:
-            self.generator = FluxGenerator(modelconfig=self.selectedmodelconfig)
+            self.generator = FluxGenerator(appconfig=self.config, modelconfig=self.selectedmodelconfig)
         else:
             self.generator = StabelDiffusionGenerator(appconfig=self.config, modelconfig=self.selectedmodelconfig)
 

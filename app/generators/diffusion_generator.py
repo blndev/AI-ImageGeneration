@@ -23,7 +23,7 @@ class StabelDiffusionGenerator(BaseGenerator):
     #     logger.info("Initialize StabelDiffusion Generator")
 
     def _load_model(self):
-        """Load and return the Stable Diffusion model to generate images"""
+        """Load and return the Stable Diffusion Pipeline to generate images"""
         if self._cached_generation_pipeline:
             return self._cached_generation_pipeline
 
@@ -52,7 +52,7 @@ class StabelDiffusionGenerator(BaseGenerator):
                     local_files_only=True,
                     cache_dir=self.appconfig.model_cache_dir,
                     torch_dtype=self.torch_dtype,
-                    safety_checker=None,  # TODO: use function callback with llava
+                    safety_checker=None,
                     requires_safety_checker=False,
                     use_safetensors=True,
                     device_map="auto",
@@ -63,13 +63,12 @@ class StabelDiffusionGenerator(BaseGenerator):
                 logger.info(
                     f"Using 'from_pretrained' option to load model {modelpath} from hugging face or local cache"
                 )
-                #TODO: use dict for parameters of both
                 pipeline = pipelinetype.from_pretrained(
                     modelpath,
                     token=self._hftoken,
                     cache_dir=self.appconfig.model_cache_dir,
                     torch_dtype=self.torch_dtype,
-                    safety_checker=None,  # TODO: use function callback with llava
+                    safety_checker=None,
                 )
 
             logger.debug("diffuser initiated")
@@ -93,7 +92,6 @@ class StabelDiffusionGenerator(BaseGenerator):
 
     def change_model(self, modelconfig: ModelConfig):
         logger.info("Change generation model to %s", modelconfig)
-        # TODO: check if the type comparison is working
         if type(modelconfig) is not type(ModelConfig):
             raise Exception("type of modelconfig must be ModelConfig")
 
@@ -124,7 +122,6 @@ class StabelDiffusionGenerator(BaseGenerator):
                     logger.error("No model loaded")
                     raise Exception("No model loaded. Generation not available")
 
-                # https://huggingface.co/docs/diffusers/main/api/pipelines/flux
                 if "1.5" in self.modelconfig.model_type.lower():
                     params = params.prepare_stablediffusion_std()
                 elif "sdxl" in self.modelconfig.model_type.lower():
