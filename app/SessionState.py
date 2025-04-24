@@ -26,7 +26,7 @@ class SessionState:
             raise TypeError(f"session must be of type str, but {type(value).__name__} was assigned.")
         return value
 
-    def __init__(self, token: int = 0, session: str = None, last_generation: str = None, nsfw: bool = False, reference_code: str = None):
+    def __init__(self, token: int = 0, session: str = None, last_generation: str = None, nsfw: int = 0, reference_code: str = None):
         """State object for storing application data in browser."""
         self.token: int = token
         self.session: str = str(uuid.uuid4()) if session == None else session
@@ -95,7 +95,7 @@ class SessionState:
             token=data.get('token', 0),
             session=data.get('session', str(uuid.uuid4())),
             last_generation=data.get('last_generation', None),
-            nsfw=data.get('nsfw', False),
+            nsfw=data.get('nsfw', 0),
             reference_code=data.get('reference_code', None)
         )
 
