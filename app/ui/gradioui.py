@@ -538,7 +538,7 @@ class GradioUI():
                             if nsfw_result.category == NSFWCategory.EXPLICIT: nsfwtoken = token - 2
                             if nsfw_result.category == NSFWCategory.SUGGESTIVE: nsfwtoken = 3
 
-                            token += nsfwtoken
+                            #token += nsfwtoken
                             session_state.nsfw += nsfwtoken
                             if self.config.feature_use_upload_for_age_check: msg += f"NSFW enabled for {nsfwtoken} generations."
 
