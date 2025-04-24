@@ -140,11 +140,11 @@ class GradioUI():
             try:
                 self._uploaded_images = {}
                 # check maybe it's better to add the data folder as well
-                self.__uploaded_images_path = os.path.join(basedir, "uploaded_images.json")
-                if os.path.exists(self.__uploaded_images_path):
-                    with open(self.__uploaded_images_path, "r") as f:
+                self.__uploaded_images_db_path = os.path.join(basedir, "uploaded_images.json")
+                if os.path.exists(self.__uploaded_images_db_path):
+                    with open(self.__uploaded_images_db_path, "r") as f:
                         self._uploaded_images.update(json.load(f))
-                logger.info(f"Initialized upload files history from '{self.__uploaded_images_path}'")
+                logger.info(f"Initialized upload files history from '{self.__uploaded_images_db_path}'")
             except Exception as e:
                 logger.error(f"Error while loading uploaded_images.json: {e}")
 
@@ -159,13 +159,27 @@ class GradioUI():
             try:
                 self._created_images_history = {}
                 # check maybe it's better to add the data folder as well
-                self.__created_images_path = os.path.join(basedir, "created_images.json")
-                if os.path.exists(self.__created_images_path):
-                    with open(self.__created_images_path, "r") as f:
+                self.__created_images__db_path = os.path.join(basedir, "created_images.json")
+                if os.path.exists(self.__created_images__db_path):
+                    with open(self.__created_images__db_path, "r") as f:
                         self._created_images_history.update(json.load(f))
-                logger.info(f"Initialized created files history from '{self.__created_images_path}'")
+                logger.info(f"Initialized created files history from '{self.__created_images__db_path}'")
             except Exception as e:
                 logger.error(f"Error while loading created_images.json: {e}")
+
+    def block_created_images_from_upload(self, images):
+        try:
+            for image in images:
+                image_sha1 = sha1(image.tobytes()).hexdigest()
+                self._created_images_history[image_sha1] = True
+        except Exception as e:
+            logger.debug(f"Error while blocking generated images from upload: {e}")
+        # now save the list to disk for reuse in later sessions
+        try:
+            with open(self.__created_images__db_path, "w") as f:
+                json.dump(self._created_images_history, f, indent=4)
+        except Exception as e:
+            logger.error(f"Error while saving {self.__created_images__db_path}: {e}")
 
     def interval_cleanup_and_analytics(self):
         """is called every 60 secdonds and:
@@ -371,6 +385,10 @@ class GradioUI():
 
             if session_state.token <= 1:
                 logger.warning(f"session {session_state.session} running out of token ({session_state.token}) left")
+
+            # save image hashes to prevent upload
+            self.block_created_images_from_upload(result_images)
+
             try:
                 # TODO: create useful values for "content" eg. main focus (describe the main object create in the image in one word")
                 # use blib or ollama image descibe
@@ -469,6 +487,10 @@ class GradioUI():
                     msg = "You've already submitted this image, and it won't generate any tokens."
                     gr.Warning(msg, title="Upload failed")
                     return session_state, gr.Button(interactive=False), None
+            elif self._created_images_history.get(image_sha1):
+                msg = "This image is already known, and it won't generate any tokens."
+                gr.Warning(msg, title="Upload failed")
+                return session_state, gr.Button(interactive=False), None
             else:
                 # prepare upload state, will be adapted later
                 self._uploaded_images[image_sha1] = {session_state.session: {"token": token, "msg": ""}}
@@ -542,10 +564,10 @@ class GradioUI():
             self._uploaded_images[image_sha1][session_state.session]["timestamp"] = datetime.now().isoformat()
             # now save the list to disk for reuse in later sessions
             try:
-                with open(self.__uploaded_images_path, "w") as f:
+                with open(self.__uploaded_images_db_path, "w") as f:
                     json.dump(self._uploaded_images, f, indent=4)
             except Exception as e:
-                logger.error(f"Error while saving {self.__uploaded_images_path}: {e}")
+                logger.error(f"Error while saving {self.__uploaded_images_db_path}: {e}")
 
         except Exception as e:
             logger.error(f"generate token for uploaded image failed: {e}")
