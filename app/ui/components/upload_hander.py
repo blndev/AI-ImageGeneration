@@ -1,7 +1,6 @@
-from datetime import datetime, timedelta
+from datetime import datetime
 from hashlib import sha1
-from time import sleep
-from typing import List
+
 import os
 import gradio as gr
 from PIL import Image
@@ -10,9 +9,8 @@ from app import SessionState
 from app.appconfig import AppConfig
 from app.validators.nsfw_detector import NSFWDetector, NSFWCategory
 from app.utils.singleton import singleton
-from app.utils.fileIO import save_image_with_timestamp, get_date_subfolder
-from app.generators import FluxGenerator, GenerationParameters, ModelConfig, StabelDiffusionGenerator
-from app.validators import ExifScanner, FaceDetector, PromptRefiner, NSFWDetector
+from app.utils.fileIO import get_date_subfolder
+from app.validators import AIImageDetector, FaceDetector, NSFWDetector
 from app.analytics import Analytics
 from .session_manager import SessionManager
 
@@ -24,17 +22,27 @@ import shutil
 logger = logging.getLogger(__name__)
 
 
+@singleton
 class UploadHandler:
     def __init__(self, session_manager: SessionManager, config: AppConfig, analytics: Analytics):
         self.config = config
         self.session_manager = session_manager
         self.analytics = analytics
+
+        # Fallback folder
+        self.basedir = "./output/"
+        if self.config.output_directory:
+            self.basedir = self.config.output_directory
+        else:
+            logger.error("No output directory specified. Using fallback ./output")
+
+        self._initialize_database_uploaded_images()
+        self._initialize_database_created_images()
+
+    def load_components(self):
         self.nsfw_detector = NSFWDetector(confidence_threshold=0.7)
         self.face_analyzer = FaceDetector()
-
-        self._uploaded_images = {}
-        self.initialize_database_uploaded_images()
-        self.initialize_database_created_images()
+        self.ai_image_detector = AIImageDetector()
 
         try:
             self.msg_share_image = ""
@@ -46,61 +54,51 @@ class UploadHandler:
         except Exception as e:
             logger.error(f"Error while loading msgs: {e}")
 
-    def initialize_database_uploaded_images(self):
-        if self.config.feature_upload_images_for_new_token_enabled:
-            # Fallback
-            basedir = "./output/"
-            if self.config.output_directory:
-                basedir = self.config.output_directory
-            else:
-                logger.error("Upload allowed but no output directory specified. Using fallback ./output")
-            try:
-                self._uploaded_images = {}
-                # check maybe it's better to add the data folder as well
-                self.__uploaded_images_db_path = os.path.join(basedir, "uploaded_images.json")
-                if os.path.exists(self.__uploaded_images_db_path):
-                    with open(self.__uploaded_images_db_path, "r") as f:
-                        self._uploaded_images.update(json.load(f))
-                logger.info(f"Initialized upload files history from '{self.__uploaded_images_db_path}'")
-            except Exception as e:
-                logger.error(f"Error while loading uploaded_images.json: {e}")
+    def _initialize_database_uploaded_images(self):
+        self._uploaded_images_data = {}
 
-    def initialize_database_created_images(self):
-        if self.config.feature_upload_images_for_new_token_enabled:
-            # Fallback
-            basedir = "./output/"
-            if self.config.output_directory:
-                basedir = self.config.output_directory
-            else:
-                logger.error("No output directory specified. Using fallback ./output")
-            try:
-                self._created_images_history = {}
-                # check maybe it's better to add the data folder as well
-                self.__created_images__db_path = os.path.join(basedir, "created_images.json")
-                if os.path.exists(self.__created_images__db_path):
-                    with open(self.__created_images__db_path, "r") as f:
-                        self._created_images_history.update(json.load(f))
-                logger.info(f"Initialized created files history from '{self.__created_images__db_path}'")
-            except Exception as e:
-                logger.error(f"Error while loading created_images.json: {e}")
+        try:
+            self._uploaded_images_data = {}
+            # check maybe it's better to add the data folder as well
+            self.__uploaded_images_db_path = os.path.join(self.config.output_directory, "uploaded_images.json")
+            if os.path.exists(self.__uploaded_images_db_path):
+                with open(self.__uploaded_images_db_path, "r") as f:
+                    self._uploaded_images_data.update(json.load(f))
+            logger.info(f"Initialized upload files history from '{self.__uploaded_images_db_path}'")
+        except Exception as e:
+            logger.error(f"Error while loading uploaded_images.json: {e}")
+
+    def _initialize_database_created_images(self):
+        self._created_images_data = {}
+
+        try:
+            # check maybe it's better to add the data folder as well
+            self.__created_images_db_path = os.path.join(self.config.output_directory, "created_images.json")
+            if os.path.exists(self.__created_images_db_path):
+                with open(self.__created_images_db_path, "r") as f:
+                    self._created_images_data.update(json.load(f))
+            logger.info(f"Initialized created files history from '{self.__created_images_db_path}'")
+        except Exception as e:
+            logger.error(f"Error while loading created_images.json: {e}")
 
     def block_created_images_from_upload(self, images):
         try:
             for image in images:
                 image_sha1 = sha1(image.tobytes()).hexdigest()
-                self._created_images_history[image_sha1] = True
+                self._created_images_data[image_sha1] = True
         except Exception as e:
             logger.debug(f"Error while blocking generated images from upload: {e}")
         # now save the list to disk for reuse in later sessions
         try:
-            with open(self.__created_images__db_path, "w") as f:
-                json.dump(self._created_images_history, f, indent=4)
+            with open(self.__created_images_db_path, "w") as f:
+                json.dump(self._created_images_data, f, indent=4)
         except Exception as e:
-            logger.error(f"Error while saving {self.__created_images__db_path}: {e}")
+            logger.error(f"Error while saving {self.__created_images_db_path}: {e}")
 
     def create_interface_elements(self, user_session_storage):
         if not self.config.feature_upload_images_for_new_token_enabled: return
-        
+        self.load_components()
+        # now start with interface
         with gr.Row(visible=(self.config.output_directory and self.config.feature_upload_images_for_new_token_enabled)):
             with gr.Accordion("Get more Token" + " or activate NSFW" if self.config.feature_use_upload_for_age_check else "", open=False):
                 with gr.Row():
@@ -111,7 +109,7 @@ class UploadHandler:
                         upload_button = gr.Button("Upload", visible=True, interactive=False)
 
                 upload_image.change(
-                    fn=self.handle_upload,
+                    fn=self._handle_upload,
                     inputs=[user_session_storage, upload_image],
                     outputs=[upload_button],
                     concurrency_limit=None,
@@ -119,14 +117,14 @@ class UploadHandler:
                 )
 
                 upload_button.click(
-                    fn=self.handle_token_generation,
+                    fn=self._handle_token_generation,
                     inputs=[user_session_storage, upload_image],
                     outputs=[user_session_storage, upload_button, upload_image],
                     concurrency_limit=None,
                     concurrency_id="gpu"
                 )
 
-    def handle_upload(self, gradio_state: str, image_path):
+    def _handle_upload(self, gradio_state: str, image_path: str):
         """
         Handle image upload
 
@@ -138,10 +136,6 @@ class UploadHandler:
         session_state = SessionState.from_gradio_state(gradio_state)
         self.session_manager.record_session_as_active(session_state)
 
-        if self.config.output_directory is None:
-            logger.debug("output directory not configured, skipping upload")
-            return gr.Button(interactive=False)
-
         if image_path is None:
             return gr.Button(interactive=False)
 
@@ -152,11 +146,11 @@ class UploadHandler:
 
             image_sha1 = sha1(image.tobytes()).hexdigest()
             logger.info(f"UPLOAD from {session_state.session} with ID: {image_sha1}")
-            if self._uploaded_images.get(image_sha1) is not None:
+            if self._uploaded_images_data.get(image_sha1) is not None:
                 logger.warning(f"Image {image_sha1} already uploaded, cancel save to disk")
                 # we keep upload button true as the whole logic is behind it
-                # could happen that it was not uploaded by same user and get few points
-                # upload means in somehow "analyze"
+                # this is important to allow physical upload while generation is runnning (use wait time)
+                # and do the token update after generation to avoid loose received token
                 return gr.Button(interactive=True)
 
             dir = self.config.output_directory
@@ -170,7 +164,7 @@ class UploadHandler:
             logger.error(f"save image failed: {e}")
         return gr.Button(interactive=True)
 
-    def handle_token_generation(self, gradio_state: str, image_path):
+    def _handle_token_generation(self, gradio_state: str, image_path):
         """
         Handle token generation for image upload
         """
@@ -187,7 +181,7 @@ class UploadHandler:
             token = self.config.feature_upload_images_token_reward
             msg = ""
             image_sha1 = sha1(image.tobytes()).hexdigest()
-            already_used = self._uploaded_images.get(image_sha1)
+            already_used = self._uploaded_images_data.get(image_sha1)
             if (already_used):
                 msg = """The image signature matches a previous submission, so the full token reward isn't possible.
                 We’re awarding you 5 tokens as a thank you for your involvement."""
@@ -197,7 +191,7 @@ class UploadHandler:
                     token = 0
                     # gr.Warning(msg, title="Upload failed")
                     # return session_state, gr.Button(interactive=False), None
-            elif self._created_images_history.get(image_sha1):
+            elif self._created_images_data.get(image_sha1):
                 msg = "This image is already known, and it won't generate any tokens."
                 token = 0
                 # gr.Warning(msg, title="Upload failed")
@@ -207,12 +201,12 @@ class UploadHandler:
                 token = 1
             else:
                 # prepare upload state, will be adapted later
-                self._uploaded_images[image_sha1] = {session_state.session: {"token": token, "msg": ""}}
+                self._uploaded_images_data[image_sha1] = {session_state.session: {"token": token, "msg": ""}}
 
                 try:
                     faces, cv2 = self.face_analyzer.get_faces(image)
-                    exifscanner = ExifScanner()  # TODO: move to self....
-                    is_ai_image, reason = exifscanner.check_image(image_path)
+
+                    is_ai_image, reason = self.ai_image_detector.is_ai_image(image_path)
                     if is_ai_image:
                         msg = "Image probably AI generated"
                         logger.warning(msg + " Reason: " + reason)
@@ -264,19 +258,19 @@ class UploadHandler:
                 gr.Warning(msg, title="Upload failed")
 
             # if token = 0, it was already claimed or it's failing the checks
-            if not self._uploaded_images.get(image_sha1):
-                self._uploaded_images[image_sha1] = {}
-            if not self._uploaded_images[image_sha1].get(session_state.session):
+            if not self._uploaded_images_data.get(image_sha1):
+                self._uploaded_images_data[image_sha1] = {}
+            if not self._uploaded_images_data[image_sha1].get(session_state.session):
                 # split creation and assignment as old data might be in the object we want to keep
-                self._uploaded_images[image_sha1][session_state.session] = {}
+                self._uploaded_images_data[image_sha1][session_state.session] = {}
 
-            self._uploaded_images[image_sha1][session_state.session]["token"] = token
-            self._uploaded_images[image_sha1][session_state.session]["msg"] = msg
-            self._uploaded_images[image_sha1][session_state.session]["timestamp"] = datetime.now().isoformat()
+            self._uploaded_images_data[image_sha1][session_state.session]["token"] = token
+            self._uploaded_images_data[image_sha1][session_state.session]["msg"] = msg
+            self._uploaded_images_data[image_sha1][session_state.session]["timestamp"] = datetime.now().isoformat()
             # now save the list to disk for reuse in later sessions
             try:
                 with open(self.__uploaded_images_db_path, "w") as f:
-                    json.dump(self._uploaded_images, f, indent=4)
+                    json.dump(self._uploaded_images_data, f, indent=4)
             except Exception as e:
                 logger.error(f"Error while saving {self.__uploaded_images_db_path}: {e}")
 
