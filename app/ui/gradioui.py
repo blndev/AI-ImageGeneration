@@ -368,11 +368,11 @@ class GradioUI():
             result_images = []
             try:
                 for image in generated_images:
-                    nsfw_check =  self.nsfw_detector.detect(image)
-                    if not nsfw_check.is_safe and session_state.nsfw<=0:
+                    nsfw_check = self.nsfw_detector.detect(image)
+                    if not nsfw_check.is_safe and nsfw_check.category == NSFWCategory.EXPLICIT and session_state.nsfw <= 0:
                         result_images.append(
                             self.nsfw_detector.censor_detected_regions(
-                                image = image, 
+                                image = image,
                                 detection_result= nsfw_check,
                                 labels_to_censor = self.nsfw_detector.EXPLICIT_LABELS,
                                 method=CensorMethod.PIXELATE)
