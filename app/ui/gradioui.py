@@ -335,7 +335,7 @@ class GradioUI():
                 if session_state.nsfw <= 0:
                     prompt = self.prompt_refiner.make_prompt_sfw(prompt)
             
-            if session_state.nsfw == 0:
+            if session_state.nsfw <= 0:
                 neg_prompt = "nude, naked, nsfw, porn," + neg_prompt
 
             logger.info(
@@ -369,6 +369,8 @@ class GradioUI():
             try:
                 for image in generated_images:
                     nsfw_check = self.nsfw_detector.detect(image)
+                    if not nsfw_check.is_safe:
+                        logger.debug(f"Generated NSFW Image detected. Category: {nsfw_check.category}, Confidence: {nsfw_check.confidence}")
                     if not nsfw_check.is_safe and nsfw_check.category == NSFWCategory.EXPLICIT and session_state.nsfw <= 0:
                         result_images.append(
                             self.nsfw_detector.censor_detected_regions(
@@ -377,9 +379,13 @@ class GradioUI():
                                 labels_to_censor = self.nsfw_detector.EXPLICIT_LABELS,
                                 method=CensorMethod.PIXELATE)
                         )
+
                     else:
-                        result_images.append(image)
-                        session_state.nsfw -= 1
+                        result_images.append(image)  # could be nsfw or not but it's allowed
+                        if nsfw_check.category == NSFWCategory.EXPLICIT:
+                            # reduce only if output is nsfw
+                            session_state.nsfw -= 1
+                        
             except Exception as e:
                 logger.warning(f"Error while NSFW check: {e}")
                 result_images = generated_images
@@ -402,7 +408,7 @@ class GradioUI():
                 logger.debug(f"error while recording sucessful image generation for stats: {e}")
                 pass
 
-            return result_images, session_state
+            return result_images, session_state, prompt
         except Exception as e:
             logger.error(f"image generation failed: {e}")
             # log Exceptiondetails as debug
@@ -587,12 +593,14 @@ class GradioUI():
     
         # Create the interface components
         with gr.Blocks(
-            title="Image Generator",
+            title=self.selectedmodelconfig.description + " Image Generator",
             css="footer {visibility: hidden}",
             analytics_enabled=False
         ) as self.interface:
             user_session_storage = gr.BrowserState()  # do not initialize it with any value!!! this is used as default
 
+            # with gr.Row():
+            #     gr.Markdown(value=self.selectedmodelconfig.description)
             # Input Values & Generate row
             with gr.Row():
                 with gr.Column():
@@ -633,7 +641,7 @@ class GradioUI():
                     image_count = gr.Slider(
                         label="Image Count",
                         minimum=1,
-                        maximum=int(os.getenv("MAX_IMAGES", 2)),
+                        maximum=int(self.selectedmodelconfig.generation.get("max_images", 2)),
                         value=1,
                         step=1,
                         scale=1
@@ -641,6 +649,12 @@ class GradioUI():
                     prompt_magic_checkbox = gr.Checkbox(
                         label="Enable Prompt Magic",
                         value=(self.prompt_refiner is not None), visible=(self.prompt_refiner is not None))
+                    magic_prompt = gr.Textbox(label="Magic Prompt", interactive=False, visible=prompt_magic_checkbox.value)
+                    prompt_magic_checkbox.change(
+                        inputs=[prompt_magic_checkbox],
+                        outputs=[magic_prompt],
+                        fn=lambda x: gr.Textbox(visible=x)
+                    )
                     # gr.Markdown(label="Note",
                     #             value="""NSFW protection is active.
                     #             """, show_label=True, container=True,
@@ -660,7 +674,7 @@ class GradioUI():
                     with gr.Row():
                         # Generate button that's interactive only when prompt has text
                         generate_btn = gr.Button(
-                            "Generate",
+                            "Generate " + self.selectedmodelconfig.description,
                             interactive=False
                         )
                         cancel_btn = gr.Button("Cancel", interactive=False, visible=False)
@@ -698,7 +712,7 @@ class GradioUI():
                         inputs=[user_session_storage, upload_image],
                         outputs=[user_session_storage, upload_button, upload_image],
                         concurrency_limit=None,
-                        concurrency_id="image upload"
+                        concurrency_id="gpu"
                     )
 
             # Gallery row
@@ -820,7 +834,7 @@ class GradioUI():
             ).then(
                 fn=self.uiaction_generate_images,
                 inputs=[user_session_storage, prompt, aspect_ratio, neg_prompt, image_count, prompt_magic_checkbox],
-                outputs=[gallery, user_session_storage],
+                outputs=[gallery, user_session_storage, magic_prompt],
                 concurrency_id="gpu",
                 show_progress="full"
             ).then(
