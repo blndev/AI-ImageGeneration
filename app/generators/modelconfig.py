@@ -137,7 +137,10 @@ class ModelConfig:
         if hasattr(priority_values, "loras") and priority_values.loras:
             self.loras.update(priority_values.loras)
         if hasattr(priority_values, "examples") and priority_values.examples:
-            self.examples.update(priority_values.examples)
+            for element in priority_values.examples:
+                if element not in self.examples:
+                    self.examples.append(element)
+            #self.examples.update(priority_values.examples)
 
     @classmethod
     def split_aspect_ratio(cls, aspect_ratio: str) -> tuple:
