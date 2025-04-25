@@ -299,7 +299,7 @@ class GradioUI():
             
             session_state.token -= image_count
             logger.debug(f"received {len(generated_images)} image(s) from generator")
-            if self.config.output_directory is not None:
+            if self.config.save_generated_output:
                 logger.debug(f"saving images to {self.config.output_directory}")
                 gen_data = generation_details.to_dict()
                 gen_data["userprompt"] = userprompt

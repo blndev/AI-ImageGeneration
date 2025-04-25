@@ -36,15 +36,12 @@ class AppConfig:
         self.feature_upload_images_for_new_token_enabled = self.feature_upload_images_token_reward > 0
         self.feature_use_upload_for_age_check = self.getbool("FEATURE_USE_UPLOAD_FOR_AGE_CHECK", False)
 
-        self.output_directory = os.getenv("OUTPUT_DIRECTORY", None)
+        self.save_generated_output = (os.getenv("OUTPUT_DIRECTORY", None) is not None)
+        self.output_directory = os.getenv("OUTPUT_DIRECTORY", "./output/")
 
-        if self.output_directory is None:
-            self.user_feedback_filestorage = "./output/feedback.txt"
-            self.feature_upload_images_for_new_token_enabled = False
-        else:
-            self.user_feedback_filestorage = os.path.join(
-                self.output_directory, get_date_subfolder(), "feedback.txt"
-            )
+        self.user_feedback_filestorage = os.path.join(
+            self.output_directory, get_date_subfolder(), "feedback.txt"
+        )
 
         self.feature_prompt_magic_enabled = self.getbool("PROMPTMAGIC", False)
 
