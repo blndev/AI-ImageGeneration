@@ -69,15 +69,7 @@ Customize your experience through environment variables in `.env`:
 - `OLLAMA_MODEL`: Model for prompt enhancement (default: artifish/llama3.2-uncensored)
 
 ### 🖼️ Generation Settings
-- `GENERATION_MODEL`: Choose your model (default: black-forest-labs/FLUX.1-dev)
-- `GENERATION_STEPS`: Number of generation steps
-- `GENERATION_GUIDANCE`: Guidance scale for generation
-- `GENERATION_ASPECT_*`: Configure output dimensions
-
-### 💾 Memory Optimization
-- `GPU_ALLOW_XFORMERS`: Enable memory-efficient attention
-- `GPU_ALLOW_ATTENTION_SLICING`: Split calculations for lower memory usage
-- `GPU_ALLOW_MEMORY_OFFLOAD`: Use CPU memory for model handling
+- `GENERATION_MODEL`: Choose your model specified in modelconfig.json (default: black-forest-labs/FLUX.1-dev)
 
 ### 🎯 Output Configuration
 - `MODEL_DIRECTORY`: Location for downloaded models
@@ -119,13 +111,16 @@ This system makes it easy to:
 #### Complete Configuration Example
 ```json
 {
-    "Model": "model-name",                    // Name used to reference this config
+    "Model": "model-name",                   // Name used to reference this config
     "Path": "huggingface-repo/model-name",   // HuggingFace path or local file
-    "Description": "Model description",       // Optional description
+    "Description": "Model description",      // Optional description
     "Parent": "parent-model",                // Optional parent config to inherit from
     "Generation": {
         "steps": 40,                         // Number of generation steps
-        "guidance": 4.0                      // Guidance scale for generation
+        "guidance": 4.0,                     // Guidance scale for generation
+        "GPU_ALLOW_XFORMERS": 1,             // Enable memory-efficient attention
+        "GPU_ALLOW_ATTENTION_SLICING": 0,    // Split calculations for lower memory usage
+        "GPU_ALLOW_MEMORY_OFFLOAD": 0        // Use CPU memory for model handling
     },
     "Aspect_Ratio": {
         "Square": "1024x1024",              // Square image dimensions

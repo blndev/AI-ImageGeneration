@@ -13,9 +13,9 @@
         "ModelType": "flux",
         "Generation": {
             "MAX_IMAGES": 2,
-            "GPU_ALLOW_XFORMERS": "False",
-            "GPU_ALLOW_ATTENTION_SLICING": "True",
-            "GPU_ALLOW_MEMORY_OFFLOAD": "True"
+            "GPU_ALLOW_XFORMERS": 0,
+            "GPU_ALLOW_ATTENTION_SLICING": 1,
+            "GPU_ALLOW_MEMORY_OFFLOAD": 1
         },        
         "Aspect_Ratio": {
             "Square": "1024x1024",

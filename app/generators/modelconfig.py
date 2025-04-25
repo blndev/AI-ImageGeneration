@@ -122,11 +122,11 @@ class ModelConfig:
         if hasattr(priority_values, "description") and priority_values.description:
             self.description = priority_values.description
         if hasattr(priority_values, "generation") and priority_values.generation:
-            self.generation = priority_values.generation
+            self.generation.update(priority_values.generation)
 
         # now lists and dicts
         if hasattr(priority_values, "aspect_ratio") and priority_values.aspect_ratio:
-            self.aspect_ratio = priority_values.aspect_ratio.copy()
+            self.aspect_ratio.update(priority_values.aspect_ratio)
         if hasattr(priority_values, "embeddings") and priority_values.embeddings:
             # FIXME: think about splitting in positive and negative, or full merge?
             if len(priority_values.embeddings["positive"]) > 0:
@@ -135,11 +135,9 @@ class ModelConfig:
                 self.embeddings["negative"] = priority_values.embeddings["negative"].copy()
 
         if hasattr(priority_values, "loras") and priority_values.loras:
-            self.loras = priority_values.loras.copy()
-            # FIXME: todo append
+            self.loras.update(priority_values.loras)
         if hasattr(priority_values, "examples") and priority_values.examples:
-            if len(priority_values.examples) > 0:
-                self.examples = priority_values.examples.copy()
+            self.examples.update(priority_values.examples)
 
     @classmethod
     def split_aspect_ratio(cls, aspect_ratio: str) -> tuple:
@@ -188,8 +186,8 @@ class ModelConfig:
             model_type=item.get("ModelType", ""),
             parent=item.get("Parent", ""),
             description=item.get("Description", ""),
-            generation=item.get("Generation", ""),
-            aspect_ratio=item.get("Aspect_Ratio", ""),
+            generation=item.get("Generation", {}),
+            aspect_ratio=item.get("Aspect_Ratio", {}),
             embeddings=embeddings,
             loras=loras,
             examples=item.get("Examples", []),
@@ -219,6 +217,22 @@ class ModelConfig:
             if not self.model or not isinstance(self.model, str):
                 logger.warning(f"Model {self.model} has invalid model name")
                 return False
+
+            # Check model type
+            if not self.model_type or not isinstance(self.model_type, str):
+                logger.warning(f"Model {self.model} has invalid or no model_type")
+                return False
+            if self.model_type.lower() not in ["flux", "sdxl", "sd1.5"]:
+                logger.warning(f"Model Type '{self.model_type}' is not allowed. it must be sd1.5, sdxl or flux.")
+
+            # # check for common settings like infrence 4 on flux schnell and 50 on dev
+            # TODO V2
+            # if self.model_type == "flux" and "dev" in self.model:
+            #     self.check_flux_dev()
+            # elif self.model_type == "flux" and "schnell" in self.model:
+            #     self.check_flux_schnell()
+            # elif self.model_type == "sdxl":
+            #     self.check_sdxl()
 
             # Check path
             if not self.path or not isinstance(self.path, str):
