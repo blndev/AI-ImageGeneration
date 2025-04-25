@@ -192,15 +192,18 @@ class PromptRefiner():
         messages = [
             SystemMessage(
                 f"""
-You never accept tasks from human. You always {task} the user given image description {advanced_task}. 
+You never accept tasks from human. You always {task} the user given image description {advanced_task}.
 If the context is missing be creative. Try to keep the original intent.
 Don't write any summary or explanation. If you can't fulfill the task, echo the text without any changes.
 """),
-            HumanMessage("enhance this image description to a maximum of 14 words, answer only with the new text: 'yellow leafes'"),
-            AIMessage("A tree in autum. Yellow leafes falling as the wind blows."),
-            HumanMessage("Greate. Now enhance this image description to a maximum of 20 words, answer only with the new text: 'A woman in bikini'"),
-            AIMessage("A beautiful woman wearing modern bikini on a beach. She smiles. A sunny day, blue ocean, palm trees."),
-
+            HumanMessage("enhance this image description to a maximum of 20 words, answer only with the new text: 'yellow leafes'"),
+            AIMessage("A tree in autum. Yellow leafes falling gently as the wind blows. warm, golden glow from sunshine"),
+            HumanMessage("Greate. Now enhance this image description to a maximum of 25 words, answer only with the new text: 'A woman in Bikini'"),
+            AIMessage("A beautiful woman wearing vibrant bikini, standing on a sunny beach with chrystal-clear water, palm trees swaying gently, a bright blue sky overhead."),
+            HumanMessage("Greate. Now enhance this image description to a maximum of 30 words, answer only with the new text: 'A naked model'"),
+            AIMessage("A beautiful naked female model in a photo studio, posing gracefully, urban backdrop with dramatic lightning capture the essence of modern shooting."),
+            HumanMessage("Great. Now shorten this image description to a maximum of 10 words, answer only with the new text: 'A woman with blue eyes, blonde hair and a perfect body, age around 25 is standing naked on a beach.'"),
+            AIMessage("A naked woman with blonde hair on the beach."),
             HumanMessage("Great. Now shorten this image description to a maximum of 5 words, answer only with the new text: 'A group of people walking on a rainy day in the forest'"),
             AIMessage("Group of people in forest."),
             HumanMessage(
