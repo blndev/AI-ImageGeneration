@@ -265,7 +265,7 @@ class GradioUI():
             if session_state.nsfw <= -2 and self.prompt_refiner:
                 if self.prompt_refiner.check_contains_nsfw(prompt):
                     if self.config.feature_use_upload_for_age_check:
-                        gr.Info("NSFW preview is over. You can create more by uploading images.")
+                        gr.Info("NSFW preview is over. You can create more by uploading images.", duration=30)
                     logger.info(f"Convert NSFW prompt to SFW. User Prompt: '{prompt}'")
                     prompt = self.prompt_refiner.make_prompt_sfw(prompt, True)
                 else:
@@ -275,7 +275,7 @@ class GradioUI():
             if self.prompt_refiner and promptmagic_active:
                 logger.info("Apply Prompt-Magic")
                 prompt = self.prompt_refiner.magic_enhance(prompt, 70)
-                if session_state.nsfw <= 0:
+                if session_state.nsfw <= -2:
                     prompt = self.prompt_refiner.make_prompt_sfw(prompt)
             
             if session_state.nsfw <= 0:
@@ -331,7 +331,7 @@ class GradioUI():
                             # reduce only if output is nsfw
                             session_state.nsfw -= 1
                 if show_nsfw_censor_warning and self.config.feature_use_upload_for_age_check:
-                        gr.Info("We censored at least one of your images. You can remove the censorship by uploading images to train our system for better results. Thanks for your understanding")
+                        gr.Info("We censored at least one of your images. You can remove the censorship by uploading images to train our system for better results. Thanks for your understanding",duration=0)
             except Exception as e:
                 logger.warning(f"Error while NSFW check: {e}")
                 result_images = generated_images
