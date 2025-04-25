@@ -116,7 +116,12 @@ class FluxGenerator(BaseGenerator):
                     params.negative_prompt = (
                         embedding.keyword + ", " + params.negative_prompt
                     )
-                params.prepare_flux_dev() # TODO: fix & debug
+
+                if "dev" in self.modelconfig.path.lower():
+                    params = params.prepare_flux_dev()
+                elif "schnell" in self.modelconfig.path.lower():
+                    params = params.prepare_flux_schnell()
+                
                 logger.debug(
                     "Guidance: %f Strength: %f, Steps: %d",
                     params.guidance_scale,

@@ -153,6 +153,8 @@ class GenerationParameters:
             warnings.warn(f"FLUX-DEV typically works better with guidance_scale >= 7.0. "
                           f"Current setting: {params.guidance_scale}")
 
+        return params
+
     def prepare_stablediffusion_std(self) -> 'GenerationParameters':
         """
         Adjusts parameters specifically for FLUX-DEV model.

@@ -63,6 +63,7 @@ class BaseGenerator():
             logger.warning("attention slicing activated")
             pipeline.enable_attention_slicing(slice_size="auto")
 
+        # FIXME TODO BUG seems not to work to read this, must be off for flux!!!
         if self.modelconfig.generation.get("GPU_ALLOW_XFORMERS", False):
             logger.info("xformers activated")
             pipeline.enable_xformers_memory_efficient_attention()
