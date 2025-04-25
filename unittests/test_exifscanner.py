@@ -2,13 +2,13 @@ import unittest
 from pathlib import Path
 from PIL import Image
 import os
-from app.validators import ExifScanner
+from app.validators import AIImageDetector
 
 class TestExifScanner(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         """Set up test fixtures before running tests"""
-        cls.scanner = ExifScanner()
+        cls.scanner = AIImageDetector()
         cls.test_dir = Path("test_images")
         cls.test_dir.mkdir(exist_ok=True)
         
@@ -47,24 +47,24 @@ class TestExifScanner(unittest.TestCase):
 
     def test_is_photo_with_no_exif(self):
         """Test image with no EXIF data"""
-        result, reason = self.scanner.check_image(self.test_dir / "no_exif.jpg")
+        result, reason = self.scanner.is_ai_image(self.test_dir / "no_exif.jpg")
         self.assertFalse(result)
 
     def test_is_photo_with_exif(self):
         """Test image with regular EXIF data"""
-        result, reason = self.scanner.check_image(self.test_dir / "with_exif.jpg")
+        result, reason = self.scanner.is_ai_image(self.test_dir / "with_exif.jpg")
         self.assertFalse(result)
         self.assertIn("No clear AI generation indicators", reason)
 
     def test_is_photo_with_ai_metadata(self):
         """Test image with AI-related metadata"""
-        result, reason = self.scanner.check_image(self.test_dir / "ai_generated.jpg")
+        result, reason = self.scanner.is_ai_image(self.test_dir / "ai_generated.jpg")
         self.assertTrue(result)
         self.assertIn("AI indicators", reason)
 
     def test_nonexistent_file(self):
         """Test behavior with non-existent file"""
-        result, reason = self.scanner.check_image(self.test_dir / "nonexistent.jpg")
+        result, reason = self.scanner.is_ai_image(self.test_dir / "nonexistent.jpg")
         self.assertIsNone(result)
         self.assertIn("Error", reason)
 
@@ -110,7 +110,7 @@ class TestExifScanner(unittest.TestCase):
         with open(invalid_path, 'w') as f:
             f.write("Not an image")
         
-        result, reason = self.scanner.check_image(invalid_path)
+        result, reason = self.scanner.is_ai_image(invalid_path)
         self.assertIsNone(result)
         self.assertIn("Error", reason)
 
