@@ -38,17 +38,18 @@ def load_prompts():
 
 def load_filters():
     """Load prompts from prompts.txt file"""
-    filter_file = os.path.join(os.path.dirname(__file__), os.getenv("MODEL_FILTER", None))
     filters = []
-    if not filter_file:
-        return []
-    try:
-        with open(filter_file, 'r') as f:
-            # filters = [line.strip() for line in f]
-            filters = [line.strip() for line in f if not line.strip().startswith('#')]
+    if os.getenv("MODEL_FILTER", None):
+        filter_file = os.path.join(os.path.dirname(__file__), os.getenv("MODEL_FILTER", None))
+        if not filter_file:
+            return []
+        try:
+            with open(filter_file, 'r') as f:
+                # filters = [line.strip() for line in f]
+                filters = [line.strip() for line in f if not line.strip().startswith('#')]
 
-    except FileNotFoundError:
-        print(f"Warning: {filter_file} not found")
+        except FileNotFoundError:
+            print(f"Warning: {filter_file} not found")
 
     return filters
 
@@ -75,7 +76,7 @@ def check_models():
     for root, dirs, files in os.walk(models_path):
         if not os.path.abspath(cache_path) in os.path.abspath(root):
             for file in files:
-                if file.endswith('.safetensors') and file in filters:
+                if file.endswith('.safetensors') and (file in filters or len(filters) == 0):
                     model_path = os.path.join(root, file)
                     if model_path not in safetensors_files:  # Only add unique model directories
                         safetensors_files.append(model_path)
