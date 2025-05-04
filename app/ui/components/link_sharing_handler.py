@@ -108,13 +108,14 @@ class LinkSharingHandler:
         self._load_ui_dependencies()
         # now start with interface
         with gr.Row(visible=(self.config.feature_sharing_links_enabled)):
-            with gr.Accordion("Get more " + ("NSFW" if self.config.feature_use_upload_for_age_check else "") + " credits by sharing Links", open=False):
+            nsfw_msg = "(including NSFW credits)" if self.config.feature_use_upload_for_age_check else ""
+            with gr.Accordion(f"Get more generator credits by sharing Links {nsfw_msg}", open=False):
                 with gr.Row():
                     with gr.Column(scale=2):
                         gr.Markdown(self.msg_share_links)
                     with gr.Column(scale=1):
                         create_refernce_link = gr.Button("Create Link")
-                        reference_code = gr.Text(label="Share following link", interactive=False)
+                        reference_code = gr.Text(label="Share following link:", interactive=False)
 
                 create_refernce_link.click(
                     fn=self._handle_link_creation,

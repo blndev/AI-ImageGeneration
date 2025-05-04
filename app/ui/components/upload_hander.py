@@ -7,10 +7,9 @@ from PIL import Image
 import logging
 from app import SessionState
 from app.appconfig import AppConfig
-from app.validators.nsfw_detector import NSFWDetector, NSFWCategory
 from app.utils.singleton import singleton
 from app.utils.fileIO import get_date_subfolder
-from app.validators import AIImageDetector, FaceDetector, NSFWDetector
+from app.validators import AIImageDetector, FaceDetector, NSFWDetector, NSFWCategory
 from app.analytics import Analytics
 from .session_manager import SessionManager
 
