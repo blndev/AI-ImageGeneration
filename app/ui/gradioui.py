@@ -1,18 +1,14 @@
 from datetime import datetime, timedelta
-from hashlib import sha1
 from time import sleep
 from typing import List
 import os
 import gradio as gr
 from apscheduler.schedulers.background import BackgroundScheduler
-from PIL import Image
 import logging
 from app import SessionState
 from ..appconfig import AppConfig
 from app.utils.singleton import singleton
-from app.utils.fileIO import save_image_with_timestamp, get_date_subfolder
-from app.generators import FluxGenerator, GenerationParameters, ModelConfig, StabelDiffusionGenerator
-from app.validators import PromptRefiner, NSFWDetector, CensorMethod, NSFWCategory
+from app.generators import ModelConfig
 from ..analytics import Analytics
 import json
 from .components import UploadHandler, SessionManager, LinkSharingHandler, ImageGenerationHandler
@@ -53,7 +49,7 @@ class GradioUI():
                 analytics=self.analytics,
                 modelconfig=self.selectedmodelconfig
             )
-            
+
             self.component_upload_handler = None
             if self.config.feature_upload_images_for_new_token_enabled or self.config.feature_use_upload_for_age_check:
                 self.component_upload_handler = UploadHandler(
@@ -94,7 +90,6 @@ class GradioUI():
         if hasattr(self, "scheduler"):
             if self.scheduler:
                 self.scheduler.shutdown(wait=False)
-
 
     def initialize_examples(self):
         self.examples = []
@@ -153,9 +148,9 @@ class GradioUI():
             return None
         session_state = SessionState.from_gradio_state(gradio_state)
         logger.debug(f"check new credits for '{session_state.session}'. Last Generation: {session_state.last_generation}")
-        
+
         session_state, new_timer_token = self.component_session_manager.check_new_token_after_wait_time(session_state)
-        
+
         new_reference_token = 0
         if self.config.feature_sharing_links_enabled:
             session_state, new_reference_token = self.component_link_sharing_handler.earn_link_rewards(session_state=session_state)
@@ -239,9 +234,8 @@ class GradioUI():
             self.analytics.stop_image_creation_timer(analytics_image_creation_duration_start_time)
         return None, session_state, prompt
 
-
     def create_interface(self):
-    
+
         # Create the interface components
         with gr.Blocks(
             title=self.selectedmodelconfig.description + " Image Generator",
@@ -481,13 +475,6 @@ class GradioUI():
                 inputs=[],
                 outputs=[feedback_txt]
             )
-
-            # generate_event = generate_btn.click(
-            #     fn=uiaction_generate_images,
-            #     inputs=[prompt, aspect_ratio, neg_prompt, image_count],
-            #     outputs=[gallery]
-            # )
-            # Connect the cancel button
 
             stop_signal = gr.State(False)
 
