@@ -5,8 +5,7 @@ from typing import List
 import os
 import gradio as gr
 from apscheduler.schedulers.background import BackgroundScheduler
-from apscheduler.schedulers.asyncio import AsyncIOScheduler
-from PIL import Image, ExifTags
+from PIL import Image
 import logging
 from app import SessionState
 from app.validators.nsfw_detector import CensorMethod, NSFWCategory
@@ -18,7 +17,7 @@ from app.validators import FaceDetector, PromptRefiner, NSFWDetector
 from ..analytics import Analytics
 import json
 import shutil
-from .components import UploadHandler, SessionManager
+from .components import UploadHandler, SessionManager, LinkSharingHandler
 
 # Set up module logger
 logger = logging.getLogger(__name__)
@@ -37,20 +36,31 @@ class GradioUI():
             self.nsfw_detector = NSFWDetector(confidence_threshold=0.7)
 
             self.component_session_manager = SessionManager(config=self.config, analytics=self.analytics)
-            self.component_upload_handler = UploadHandler(
-                session_manager=self.component_session_manager,
-                config=self.config,
-                analytics=self.analytics
-            )
+            
+            self.component_upload_handler = None
+            if self.config.feature_upload_images_for_new_token_enabled or self.config.feature_use_upload_for_age_check:
+                self.component_upload_handler = UploadHandler(
+                    session_manager=self.component_session_manager,
+                    config=self.config,
+                    analytics=self.analytics
+                )
 
-            # TODO: should be used to determine when to unload models etc
+            self.component_link_sharing_handler = None
+            if self.config.feature_sharing_links_enabled:
+                self.component_link_sharing_handler = LinkSharingHandler(
+                    session_manager=self.component_session_manager,
+                    config=self.config,
+                    analytics=self.analytics
+                )
+
+            # used to determine when to unload models etc
             self.app_last_image_generation = datetime.now()
 
             # TODO: MOve to feedback handler
             self.__feedback_file = self.config.user_feedback_filestorage
             logger.info(f"Initialize Feedback file on '{self.__feedback_file}'")
 
-            # TODO: move to AppStart
+            # TODO: move to AppStart and just hand over the selected model
             selectedmodel = self.config.selected_model
             self.selectedmodelconfig = ModelConfig.get_config(model=selectedmodel, configs=modelconfigs)
 
@@ -63,7 +73,6 @@ class GradioUI():
             if self.selectedmodelconfig.sanity_check() == False:
                 logger.error("Configured Model and parents does not contain a path or modeltype. Stop execution.")
                 exit(1)
-
 
             self.initialize_examples()
             self.initialize_image_generator()
@@ -145,42 +154,28 @@ class GradioUI():
             request (gr.Request): The Gradio request object containing client information
             state_dict (dict): The current application state dictionary
         """
-        logger.info("Session - %s - initialized with %i token for: %s",
+        logger.info("Session - %s - initialized with %i credits for: %s",
                     session_state.session, session_state.token, request.client.host)
 
-        # TODO: move to rteference manager
-        shared_reference_key = self.get_reference_code(request)
-        self.analytics.record_new_session(
-            user_agent=request.headers["user-agent"],
-            languages=request.headers["accept-language"],
-            reference=shared_reference_key)
-
-        self.component_session_manager.record_session_as_active(session_state)
+        self.component_link_sharing_handler.initialize_session_references(request=request)
+        self.component_session_manager.record_active_session(session_state)
 
     def uiaction_timer_check_token(self, gradio_state: str):
         if gradio_state is None:
             return None
         session_state = SessionState.from_gradio_state(gradio_state)
-        logger.debug(f"check new token for '{session_state.session}'. Last Generation: {session_state.last_generation}")
-        session_state, new_token = self.component_session_manager.check_new_token_after_wait_time(session_state)
-        if self.config.token_enabled and new_token > 0:
-            gr.Info(f"Congratulation, you received {new_token} new generation token for waiting!", duration=0)
+        logger.debug(f"check new credits for '{session_state.session}'. Last Generation: {session_state.last_generation}")
+        
+        session_state, new_timer_token = self.component_session_manager.check_new_token_after_wait_time(session_state)
+        
+        new_reference_token = 0
+        if self.config.feature_sharing_links_enabled:
+            session_state, new_reference_token = self.component_link_sharing_handler.earn_link_rewards(session_state=session_state)
 
-        # TODO: move to reference handler
-        if session_state.has_reference_code() and self.config.feature_sharing_links_enabled:
-            try:
-                reference_count = self.session_references.get(session_state.reference_code, 0)
-                if reference_count > 0:
-                    new_token = reference_count * self.config.feature_sharing_link_new_token
-                    session_state.token += new_token
-                    gr.Info(
-                        f"""Congratulation, other Users used your shared link to generate images.
-                        You received {new_token} new generation token!""", duration=0)
-                    logger.info(f"session {session_state.session} received {new_token} new token for references")
-                    # FIXME: potentially not thread safe, needs to be checked
-                    self.session_references[session_state.reference_code] = 0
-            except Exception as e:
-                logger.warning(f"Reference count handling failed: {e}")
+        if self.config.token_enabled and (new_timer_token + new_reference_token) > 0:
+            msgTimer = f"{new_timer_token} for waiting," if new_timer_token > 0 else ""
+            msgReference = f"{new_reference_token} for sharing links" if new_reference_token > 0 else ""
+            gr.Info(f"Congratulation, you received new generation credits: {msgTimer} {msgReference}!", duration=0)
 
         self.analytics.update_user_tokens(session_state.session, session_state.token)
         return session_state
@@ -195,14 +190,14 @@ class GradioUI():
             image_count (int): The number of images to generate
         """
         session_state = SessionState.from_gradio_state(gr_state)
-        self.component_session_manager.record_session_as_active(session_state)
+        self.component_session_manager.record_active_session(session_state)
         self.app_last_image_generation = datetime.now()
         analytics_image_creation_duration_start_time = None
         try:
             if self.config.token_enabled and session_state.token < image_count:
-                msg = f"Not enough generation token available.\n\nPlease wait {self.config.new_token_wait_time} minutes"
+                msg = f"Not enough generation credits available.\n\nPlease wait {self.config.new_token_wait_time} minutes"
                 if self.config.feature_upload_images_for_new_token_enabled:
-                    msg += ", or get new token by sharing images for training"
+                    msg += ", or get new credits by sharing images for training"
                 if self.config.feature_sharing_links_enabled:
                     msg += ", or share the application link to other users"
                 gr.Warning(msg, title="Image generation failed", duration=30)
@@ -210,18 +205,17 @@ class GradioUI():
 
             analytics_image_creation_duration_start_time = self.analytics.start_image_creation_timer()
             session_state.save_last_generation_activity()
+            shared_reference_key = None
             # preparation for ?share=CODE
             # TODO: add to session state and to reference list shared[share_code]+=1
             # then the originated user can receive the token
             # every 600 seconds 1 token = 10 images per hour if activated
             # shoudl be in create image
-            shared_reference_key = self.get_reference_code(request)
-            if shared_reference_key is not None and shared_reference_key != "":
-                # url = request.url
-                v = self.session_references.get(shared_reference_key, 0)
-                v += image_count
-                self.session_references[shared_reference_key] = v
-                logger.debug(f"session reference saved for reference: {shared_reference_key}")
+            if self.component_link_sharing_handler:
+                shared_reference_key = self.component_link_sharing_handler.record_image_generation_for_shared_link(
+                    request=request,
+                    image_count=image_count
+                )
 
             # Map aspect ratio selection to dimensions
             width, height = 512, 512  # fallback
@@ -256,7 +250,7 @@ class GradioUI():
                 neg_prompt = "nude, naked, nsfw, porn," + neg_prompt
 
             logger.info(
-                f"generating image for {session_state.session} with {session_state.token} token available.\n - prompt: '{prompt}'")
+                f"generating image for {session_state.session} with {session_state.token} credits available.\n - prompt: '{prompt}'")
 
             generation_details = GenerationParameters(
                 prompt=prompt,
@@ -305,16 +299,17 @@ class GradioUI():
                             # reduce only if output is nsfw
                             session_state.nsfw -= 1
                 if show_nsfw_censor_warning and self.config.feature_use_upload_for_age_check:
-                        gr.Info("We censored at least one of your images. You can remove the censorship by uploading images to train our system for better results. Thanks for your understanding",duration=0)
+                        gr.Info("We censored at least one of your images. You can remove the censorship by uploading images to train our System for better results or sharing Links. Thanks for your understanding", duration=0)
             except Exception as e:
                 logger.warning(f"Error while NSFW check: {e}")
                 result_images = generated_images
 
             if session_state.token <= 1:
-                logger.warning(f"session {session_state.session} running out of token ({session_state.token}) left")
+                logger.warning(f"session {session_state.session} running out of credits ({session_state.token}) left")
 
             # save image hashes to prevent upload
-            self.component_upload_handler.block_created_images_from_upload(result_images)
+            if self.component_upload_handler:
+                self.component_upload_handler.block_created_images_from_upload(result_images)
 
             try:
                 # TODO: create useful values for "content" eg. main focus (describe the main object create in the image in one word")
@@ -325,7 +320,7 @@ class GradioUI():
                     content="",
                     reference=shared_reference_key)
             except Exception as e:
-                logger.debug(f"error while recording sucessful image generation for stats: {e}")
+                logger.warning(f"error while recording sucessful image generation for stats: {e}")
                 pass
 
             return result_images, session_state, prompt
@@ -340,12 +335,8 @@ class GradioUI():
             self.analytics.stop_image_creation_timer(analytics_image_creation_duration_start_time)
         return None, session_state
 
-    def get_reference_code(self, request):
-        shared_reference_key = request.query_params.get("share")
-        return shared_reference_key
 
     def create_interface(self):
-
         # TODO: sowas wie
         #         # Create components
         # self.image_generator.create_interface_elements(gr)
@@ -440,6 +431,14 @@ class GradioUI():
                         )
                         cancel_btn = gr.Button("Cancel", interactive=False, visible=False)
 
+            # Upload to get Token row
+            if self.component_link_sharing_handler:
+                self.component_link_sharing_handler.create_interface_elements(user_session_storage)
+
+            # Upload to get Token row
+            if self.component_upload_handler:
+                self.component_upload_handler.create_interface_elements(user_session_storage)
+
             # Examples row
             with gr.Row(visible=len(self.examples) > 0):
                 with gr.Accordion("Examples", open=False):
@@ -450,8 +449,6 @@ class GradioUI():
                         label="Click an example to load it"
                     )
 
-            # Upload to get Token row
-            self.component_upload_handler.create_interface_elements(user_session_storage)
             # Gallery row
             with gr.Row():
                 # Gallery for displaying generated images
@@ -634,7 +631,7 @@ class GradioUI():
                 # Initialize session when app loads
                 self.action_session_initialized(request=request, session_state=session_state)
 
-                logger.debug("Restoring token from local storage: %s", session_state.token)
+                logger.debug("Restoring credits from local storage: %s", session_state.token)
                 logger.debug("Session ID: %s", session_state.session)
                 return session_state
 

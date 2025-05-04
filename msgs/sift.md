@@ -1,9 +1,9 @@
-# Image Sharing and Token Rewards
+# Image Sharing for credits
 
-We encourage you to share images to help us improve our model. You can do this without worrying about your privacy, as all contributions are anonymous.
-For each image accepted, you will receive an **additional tokens**. Thank you for helping us enhance our model!
+We encourage you to share images to help us improve our application. You can do this without worrying about your privacy, as all contributions are anonymous.
+For each image accepted, you will receive an **additional credits**. Thank you for helping us enhance our model!
 
-- **Anonymity:** Your shared images remain anonymous, just like your usage of our platform. You will receive generation tokens for your current session only.
+- **Anonymity:** Your shared images remain anonymous, just like your usage of our platform. You will receive generation credits for your current session only.
 
 - **Any Content Welcome:** We accept all kinds of content. Feel free to share images of what you think the model is missing or where it is currently failing in generation.
 

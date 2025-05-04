@@ -100,7 +100,7 @@ class UploadHandler:
         self.load_components()
         # now start with interface
         with gr.Row(visible=(self.config.output_directory and self.config.feature_upload_images_for_new_token_enabled)):
-            with gr.Accordion("Get more Token" + " or activate NSFW" if self.config.feature_use_upload_for_age_check else "", open=False):
+            with gr.Accordion("Get more generation credits" + " or activate NSFW" if self.config.feature_use_upload_for_age_check else "", open=False):
                 with gr.Row():
                     with gr.Column(scale=2):
                         gr.Markdown(self.msg_share_image)
@@ -134,7 +134,7 @@ class UploadHandler:
         """
         logger.debug("starting image upload handler")
         session_state = SessionState.from_gradio_state(gradio_state)
-        self.session_manager.record_session_as_active(session_state)
+        self.session_manager.record_active_session(session_state)
 
         if image_path is None:
             return gr.Button(interactive=False)
@@ -173,31 +173,31 @@ class UploadHandler:
             return gradio_state, gr.Button(interactive=False), None
 
         session_state = SessionState.from_gradio_state(gradio_state)
-        self.session_manager.record_session_as_active(session_state)
+        self.session_manager.record_active_session(session_state)
         try:
             logger.debug(f"image type: {type(image_path)} with value {image_path}")
             image = Image.open(image_path)
-            logger.info(f"Analyze upload to receive TOKEN from {session_state.session}")
+            logger.info(f"Analyze upload to receive credits from {session_state.session}")
             token = self.config.feature_upload_images_token_reward
             msg = ""
             image_sha1 = sha1(image.tobytes()).hexdigest()
             already_used = self._uploaded_images_data.get(image_sha1)
             if (already_used):
-                msg = """The image signature matches a previous submission, so the full token reward isn't possible.
-                We’re awarding you 5 tokens as a thank you for your involvement."""
+                msg = """The image signature matches a previous submission, so the full credit reward isn't possible.
+                We’re awarding you 5 credits as a thank you for your involvement."""
                 token = 5
                 if already_used.get(session_state.session):
-                    msg = "You've already submitted this image, and it won't generate any tokens."
+                    msg = "You've already submitted this image, and it won't generate any credits."
                     token = 0
                     # gr.Warning(msg, title="Upload failed")
                     # return session_state, gr.Button(interactive=False), None
             elif self._created_images_data.get(image_sha1):
-                msg = "This image is already known, and it won't generate any tokens."
+                msg = "This image is already known, and it won't generate any credits."
                 token = 0
                 # gr.Warning(msg, title="Upload failed")
                 # return session_state, gr.Button(interactive=False), None
             elif image.width <= 768 or image.height <= 768:
-                msg = "This image is too small to be used for training. Pleas use a larger resolution to get more tokens."
+                msg = "This image is too small to be used for training. Pleas use a larger resolution to get more credits."
                 token = 1
             else:
                 # prepare upload state, will be adapted later
@@ -213,7 +213,7 @@ class UploadHandler:
                         token = 1
                     elif len(faces) == 0:
                         msg = """No face detected in the image. Could happen that the face is to narrow or the resolution is too low.
-                                Try another pictrue to get more token!"""
+                                Try another pictrue to get more credits!"""
                         token = 5
                         logger.warning(f"No Face detected on image {image_sha1} from {session_state.session}")
 
@@ -250,9 +250,9 @@ class UploadHandler:
             if (token > 0):
                 session_state.token += token
                 if msg != "":
-                    gr.Info(f"You received {token} new generation token! \n\nNote: {msg}", duration=30)
+                    gr.Info(f"You received {token} new generation credits! \n\nNote: {msg}", duration=30)
                 else:
-                    gr.Info(f"Congratulation, you received {token} new generation token!", duration=30)
+                    gr.Info(f"Congratulation, you received {token} new generation credits!", duration=30)
 
             else:
                 gr.Warning(msg, title="Upload failed")
@@ -275,6 +275,6 @@ class UploadHandler:
                 logger.error(f"Error while saving {self.__uploaded_images_db_path}: {e}")
 
         except Exception as e:
-            logger.error(f"generate token for uploaded image failed: {e}")
+            logger.error(f"generate credits for uploaded image failed: {e}")
             logger.debug("Exception details:", exc_info=True)
         return session_state, gr.Button(interactive=False), None

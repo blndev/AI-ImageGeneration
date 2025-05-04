@@ -29,8 +29,8 @@ class AppConfig:
         self.token_enabled = self.initial_token > 0
         self.new_token_wait_time = int(os.getenv("NEW_TOKEN_WAIT_TIME", 10))
 
-        self.feature_sharing_link_new_token = int(os.getenv("FEATURE_SHARING_LINK_NEW_TOKEN", 0))
-        self.feature_sharing_links_enabled = self.feature_sharing_link_new_token > 0
+        self.feature_sharing_links_new_token_per_image = int(os.getenv("FEATURE_SHARING_LINK_NEW_TOKEN", 0))
+        self.feature_sharing_links_enabled = self.feature_sharing_links_new_token_per_image > 0
 
         self.feature_upload_images_token_reward = int(os.getenv("FEATURE_UPLOAD_IMAGE_NEW_TOKEN", 0))
         self.feature_upload_images_for_new_token_enabled = self.feature_upload_images_token_reward > 0
