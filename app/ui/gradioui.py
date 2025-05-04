@@ -36,22 +36,21 @@ class GradioUI():
 
             self.nsfw_detector = NSFWDetector(confidence_threshold=0.7)
 
-            self.component_session_manager = SessionManager()
+            self.component_session_manager = SessionManager(config=self.config, analytics=self.analytics)
             self.component_upload_handler = UploadHandler(
                 session_manager=self.component_session_manager,
                 config=self.config,
                 analytics=self.analytics
             )
 
-            self.active_sessions = {}  # key=sessionid, value = timestamp of last token refresh
-            self.session_references = {}  # key=referencID, value = int count(image created via reference)
-            self.last_generation = datetime.now()
+            # TODO: should be used to determine when to unload models etc
+            self.app_last_image_generation = datetime.now()
 
+            # TODO: MOve to feedback handler
             self.__feedback_file = self.config.user_feedback_filestorage
             logger.info(f"Initialize Feedback file on '{self.__feedback_file}'")
 
-            logger.debug("Initial token: %i, wait time: %i minutes", self.config.initial_token, self.config.new_token_wait_time)
-
+            # TODO: move to AppStart
             selectedmodel = self.config.selected_model
             self.selectedmodelconfig = ModelConfig.get_config(model=selectedmodel, configs=modelconfigs)
 
@@ -132,29 +131,12 @@ class GradioUI():
         logger.debug("tick - cleanup interval")
         timeout_minutes = self.config.free_memory_after_minutes_inactivity
         x15_minutes_ago = datetime.now() - timedelta(minutes=timeout_minutes)
-        to_be_removed = []
-        for key, last_active in self.active_sessions.items():
-            if last_active < x15_minutes_ago:
-                to_be_removed.append(key)
+        self.component_session_manager.session_cleanup_and_analytics()
 
-        if len(to_be_removed) > 0:
-            logger.info(f"remove {len(to_be_removed)} sessions as they are inactive for {timeout_minutes} minutes")
-
-        for ktr in to_be_removed:
-            self.active_sessions.pop(ktr)
-
-        self.analytics.update_active_sessions(len(self.active_sessions))
-
-        if len(self.active_sessions) == 0 and self.last_generation < x15_minutes_ago and self.generator:
+        if self.app_last_image_generation < x15_minutes_ago and self.generator:
             # no active user for 15 minutes, we can unload the model to free memory
             logger.info(f"No active user for {timeout_minutes} minutes. Unloading Generator Models from Memory")
             self.generator.unload_model()
-            # TODO: onload also other models if possible like Validators.FaceDetector
-
-    def record_session_as_active(self, session_state):
-        """record the session as active with timestamp in local session state dictionary"""
-        if self.active_sessions is not None:
-            self.active_sessions[session_state.session] = datetime.now()
 
     def action_session_initialized(self, request: gr.Request, session_state: SessionState):
         """Initialize analytics session when app loads.
@@ -166,32 +148,25 @@ class GradioUI():
         logger.info("Session - %s - initialized with %i token for: %s",
                     session_state.session, session_state.token, request.client.host)
 
+        # TODO: move to rteference manager
         shared_reference_key = self.get_reference_code(request)
         self.analytics.record_new_session(
             user_agent=request.headers["user-agent"],
             languages=request.headers["accept-language"],
             reference=shared_reference_key)
 
-        self.record_session_as_active(session_state)
-        self.analytics.update_active_sessions(len(self.active_sessions))
+        self.component_session_manager.record_session_as_active(session_state)
 
     def uiaction_timer_check_token(self, gradio_state: str):
         if gradio_state is None:
             return None
         session_state = SessionState.from_gradio_state(gradio_state)
         logger.debug(f"check new token for '{session_state.session}'. Last Generation: {session_state.last_generation}")
-        # logic: (10) minutes after running out of token, user get filled up to initial (10) new token
-        # exception: user upload image for training or receive advertising token
-        if self.config.token_enabled:
-            current_token = session_state.token
-            if session_state.generation_before_minutes(self.config.new_token_wait_time) and session_state.token <= 2:
-                session_state.token = self.config.initial_token
-                session_state.reset_last_generation_activity()
-            new_token = session_state.token - current_token
-            if new_token > 0:
-                gr.Info(f"Congratulation, you received {new_token} new generation token for waiting!", duration=0)
-                logger.info(f"session {session_state.session} received {new_token} new token for waiting")
+        session_state, new_token = self.component_session_manager.check_new_token_after_wait_time(session_state)
+        if self.config.token_enabled and new_token > 0:
+            gr.Info(f"Congratulation, you received {new_token} new generation token for waiting!", duration=0)
 
+        # TODO: move to reference handler
         if session_state.has_reference_code() and self.config.feature_sharing_links_enabled:
             try:
                 reference_count = self.session_references.get(session_state.reference_code, 0)
@@ -207,7 +182,6 @@ class GradioUI():
             except Exception as e:
                 logger.warning(f"Reference count handling failed: {e}")
 
-        self.record_session_as_active(session_state)
         self.analytics.update_user_tokens(session_state.session, session_state.token)
         return session_state
 
@@ -221,8 +195,8 @@ class GradioUI():
             image_count (int): The number of images to generate
         """
         session_state = SessionState.from_gradio_state(gr_state)
-        self.record_session_as_active(session_state)
-        self.last_generation = datetime.now()
+        self.component_session_manager.record_session_as_active(session_state)
+        self.app_last_image_generation = datetime.now()
         analytics_image_creation_duration_start_time = None
         try:
             if self.config.token_enabled and session_state.token < image_count:
