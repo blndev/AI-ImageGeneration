@@ -125,7 +125,7 @@ class GradioUI():
         x15_minutes_ago = datetime.now() - timedelta(minutes=timeout_minutes)
         self.component_session_manager.session_cleanup_and_analytics()
 
-        if self.app_last_image_generation < x15_minutes_ago and self.generator:
+        if self.app_last_image_generation < x15_minutes_ago:
             # no active user for 15 minutes, we can unload the model to free memory
             logger.info(f"No active user for {timeout_minutes} minutes. Unloading Generator Models from Memory")
             self.component_image_generator.generator.unload_model()
@@ -137,8 +137,8 @@ class GradioUI():
             request (gr.Request): The Gradio request object containing client information
             state_dict (dict): The current application state dictionary
         """
-        logger.info("Session - %s - initialized with %i credits for: %s",
-                    session_state.session, session_state.token, request.client.host)
+        logger.info("Session - %s - initialized with %i (%i) credits for: %s",
+                    session_state.session, session_state.token, session_state.nsfw, request.client.host)
 
         self.component_link_sharing_handler.initialize_session_references(request=request)
         self.component_session_manager.record_active_session(session_state)
@@ -230,9 +230,10 @@ class GradioUI():
             logger.debug("Exception details:", exc_info=True)
 
             gr.Warning(f"Error while generating the image: {e}", title="Image generation failed", duration=30)
+            return [], session_state, prompt
+
         finally:
             self.analytics.stop_image_creation_timer(analytics_image_creation_duration_start_time)
-        return None, session_state, prompt
 
     def create_interface(self):
 

@@ -42,7 +42,7 @@ class SessionManager:
                 to_be_removed.append(key)
 
         if len(to_be_removed) > 0:
-            logger.info(f"remove {len(to_be_removed)} sessions as they are inactive for {timeout_minutes} minutes")
+            logger.debug(f"remove {len(to_be_removed)} sessions as they are inactive for {timeout_minutes} minutes")
 
         for ktr in to_be_removed:
             self.active_sessions.pop(ktr)

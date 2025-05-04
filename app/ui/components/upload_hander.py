@@ -195,8 +195,8 @@ class UploadHandler:
                 token = 0
                 # gr.Warning(msg, title="Upload failed")
                 # return session_state, gr.Button(interactive=False), None
-            elif image.width <= 768 or image.height <= 768:
-                msg = "This image is too small to be used for training. Pleas use a larger resolution to get more credits."
+            elif (image.width <= 768 and image.height <= 768) or (image.width <= 512 or image.height <= 512):
+                msg = "This image is too small to be used for training of our generator. Please use a resolution with more then 768x768 to get more credits."
                 token = 1
             else:
                 # prepare upload state, will be adapted later
@@ -214,7 +214,7 @@ class UploadHandler:
                         msg = """No face detected in the image. Could happen that the face is to narrow or the resolution is too low.
                                 Try another pictrue to get more credits!"""
                         token = 5
-                        logger.warning(f"No Face detected on image {image_sha1} from {session_state.session}")
+                        logger.info(f"No Face detected on image {image_sha1} from {session_state.session}")
 
                     else:
                         # prepare for auto removal of critical images
@@ -248,6 +248,7 @@ class UploadHandler:
 
             if (token > 0):
                 session_state.token += token
+                logger.info(msg)
                 if msg != "":
                     gr.Info(f"You received {token} new generation credits! \n\nNote: {msg}", duration=30)
                 else:
