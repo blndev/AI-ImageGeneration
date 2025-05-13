@@ -184,7 +184,7 @@ class GradioUI():
                 if self.config.feature_sharing_links_enabled:
                     msg += ", or share the application link to other users"
                 gr.Warning(msg, title="Image generation failed", duration=30)
-                return None, session_state
+                return [], session_state
 
             analytics_image_creation_duration_start_time = self.analytics.start_image_creation_timer()
             session_state.save_last_generation_activity()
