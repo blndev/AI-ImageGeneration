@@ -64,12 +64,13 @@ class PromptRefiner():
         return validation
 
     def is_safe_for_work(self, prompt: str) -> bool:
-        return not self.check_contains_nsfw(prompt=prompt)
+        nsfw, _ = self.check_contains_nsfw(prompt=prompt)
+        return not nsfw
 
     # def contains_nsfw(self, prompt: str, include_rule_violations: bool=False) -> bool:
     def check_contains_nsfw(self, prompt: str) -> bool:
         """Validates if the prompt contains NSFW"""
-        if not self.llm: return False, ""
+        if not self.llm: return False, "no llm available"
 
         # now check for NSFW
         checks = [
@@ -87,7 +88,7 @@ class PromptRefiner():
             HumanMessage("Questions will follow. Here is the next text to check: 'a girl'"),
             AIMessage("Understood. Please ask your questions now."),
             HumanMessage(checks[0]),
-            AIMessage("No."),
+            AIMessage("No. Text 'a Girl', 'a woman' or similiar is not related"),
 
             # chain of tough
             HumanMessage("Questions will follow. Here is the first text to check: 'a dog and a horse'"),
@@ -117,6 +118,7 @@ class PromptRefiner():
             messages.append(ai_msg)
             lower_response = ai_msg.content.lower()
             if "yes" in lower_response:
+                logger.debug(f"detected nsfw in prompt: {ai_msg.content}")
                 return True, ai_msg.content
 
         return False, ""
@@ -169,7 +171,7 @@ class PromptRefiner():
         rules = [
             "Replace all explicit or implicit depictions of nudity or porn including the words naked, nude with clothed e.g. underwear",
             "Remove all mentionings of genitals and nipples",
-            "Remove all mentionings of transexuals, make them woman or man",
+            "Remove all mentionings of transexuals, make them woman or man, but keep age descriptions",
             "Remove mentioning of death or killed people.",
             "Remove mentioning of sexual activity like gangbang or sex between humans.",
             "If the image is related to People, add terms like perfect face or beautiful."
@@ -211,7 +213,8 @@ Don't write any summary or explanation. If you can't fulfill the task, echo the 
             AIMessage("A beautiful naked female model with beautiful face in a photo studio, posing gracefully, urban backdrop with dramatic lightning capture the essence of modern shooting."),
             HumanMessage("Great. Now shorten this image description to a maximum of 10 words, answer only with the new text: 'A woman with blue eyes, blonde hair and a perfect body, age around 25 is standing naked on a beach.'"),
             AIMessage("A naked woman with blonde hair on the beach."),
-            HumanMessage("Great. Now shorten this image description to a maximum of 5 words, answer only with the new text: 'A group of people walking on a rainy day in the forest'"),
+            HumanMessage(
+                "Great. Now shorten this image description to a maximum of 5 words, answer only with the new text: 'A group of people walking on a rainy day in the forest'"),
             AIMessage("Group of people in forest."),
             HumanMessage(
                 f"Perfect. New Task:\n{task} this image description to a maximum of {max_words} words, answer only with the new text: '{prompt}'"),

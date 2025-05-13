@@ -158,8 +158,9 @@ class ImageGenerationHandler:
     def _apply_prompt_magic(self, session_state: SessionState, prompt: str, user_activated_promptmagic: bool) -> str:
         # check if nsfw or preview is allowed, enforce SFW prompt if not
         if session_state.nsfw <= self.MAX_NSFW_WARNINGS and self.prompt_refiner:
-            if self.prompt_refiner.check_contains_nsfw(prompt):
-                if self.config.feature_use_upload_for_age_check:
+            nsfw, _ = self.prompt_refiner.check_contains_nsfw(prompt)
+            if nsfw:
+                if self.config.feature_use_upload_for_age_check and session_state.nsfw < self.MAX_NSFW_WARNINGS and not session_state.nsfw <= self.MAX_NSFW_WARNINGS * 2:
                     gr.Info("""Explicit image generation preview is over and will now be blocked.
                             You can get credits for uncensored images by uploading related images for our model training.
                             What you upload, you can create!""", duration=30)
@@ -171,8 +172,9 @@ class ImageGenerationHandler:
         if self.prompt_refiner and user_activated_promptmagic:
             logger.debug("Apply Prompt-Magic")
             # refine prompt multiple times for better reults
-            for _ in range(2):
-                prompt = self.prompt_refiner.magic_enhance(prompt, 200)
+            for _ in range(3):
+                new_prompt = self.prompt_refiner.magic_enhance(prompt, 200)
+                if len(new_prompt) > len(prompt): prompt = new_prompt
             if session_state.nsfw <= self.MAX_NSFW_WARNINGS and not self.prompt_refiner.is_safe_for_work(prompt):
                 prompt = self.prompt_refiner.make_prompt_sfw(prompt)
 
