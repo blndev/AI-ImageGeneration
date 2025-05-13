@@ -84,6 +84,12 @@ class PromptRefiner():
             AIMessage("Understood. Please ask your questions now."),
 
             # chain of tough
+            HumanMessage("Questions will follow. Here is the next text to check: 'a girl'"),
+            AIMessage("Understood. Please ask your questions now."),
+            HumanMessage(checks[0]),
+            AIMessage("No."),
+
+            # chain of tough
             HumanMessage("Questions will follow. Here is the first text to check: 'a dog and a horse'"),
             AIMessage("Understood. Please ask your questions now."),
             HumanMessage(checks[0]),

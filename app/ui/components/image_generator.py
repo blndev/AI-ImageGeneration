@@ -80,7 +80,7 @@ class ImageGenerationHandler:
 
             logger.info(
                 f"""generating image for {session_state.session}
-                with {session_state.token} ({session_state.nsfw} NSFW) credits available
+                with {session_state.token} credits ({session_state.nsfw} NSFW) available
                 prompt: '{prompt}'""")
 
             # split aspect ratio selection to dimensions by using modelconfig
@@ -160,8 +160,9 @@ class ImageGenerationHandler:
         if session_state.nsfw <= self.MAX_NSFW_WARNINGS and self.prompt_refiner:
             if self.prompt_refiner.check_contains_nsfw(prompt):
                 if self.config.feature_use_upload_for_age_check:
-                    gr.Info("""Explicit image generation preview is over and will now be blocked. " \
-                            You can get credits for uncensored images by uploading related images for our model training.""", duration=30)
+                    gr.Info("""Explicit image generation preview is over and will now be blocked.
+                            You can get credits for uncensored images by uploading related images for our model training.
+                            What you upload, you can create!""", duration=30)
                 logger.info(f"Convert NSFW prompt to SFW. User Prompt: '{prompt}'")
                 prompt = self.prompt_refiner.make_prompt_sfw(prompt, True)
             else:
@@ -191,7 +192,7 @@ class ImageGenerationHandler:
                 for image in result_images:
                     if image not in generated_images:
                         save_image_with_timestamp(image=image, folder_path=outdir, ignore_errors=True,
-                                                  generation_details=gen_data, reference="censored")
+                                                  generation_details=gen_data, appendix="-censored")
         except Exception as e:
             logger.warning(f"error while saving images: {e}")
 

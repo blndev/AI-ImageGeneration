@@ -45,11 +45,11 @@ class UploadHandler:
 
         try:
             self.msg_share_image = ""
-            p = "./msgs/sift.md"
+            p = "./msgs/sift.md"  # TODO: make it configurable via env
             if os.path.exists(p):
                 with open(p, "r") as f:
                     self.msg_share_image = f.read()
-            logger.info(f"Initialized messages from '{p}'")
+            logger.debug(f"Initialized info for upload from '{p}'")
         except Exception as e:
             logger.error(f"Error while loading msgs: {e}")
 

@@ -252,7 +252,7 @@ class GradioUI():
                 with gr.Column():
                     # Text prompt input
                     prompt = gr.Textbox(
-                        label="Your prompt",
+                        label="Your wish",
                         placeholder="Describe the image you want to generate...",
                         value="",
                         scale=4,
@@ -262,7 +262,7 @@ class GradioUI():
 
                     # Text prompt input
                     neg_prompt = gr.Textbox(
-                        label="Negative prompt",
+                        label="Avoid",
                         placeholder="Describe what you don't want...",
                         value="",
                         scale=4,
@@ -321,11 +321,11 @@ class GradioUI():
                         )
                         cancel_btn = gr.Button("Cancel", interactive=False, visible=False)
 
-            # Upload to get Token row
+            # Sharew Links to get credits
             if self.component_link_sharing_handler:
                 self.component_link_sharing_handler.create_interface_elements(user_session_storage)
 
-            # Upload to get Token row
+            # Upload to get credits
             if self.component_upload_handler:
                 self.component_upload_handler.create_interface_elements(user_session_storage)
 
@@ -499,7 +499,6 @@ class GradioUI():
                 outputs=[download_btn]
             )
 
-            # TODO: link via fn directly to self.action...
             app = self.interface
 
             @app.load(inputs=[user_session_storage], outputs=[user_session_storage])

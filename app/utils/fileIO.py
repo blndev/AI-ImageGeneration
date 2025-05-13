@@ -82,7 +82,7 @@ def save_image_as_png(image: Image.Image, dir: str, filename: str = None):
         return None
 
 
-def save_image_with_timestamp(image, folder_path, ignore_errors=False, reference="", generation_details: dict = None):
+def save_image_with_timestamp(image, folder_path, ignore_errors=False, reference="", appendix: str = "", generation_details: dict = None):
     """
     saves a image in a given folder and returns the used path
     reference: could be the SHA1 from source image to make a combined filename
@@ -97,7 +97,7 @@ def save_image_with_timestamp(image, folder_path, ignore_errors=False, reference
         sleep(0.2)  # make sure we have unique filenames
         separator = "" if reference == "" else "-"
         # Create the filename with the timestamp
-        filename = f"{reference}{separator}{timestamp}.png"  # Change the extension as needed
+        filename = f"{reference}{separator}{timestamp}{appendix}.png"  # Change the extension as needed
 
         # Full path to save the image
         file_path = os.path.join(folder_path, filename)
