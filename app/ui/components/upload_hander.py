@@ -154,7 +154,8 @@ class UploadHandler:
                 return gr.Button(interactive=True)
 
             dir = self.config.output_directory
-            dir = os.path.join(dir, get_date_subfolder(), "upload")
+            #dir = os.path.join(dir, get_date_subfolder(), "upload")
+            dir = os.path.join(dir, "upload")
             targetpath = os.path.join(dir, str(session_state.session) + '_' + image_sha1 + "_" + filename)
             # copy file from source to outdir
             os.makedirs(dir, exist_ok=True)
