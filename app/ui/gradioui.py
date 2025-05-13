@@ -301,10 +301,6 @@ class GradioUI():
                         outputs=[magic_prompt],
                         fn=lambda x: gr.Textbox(visible=x)
                     )
-                    # gr.Markdown(label="Note",
-                    #             value="""NSFW protection is active.
-                    #             """, show_label=True, container=True,
-                    #             visible=(self.prompt_refiner is not None))
 
                 # generate and token count
                 with gr.Column(visible=True):
@@ -415,7 +411,7 @@ class GradioUI():
                     token = "unlimited"
                 n = ""
                 if self.config.feature_use_upload_for_age_check and ss.nsfw > 0:
-                    n = f"(NSFW: {ss.nsfw})"
+                    n = f"(Uncensored: {ss.nsfw})"
                 return f"Generations left: {token} {n}"
             user_session_storage.change(
                 # update the UI with current token count

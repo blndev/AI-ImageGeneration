@@ -99,7 +99,8 @@ class UploadHandler:
         self.load_components()
         # now start with interface
         with gr.Row(visible=(self.config.output_directory and self.config.feature_upload_images_for_new_token_enabled)):
-            with gr.Accordion("Get more generation credits" + " or activate NSFW" if self.config.feature_use_upload_for_age_check else "", open=False):
+            nsfw_msg = " and remove censorship by uploading images" if self.config.feature_use_upload_for_age_check else ""
+            with gr.Accordion("Get more generation credits" + nsfw_msg, open=False):
                 with gr.Row():
                     with gr.Column(scale=2):
                         gr.Markdown(self.msg_share_image)

@@ -25,6 +25,7 @@ class ImageGenerationHandler:
 
         self.initialize_image_generator()
         self.initialize_prompt_magic()
+        self.MAX_NSFW_WARNINGS = -2  # amount of censored images if user generates nsfw content before we fully rewrite the prompt to avoid it
 
     def initialize_image_generator(self):
         if "flux" in self.selectedmodelconfig.model_type:
@@ -74,7 +75,7 @@ class ImageGenerationHandler:
             prompt = self._apply_prompt_magic(session_state, userprompt, user_activated_promptmagic)
 
             # additional nsfw protection
-            if session_state.nsfw <= 0:
+            if session_state.nsfw <= self.MAX_NSFW_WARNINGS:
                 neg_prompt = "nude, naked, nsfw, porn," + neg_prompt
 
             logger.info(
@@ -98,11 +99,13 @@ class ImageGenerationHandler:
 
             # reduce available credits after successful generation
             session_state.token -= image_count
-            # check saving output for validation of generation (Debug & Beta Only!!)
-            self._save_output_for_debug(generation_details.to_dict(), userprompt, generated_images)
 
             # apply censorship if still nsfw content is contained
             result_images = self._censor_nsfw_images(session_state, generated_images)
+
+            # check saving output for validation of generation (Debug & Beta Only!!)
+            self._save_output_for_debug(generation_details.to_dict(), userprompt, generated_images, result_images)
+
             return result_images, session_state, prompt
 
         except Exception as e:
@@ -117,7 +120,11 @@ class ImageGenerationHandler:
             for image in generated_images:
                 nsfw_check = self.nsfw_detector.detect(image)
                 if not nsfw_check.is_safe:
+                    # just for debugging purposes
                     logger.debug(f"Generated NSFW Image detected. Category: {nsfw_check.category}, Confidence: {nsfw_check.confidence}")
+
+                # we check against nsfw<=0 to apply censorship on the explicit regions, if that happen more often (-2),
+                # the prompt refiner is used in advance to avoid nsfw generation (trigger value is NSFW_WARNINGS)
                 if not nsfw_check.is_safe and nsfw_check.category == NSFWCategory.EXPLICIT and session_state.nsfw <= 0:
                     result_images.append(
                         self.nsfw_detector.censor_detected_regions(
@@ -127,14 +134,16 @@ class ImageGenerationHandler:
                             method=CensorMethod.PIXELATE)
                     )
                     show_nsfw_censor_warning = True
-                    session_state.nsfw -= 1  # because block starts at -2
+                    session_state.nsfw -= 1  # we must can go into negative values, as block starts after MAX_NSFW_WARNINGS limit
                 else:
                     result_images.append(image)  # could be nsfw or not but it's allowed
                     if nsfw_check.category == NSFWCategory.EXPLICIT:
                         # reduce only if output is nsfw
                         session_state.nsfw -= 1
             if show_nsfw_censor_warning and self.config.feature_use_upload_for_age_check:
-                gr.Info("We censored at least one of your images. You can remove the censorship by uploading images to train our System for better results or sharing Links. Thanks for your understanding", duration=0)
+                gr.Info("""We censored at least one of your images.
+                        You can remove the censorship by uploading images to train our System for better results or sharing Links.
+                        Thanks for your understanding""", duration=0)
         except Exception as e:
             logger.warning(f"Error while NSFW check: {e}")
             result_images = generated_images
@@ -142,10 +151,11 @@ class ImageGenerationHandler:
 
     def _apply_prompt_magic(self, session_state: SessionState, prompt: str, user_activated_promptmagic: bool) -> str:
         # check if nsfw or preview is allowed, enforce SFW prompt if not
-        if session_state.nsfw <= -2 and self.prompt_refiner:
+        if session_state.nsfw <= self.MAX_NSFW_WARNINGS and self.prompt_refiner:
             if self.prompt_refiner.check_contains_nsfw(prompt):
                 if self.config.feature_use_upload_for_age_check:
-                    gr.Info("NSFW preview is over. You can create more by uploading images.", duration=30)
+                    gr.Info("""Explicit image generation preview is over and will now be blocked. " \
+                            You can get credits for uncensored images by uploading related images for our model training.""", duration=30)
                 logger.info(f"Convert NSFW prompt to SFW. User Prompt: '{prompt}'")
                 prompt = self.prompt_refiner.make_prompt_sfw(prompt, True)
             else:
@@ -153,13 +163,15 @@ class ImageGenerationHandler:
 
         if self.prompt_refiner and user_activated_promptmagic:
             logger.info("Apply Prompt-Magic")
-            prompt = self.prompt_refiner.magic_enhance(prompt, 200)
-            if session_state.nsfw <= -2 and not self.prompt_refiner.is_safe_for_work(prompt):
+            # refine prompt multiple times for better reults
+            for _ in range(3):
+                prompt = self.prompt_refiner.magic_enhance(prompt, 200)
+            if session_state.nsfw <= self.MAX_NSFW_WARNINGS and not self.prompt_refiner.is_safe_for_work(prompt):
                 prompt = self.prompt_refiner.make_prompt_sfw(prompt)
 
         return prompt
 
-    def _save_output_for_debug(self, gen_data: dict, userprompt: str, generated_images: list):
+    def _save_output_for_debug(self, gen_data: dict, userprompt: str, generated_images: list, result_images: list):
         # check saving output for validation of generation (Debug & Beta Only!!)
         if self.config.save_generated_output:
             logger.debug(f"saving images to {self.config.output_directory}")
@@ -168,6 +180,12 @@ class ImageGenerationHandler:
             for image in generated_images:
                 outdir = os.path.join(self.config.output_directory, get_date_subfolder(), "generation")
                 save_image_with_timestamp(image=image, folder_path=outdir, ignore_errors=True, generation_details=gen_data)
+
+            for image in result_images:
+                if image not in generated_images:
+                    outdir = os.path.join(self.config.output_directory, get_date_subfolder(), "generation")
+                    save_image_with_timestamp(image=image, folder_path=outdir, ignore_errors=True,
+                                              generation_details=gen_data, reference="result_")
 
     def _get_image_dimensions(self, aspect_ratio):
         width, height = 512, 512  # fallback
