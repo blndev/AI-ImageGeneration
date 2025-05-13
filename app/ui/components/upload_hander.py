@@ -159,7 +159,7 @@ class UploadHandler:
             # copy file from source to outdir
             os.makedirs(dir, exist_ok=True)
             shutil.copy(image_path, targetpath)
-            logger.info(f"Image saved to {targetpath}")
+            logger.debug(f"Image saved to {targetpath}")
         except Exception as e:
             logger.error(f"save image failed: {e}")
         return gr.Button(interactive=True)
@@ -209,17 +209,17 @@ class UploadHandler:
                     is_ai_image, reason = self.ai_image_detector.is_ai_image(image_path)
                     if is_ai_image:
                         msg = "Image probably AI generated"
-                        logger.warning(msg + " Reason: " + reason)
+                        logger.info(msg + " Reason: " + reason)
                         token = 1
                     elif len(faces) == 0:
                         msg = """No face detected in the image. Could happen that the face is to narrow or the resolution is too low.
                                 Try another pictrue to get more credits!"""
                         token = 5
-                        logger.info(f"No Face detected on image {image_sha1} from {session_state.session}")
+                        logger.debug(f"No Face detected on image {image_sha1} from {session_state.session}")
 
                     else:
                         # prepare for auto removal of critical images
-                        logger.info(f"{len(faces)} Face(s) detected on upload from {session_state.session}")
+                        logger.debug(f"{len(faces)} Face(s) detected on upload from {session_state.session}")
                         ages = ""
                         for face in faces:
                             if face.age:
@@ -249,7 +249,7 @@ class UploadHandler:
 
             if (token > 0):
                 session_state.token += token
-                logger.info(msg)
+                logger.info(f"Received token for upload: {token} - {msg}")
                 if msg != "":
                     gr.Info(f"You received {token} new generation credits! \n\nNote: {msg}", duration=30)
                 else:

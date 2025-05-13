@@ -79,7 +79,9 @@ class ImageGenerationHandler:
                 neg_prompt = "nude, naked, nsfw, porn," + neg_prompt
 
             logger.info(
-                f"generating image for {session_state.session} with {session_state.token} credits available.\n - prompt: '{prompt}'")
+                f"""generating image for {session_state.session}
+                with {session_state.token} ({session_state.nsfw} NSFW) credits available
+                prompt: '{prompt}'""")
 
             # split aspect ratio selection to dimensions by using modelconfig
             width, height = self._get_image_dimensions(aspect_ratio)
@@ -104,7 +106,11 @@ class ImageGenerationHandler:
             result_images = self._censor_nsfw_images(session_state, generated_images)
 
             # check saving output for validation of generation (Debug & Beta Only!!)
-            self._save_output_for_debug(generation_details.to_dict(), userprompt, generated_images, result_images)
+            self._save_output_for_debug(gen_data=generation_details.to_dict(),
+                                        userprompt=userprompt,
+                                        generated_images=generated_images,
+                                        result_images=result_images
+                                        )
 
             return result_images, session_state, prompt
 
@@ -142,7 +148,7 @@ class ImageGenerationHandler:
                         session_state.nsfw -= 1
             if show_nsfw_censor_warning and self.config.feature_use_upload_for_age_check:
                 gr.Info("""We censored at least one of your images.
-                        You can remove the censorship by uploading images to train our System for better results or sharing Links.
+                        You can remove the censorship by uploading images to train our System for better results, or by sharing Links of this app.
                         Thanks for your understanding""", duration=0)
         except Exception as e:
             logger.warning(f"Error while NSFW check: {e}")
@@ -162,9 +168,9 @@ class ImageGenerationHandler:
                 logger.debug("prompt is SFW")
 
         if self.prompt_refiner and user_activated_promptmagic:
-            logger.info("Apply Prompt-Magic")
+            logger.debug("Apply Prompt-Magic")
             # refine prompt multiple times for better reults
-            for _ in range(3):
+            for _ in range(2):
                 prompt = self.prompt_refiner.magic_enhance(prompt, 200)
             if session_state.nsfw <= self.MAX_NSFW_WARNINGS and not self.prompt_refiner.is_safe_for_work(prompt):
                 prompt = self.prompt_refiner.make_prompt_sfw(prompt)
@@ -172,20 +178,22 @@ class ImageGenerationHandler:
         return prompt
 
     def _save_output_for_debug(self, gen_data: dict, userprompt: str, generated_images: list, result_images: list):
-        # check saving output for validation of generation (Debug & Beta Only!!)
-        if self.config.save_generated_output:
-            logger.debug(f"saving images to {self.config.output_directory}")
-            gen_data["userprompt"] = userprompt
-            gen_data["model"] = self.selectedmodelconfig.model
-            for image in generated_images:
+        try:
+            # check saving output for validation of generation (Debug & Beta Only!!)
+            if self.config.save_generated_output:
+                logger.debug(f"saving images to {self.config.output_directory}")
+                gen_data["userprompt"] = userprompt
+                gen_data["model"] = self.selectedmodelconfig.model
                 outdir = os.path.join(self.config.output_directory, get_date_subfolder(), "generation")
-                save_image_with_timestamp(image=image, folder_path=outdir, ignore_errors=True, generation_details=gen_data)
+                for image in generated_images:
+                    save_image_with_timestamp(image=image, folder_path=outdir, ignore_errors=True, generation_details=gen_data)
 
-            for image in result_images:
-                if image not in generated_images:
-                    outdir = os.path.join(self.config.output_directory, get_date_subfolder(), "generation")
-                    save_image_with_timestamp(image=image, folder_path=outdir, ignore_errors=True,
-                                              generation_details=gen_data, reference="result_")
+                for image in result_images:
+                    if image not in generated_images:
+                        save_image_with_timestamp(image=image, folder_path=outdir, ignore_errors=True,
+                                                  generation_details=gen_data, reference="censored")
+        except Exception as e:
+            logger.warning(f"error while saving images: {e}")
 
     def _get_image_dimensions(self, aspect_ratio):
         width, height = 512, 512  # fallback
