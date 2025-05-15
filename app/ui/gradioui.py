@@ -140,8 +140,7 @@ class GradioUI():
         logger.info("Session - %s - initialized with %i (%i) credits for: %s",
                     session_state.session, session_state.token, session_state.nsfw, request.client.host)
 
-        self.component_link_sharing_handler.initialize_session_references(request=request)
-        self.component_session_manager.record_active_session(session_state)
+        if self.component_link_sharing_handler:
 
     def uiaction_timer_check_token(self, gradio_state: str):
         if gradio_state is None:
@@ -184,7 +183,7 @@ class GradioUI():
                 if self.config.feature_sharing_links_enabled:
                     msg += ", or share the application link to other users"
                 gr.Warning(msg, title="Image generation failed", duration=30)
-                return [], session_state
+                return [], session_state, ""
 
             analytics_image_creation_duration_start_time = self.analytics.start_image_creation_timer()
             session_state.save_last_generation_activity()
