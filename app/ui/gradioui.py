@@ -141,6 +141,9 @@ class GradioUI():
                     session_state.session, session_state.token, session_state.nsfw, request.client.host)
 
         if self.component_link_sharing_handler:
+            self.component_link_sharing_handler.initialize_session_references(request=request)
+        if self.component_session_manager:
+            self.component_session_manager.record_active_session(session_state)
 
     def uiaction_timer_check_token(self, gradio_state: str):
         if gradio_state is None:
@@ -236,10 +239,81 @@ class GradioUI():
 
     def create_interface(self):
 
+        js="""
+        function setupGalleryFullscreen() {
+            alert('Debug: Setting up fullscreen');
+            
+            // Create overlay elements
+            const overlay = document.createElement('div');
+            overlay.className = 'fullscreen-overlay';
+            overlay.style.display = 'none';
+            
+            const fullImage = document.createElement('img');
+            fullImage.className = 'fullscreen-image';
+            overlay.appendChild(fullImage);
+            document.body.appendChild(overlay);
+            
+            // Add double-click handlers to gallery images
+            const gallery = document.getElementById('image-gallery');
+            if (gallery) {
+                alert('Debug: Gallery found');
+                gallery.addEventListener('dblclick', function(e) {
+                    alert('Debug: Double click detected');
+                    const clickedImg = e.target.closest('img');
+                    if (clickedImg && !clickedImg.closest('.fullscreen-overlay')) {
+                        e.preventDefault();
+                        fullImage.src = clickedImg.src;
+                        overlay.style.display = 'flex';
+                    }
+                });
+            } else {
+                alert('Debug: Gallery not found');
+            }
+            
+            overlay.addEventListener('click', function() {
+                overlay.style.display = 'none';
+            });
+        }
+        
+        // Make sure the function is called after Gradio loads
+        if (window.gradio_config) {
+            alert('Debug: Gradio config found');
+            setupGalleryFullscreen();
+        } else {
+            alert('Debug: Waiting for Gradio');
+            document.addEventListener('DOMContentLoaded', function() {
+                setTimeout(setupGalleryFullscreen, 1000);
+            });
+        }
+        alert('debug: custom script loaded');
+
+        """
         # Create the interface components
         with gr.Blocks(
             title=self.selectedmodelconfig.description + " Image Generator",
-            css="footer {visibility: hidden}",
+            #js=js,
+            css="""
+            footer {visibility: hidden}
+            .fullscreen-overlay {
+                display: none;
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                background-color: rgba(0, 0, 0, 0.9);
+                z-index: 9999;
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                cursor: pointer;
+            }
+            .fullscreen-image {
+                max-width: 90%;
+                max-height: 90%;
+                object-fit: contain;
+            }
+            """,
             analytics_enabled=False
         ) as self.interface:
             user_session_storage = gr.BrowserState()  # do not initialize it with any value!!! this is used as default
@@ -343,6 +417,7 @@ class GradioUI():
                 # Gallery for displaying generated images
                 gallery = gr.Gallery(
                     label="Generated Images",
+                    elem_id="image-gallery",  # used for css
                     show_share_button=False,
                     show_download_button=True,
                     format="jpeg",
@@ -352,6 +427,13 @@ class GradioUI():
                     object_fit="contain",
                     preview=False
                 )
+                gr.HTML(f"""
+                <script>
+                    alert('Debug: Script loaded');
+                    // ... rest of the JavaScript code ...
+                    {js}
+                </script>
+                """)
 
             # Download Button
             with gr.Row():
