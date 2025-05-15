@@ -1,4 +1,24 @@
-import gc, abc, os
+"""
+Base Generator Module for AI Image Generation
+
+This module provides the foundation for AI-powered image generation implementations.
+It handles basic GPU/CPU device management, model loading, and memory optimization
+for AI image generation models.
+
+Classes:
+    ModelConfigException: Custom exception for model configuration errors
+    BaseGenerator: Abstract base class for implementing AI image generators
+
+Dependencies:
+    - torch: For GPU/CPU tensor operations
+    - PIL: For image processing
+    - threading: For thread-safe model operations
+    - logging: For application logging
+"""
+
+import gc
+import abc
+import os
 from time import sleep
 from typing import List
 from PIL import Image, ImageDraw
@@ -7,20 +27,51 @@ from .modelconfig import ModelConfig
 from ..appconfig import AppConfig
 from . import GenerationParameters
 
-# AI STuff
 import torch
-
-# Set up module logger
 import logging
+
 logger = logging.getLogger(__name__)
 
 
 class ModelConfigException(Exception):
+    """
+    Exception raised for errors in model configuration.
+
+    This exception should be raised when there are issues with model initialization
+    or configuration parameters.
+    """
     pass
 
 
 class BaseGenerator():
+    """
+    Abstract base class for AI image generation implementations.
+
+    This class provides common functionality for AI image generators including
+    device management, model loading/unloading, and memory optimization.
+
+    Attributes:
+        modelconfig (ModelConfig): Configuration for the AI model
+        appconfig (AppConfig): Application-wide configuration
+        device (str): Computing device ('cuda' or 'cpu')
+        torch_dtype: PyTorch data type for tensor operations
+        _cached_generation_pipeline: Cached model pipeline (defined by concrete implementations)
+        _generation_lock (threading.Lock): Thread lock for generation operations
+        _hftoken (str): HuggingFace API token
+
+    Args:
+        appconfig (AppConfig): Application configuration instance
+        modelconfig (ModelConfig): Model configuration instance
+    """
+
     def __init__(self, appconfig: AppConfig, modelconfig: ModelConfig):
+        """
+        Initialize the generator with application and model configurations.
+
+        Args:
+            appconfig (AppConfig): Application configuration instance
+            modelconfig (ModelConfig): Model configuration instance
+        """
         logger.info("Initialize Base Generator")
         self.modelconfig = modelconfig
         if self.modelconfig:
@@ -50,14 +101,37 @@ class BaseGenerator():
         self.unload_model()
 
     def check_safety(self, x_image):
-        """Support function to check if the image is NSFW."""
+        """
+        Check if the generated image is safe for viewing (non-NSFW).
+
+        Args:
+            x_image: Image to be checked
+
+        Returns:
+            tuple: (image, is_nsfw_flag) - true if NSFW
+        """
+        # implemented in nsfw_check in image_generator, because of advanced logic
         return x_image, False
 
-    def warmup(self):
-        """prepares the execution and load the model from storage or internet to the GPU"""
+    def warmup(self) -> None:
+        """
+        Prepare the model for execution by loading it into memory.
+        This method should be called before generating images to ensure
+        the model is ready for inference.
+        """
         self._load_model()
 
-    def memory_optimization(self, pipeline):
+    def _memory_optimization(self, pipeline):
+        """
+        Apply memory optimization techniques to the model pipeline.
+
+        Configures various optimization settings like attention slicing,
+        xformers optimization, and GPU memory management based on the
+        model configuration.
+
+        Args:
+            pipeline: The model pipeline to optimize
+        """
         # cpu offload will not work with pipeline.to(cuda)
         if self.modelconfig.generation.get("GPU_ALLOW_ATTENTION_SLICING", False):
             logger.warning("attention slicing activated")
@@ -96,19 +170,25 @@ class BaseGenerator():
         else:
             logger.info(f"load model to {self.device}")
             pipeline.to(self.device)
-        
+
         self._log_gpu_memory_usage()
 
     def _log_gpu_memory_usage(self):
+        """
+        Log current GPU memory usage statistics.
+
+        Logs total, allocated, and cached GPU memory if CUDA is available.
+        This method is used for debugging and monitoring purposes.
+        """
         if self.device == "cuda" and torch.cuda.is_available():
             # Get the GPU ID
             gpu_id = torch.cuda.current_device()
-            
+
             # Get the total and allocated memory
             total_memory = torch.cuda.get_device_properties(gpu_id).total_memory
             allocated_memory = torch.cuda.memory_allocated(gpu_id)
             cached_memory = torch.cuda.memory_reserved(gpu_id)
-            
+
             logger.info(f"Total GPU memory: {total_memory / 1024**3:.2f} GB")
             logger.info(f"Allocated GPU memory: {allocated_memory / 1024**3:.2f} GB")
             logger.info(f"Cached GPU memory: {cached_memory / 1024**3:.2f} GB")
@@ -116,10 +196,15 @@ class BaseGenerator():
             pass
 
     def unload_model(self):
-        #  unload after a period of time without generation is triggered from ui, as this knows what will happen next
+        """
+        Unload the model from memory and free up GPU resources.
+
+        This method should be called when the model is no longer needed
+        to free up system resources.
+        """
         try:
-            logger.info("unload image generation model")
             if self._cached_generation_pipeline:
+                logger.info("unload image generation model")
                 del self._cached_generation_pipeline
                 self._cached_generation_pipeline = None
             gc.collect()
@@ -128,7 +213,15 @@ class BaseGenerator():
             logger.error("Error while unloading Image generation model")
 
     def _create_test_image(self, params: GenerationParameters) -> Image.Image:
-        """Creates a debug image with white background and black text showing the parameters"""
+        """
+        Create test images with parameter information for debugging.
+
+        Args:
+            params (GenerationParameters): Parameters for image generation
+
+        Returns:
+            List[Image.Image]: List of generated test images with parameter text
+        """
         images = []
         bg_colors = [
             "aliceblue",
@@ -178,5 +271,17 @@ class BaseGenerator():
         return images
 
     @abc.abstractmethod
-    def _load_model(self, use_cached_model=True):
+    def _load_model(self, use_cached_model: bool = True) -> None:
+        """
+        Abstract method to load the AI model.
+
+        This method must be implemented by concrete subclasses to define
+        how their specific model should be loaded.
+
+        Args:
+            use_cached_model (bool): Whether to use a cached model if available
+
+        Raises:
+            NotImplementedError: If not implemented by concrete subclass
+        """
         pass

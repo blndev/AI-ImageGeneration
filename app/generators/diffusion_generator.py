@@ -1,4 +1,25 @@
 
+"""
+Stable Diffusion Generator Module
+
+This module implements a Stable Diffusion-based image generator that supports both
+standard Stable Diffusion 1.5 and SDXL models. It provides functionality for
+generating images from text prompts using different model architectures.
+
+The generator supports both local model files (safetensors) and models from
+Hugging Face, with automatic model caching and memory optimization features.
+
+Classes:
+    StabelDiffusionGenerator: Singleton class implementing the BaseGenerator
+    interface for Stable Diffusion models.
+
+Dependencies:
+    - torch: For GPU/CPU tensor operations
+    - diffusers: For Stable Diffusion pipeline implementations
+    - PIL: For image processing
+    - typing: For type hints
+"""
+
 from typing import List
 from PIL import Image
 from ..utils.singleton import singleton
@@ -19,11 +40,42 @@ logger = logging.getLogger(__name__)
 # TODO fo SDXL use refiner as well: https://huggingface.co/stabilityai/stable-diffusion-xl-base-1.0
 @singleton
 class StabelDiffusionGenerator(BaseGenerator):
-    # def __init__(self, appconfig:AppConfig, modelconfig:ModelConfig):
-    #     logger.info("Initialize StabelDiffusion Generator")
+    """
+    Stable Diffusion implementation of the BaseGenerator interface.
+
+    This class implements image generation using either Stable Diffusion 1.5 or
+    SDXL models. It supports loading models from local safetensor files or
+    from Hugging Face, with automatic caching and memory optimization.
+
+    The class is implemented as a singleton to ensure only one instance of the
+    model is loaded in memory at any time.
+
+    Attributes:
+        modelconfig (ModelConfig): Configuration for the current model
+        appconfig (AppConfig): Application-wide configuration
+    """
 
     def _load_model(self):
-        """Load and return the Stable Diffusion Pipeline to generate images"""
+        """
+        Load and configure the Stable Diffusion Pipeline for image generation.
+
+        Requires self.modelconfig is set!
+
+        This method handles the loading of different types of Stable Diffusion
+        models (1.5 or SDXL) from either local safetensor files or Hugging Face.
+        It includes automatic model caching and memory optimization.
+
+        Returns:
+            StableDiffusionPipeline or StableDiffusionXLPipeline: Configured pipeline
+            None: If loading fails
+
+        Raises:
+            ModelConfigException: If an unsupported model type is specified
+
+        Notes:
+            - Supports both .safetensors files and Hugging Face models
+            - Automatically handles device placement and memory optimization
+        """
         if self._cached_generation_pipeline:
             return self._cached_generation_pipeline
 
@@ -73,7 +125,7 @@ class StabelDiffusionGenerator(BaseGenerator):
 
             logger.debug("diffuser initiated")
 
-            self.memory_optimization(pipeline)
+            self._memory_optimization(pipeline)
 
             #     # https://huggingface.co/stabilityai/stable-diffusion-xl-base-1.0
             #     pipeline.unet = torch.compile(pipeline.unet, mode="reduce-overhead", fullgraph=True)
@@ -91,6 +143,19 @@ class StabelDiffusionGenerator(BaseGenerator):
             # raise Exception("Error while loading the pipeline for image conversion.\nSee logfile for details.")
 
     def change_model(self, modelconfig: ModelConfig):
+        """
+        Change the current generation model to a new one.
+
+        This method safely unloads the current model and loads a new one
+        based on the provided configuration.
+
+        Args:
+            modelconfig (ModelConfig): Configuration for the new model
+
+        Raises:
+            Exception: If the modelconfig is not of type ModelConfig
+            Exception: If loading the new model fails
+        """
         logger.info("Change generation model to %s", modelconfig)
         if type(modelconfig) is not type(ModelConfig):
             raise Exception("type of modelconfig must be ModelConfig")
@@ -104,7 +169,45 @@ class StabelDiffusionGenerator(BaseGenerator):
             raise (f"Loading new img2img model '{self.modelconfig.model}' failed", e)
 
     def generate_images(self, params: GenerationParameters) -> List[Image.Image]:
-        """Generate a list of images."""
+        """
+        Generate images using the current Stable Diffusion model.
+
+        This method handles the complete image generation process, including:
+        - Parameter validation
+        - Model loading and verification
+        - Prompt preprocessing with embeddings
+        - Batch image generation
+        - Error handling and resource cleanup
+
+        Args:
+            params (GenerationParameters): Parameters for image generation
+                including prompts, number of images, steps, etc.
+
+        Returns:
+            List[Image.Image]: List of generated PIL Images
+
+        Raises:
+            Exception: If no model is loaded or if generation fails
+            RuntimeError: If CUDA encounters memory issues
+
+        Notes:
+            - Handles both SD 1.5 and SDXL model types
+            - Automatically applies positive and negative embeddings
+            - Implements batch processing for multiple images
+            - Includes CUDA memory management
+            - Thread-safe execution using generation lock
+
+        Example:
+            ```python
+            generator = StabelDiffusionGenerator(...)
+            params = GenerationParameters(
+                prompt="a beautiful sunset",
+                num_images_per_prompt=1,
+                num_inference_steps=30
+            )
+            images = generator.generate_images(params)
+            ```
+        """
         logger.debug("starting image generation")
         # Validate parameters and throw exceptions
         params.validate()
