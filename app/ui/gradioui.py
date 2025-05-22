@@ -197,7 +197,7 @@ class GradioUI():
                 logger.info("User %s attempted generation with insufficient credits (%s needed, %s available)",
                             session_state.session, image_count, session_state.token)
                 gr.Warning(msg, title="Image generation failed", duration=30)
-                return [], session_state, "", None
+                return [], session_state, ""
 
             analytics_image_creation_duration_start_time = self.analytics.start_image_creation_timer()
             session_state.save_last_generation_activity()
@@ -229,7 +229,7 @@ class GradioUI():
                 logger.debug("Image generation exception details:", exc_info=True)
                 gr.Warning(f"Failed to generate images: {str(e)}", title="Image generation failed", duration=30)
                 raise Exception("AI Pipeline Error.")
-            
+
             # save image hashes to prevent upload
             if self.component_upload_handler:
                 try:
@@ -254,13 +254,13 @@ class GradioUI():
                 pass
 
             progress(1, "image generation finished")
-            return generated_images, session_state, prompt, None
+            return generated_images, session_state, prompt
         except Exception as e:
             logger.error(f"image generation failed: {e}")
             logger.debug("Exception details:", exc_info=True)
 
             gr.Warning(f"Error while generating the image: {e}", title="Image generation failed", duration=30)
-            return [], session_state, prompt, None
+            return [], session_state, prompt
 
         finally:
             try:
@@ -285,25 +285,12 @@ class GradioUI():
             # with gr.Row():
             #     gr.Markdown(value=self.selectedmodelconfig.description)
             # Input Values & Generate row
-            #with gr.Row(visible=self.config.feature_generation_credits_enabled):
-                # # token count is restored from app.load
-                # token_label1 = gr.Text(
-                #     show_label=False,
-                #     container=False,
-                #     # scale=2,
-                #     # label="Credits",
-                #     # elem_classes="smalltext",
-                #     # elem_id="credits",
-                #     value="?"
-                #     # info=f"Amount of images you can generate before a wait time of {self.config.new_token_wait_time} minutes",
-                # )
-                # button_check_token = gr.Button(value="🗘", size="sm")
-
             with gr.Row():
                 with gr.Column(scale=2):
                     # Text prompt input
                     prompt = gr.Textbox(
-                        label="Your wish",
+                        label="What image you want to see?",
+                        info="Prompt",
                         placeholder="Describe the image you want to generate...",
                         value="",
                         lines=3,
@@ -313,30 +300,21 @@ class GradioUI():
 
                 # generate and token count
                 with gr.Column():
-                    with gr.Row(visible=self.config.feature_generation_credits_enabled):
-                        token_label = gr.Text(value="", container=False, show_label=False)
-                    with gr.Row():
+                    with gr.Group():
+                        with gr.Row():  # visible=self.config.feature_generation_credits_enabled):
+                            token_label = gr.Text(value="", container=True, show_label=False)
+                        with gr.Row():
 
-                        # Generate button that's interactive only when prompt has text
-                        generate_btn = gr.Button(
-                            "Start",
-                            interactive=False
-                        )
-                        cancel_btn = gr.Button("Cancel", interactive=False, visible=False)
+                            # Generate button that's interactive only when prompt has text
+                            generate_btn = gr.Button(
+                                "Start",
+                                interactive=False
+                            )
+                            cancel_btn = gr.Button("Cancel", interactive=False, visible=False)
             # Advanced row
             with gr.Row():
                 with gr.Accordion("Advanced generation Options", open=False):
-                    with gr.Row():
-                        with gr.Column(visible=True):
-                            # Text prompt input
-                            neg_prompt = gr.Textbox(
-                                label="Negative Prompt, avoid the following Elements",
-                                placeholder="Describe what you don't want...",
-                                value="",
-                                scale=3,
-                                lines=2,
-                                max_length=340
-                            )
+                    with gr.Tab("Image"):
                         with gr.Column(visible=True):
                             with gr.Row():
                                 image_count = gr.Slider(
@@ -362,37 +340,57 @@ class GradioUI():
                                     label="Aspect Ratio",
                                     scale=1
                                 )
-                    with gr.Row():
-                        prompt_magic_checkbox = gr.Checkbox(
-                            label="Enable Prompt Magic",
-                            info="Optimization",
-                            container=False,
-                            value=(self.config.feature_prompt_magic_enabled), visible=(self.component_image_generator.promptmagic_enabled))
-                    with gr.Row():
-                        magic_prompt = gr.Textbox(
-                            #info="used Magic Prompt",
-                            show_label=True,
-                            show_copy_button=True,
-                            #container=False,
-                            scale=2,
-                            label="Used Magic Prompt",
-                            lines=2,
-                            interactive=False,
-                            visible=prompt_magic_checkbox.value
-                        )
-                        prompt_magic_checkbox.change(
-                            inputs=[prompt_magic_checkbox],
-                            outputs=[magic_prompt],
-                            fn=lambda x: gr.Textbox(visible=x)
-                        )
+                            # TODO: STyles
+                    with gr.Tab("Prompt"):
+                        with gr.Row():
+                            with gr.Column(visible=True):
+                                # Text prompt input
+                                neg_prompt = gr.Textbox(
+                                    label="Negative Prompt, avoid the following Elements",
+                                    placeholder="Describe what you don't want...",
+                                    value="",
+                                    scale=3,
+                                    lines=2,
+                                    max_length=340
+                                )
 
-            # Share Links to get credits
-            if self.component_link_sharing_handler:
-                self.component_link_sharing_handler.create_interface_elements(user_session_storage)
+                        with gr.Row():
+                            prompt_magic_checkbox = gr.Checkbox(
+                                label="Enable Prompt Magic",
+                                info="Optimization",
+                                container=False,
+                                value=(self.config.feature_prompt_magic_enabled), visible=(self.component_image_generator.promptmagic_enabled))
+                        with gr.Row():
+                            magic_prompt = gr.Textbox(
+                                # info="used Magic Prompt",
+                                show_label=True,
+                                show_copy_button=True,
+                                # container=False,
+                                scale=2,
+                                label="Used Magic Prompt",
+                                lines=2,
+                                interactive=False,
+                                visible=prompt_magic_checkbox.value
+                            )
+                            prompt_magic_checkbox.change(
+                                inputs=[prompt_magic_checkbox],
+                                outputs=[magic_prompt],
+                                fn=lambda x: gr.Textbox(visible=x)
+                            )
 
-            # Upload to get credits
-            if self.component_upload_handler:
-                self.component_upload_handler.create_interface_elements(user_session_storage)
+            with gr.Accordion(
+                label=f"Get Credits to generate more {("(uncensored)" if self.config.feature_use_upload_for_age_check else "")} images",
+                open=False
+            ):
+                with gr.Tab("Upload"):
+                    # Share Links to get credits
+                    if self.component_link_sharing_handler:
+                        self.component_link_sharing_handler.create_interface_elements(user_session_storage)
+
+                with gr.Tab("Share Link"):
+                    # Upload to get credits
+                    if self.component_upload_handler:
+                        self.component_upload_handler.create_interface_elements(user_session_storage)
 
             # Examples row
             with gr.Row(visible=len(self.examples) > 0):
@@ -410,7 +408,7 @@ class GradioUI():
                 gallery = gr.Gallery(
                     label="Generated Images",
                     elem_id="image-gallery",  # used for css
-                    show_share_button=True,
+                    show_share_button=False,
                     show_download_button=True,
                     format="jpeg",
                     columns=int(self.selectedmodelconfig.generation.get("max_images", 2)),
@@ -483,9 +481,10 @@ class GradioUI():
             ).then(
                 fn=self.uiaction_generate_images,
                 inputs=[user_session_storage, prompt, aspect_ratio, neg_prompt, image_count, prompt_magic_checkbox],
-                outputs=[gallery, user_session_storage, magic_prompt, token_label],
+                outputs=[gallery, user_session_storage, magic_prompt],
                 concurrency_id="gpu",
-                show_progress="full"
+                show_progress="full",
+                show_progress_on=token_label
             ).then(
                 fn=lambda: (gr.Timer(active=True), gr.Button(interactive=True),
                             gr.Button(interactive=False), gr.Gallery(preview=False)),
