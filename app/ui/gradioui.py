@@ -11,7 +11,7 @@ from app.utils.singleton import singleton
 from app.generators import ModelConfig
 from ..analytics import Analytics
 import json
-from .components import UploadHandler, SessionManager, LinkSharingHandler, ImageGenerationHandler
+from .components import UploadHandler, SessionManager, LinkSharingHandler, ImageGenerationHandler, FeedbackHandler
 
 # Set up module logger
 logger = logging.getLogger(__name__)
@@ -65,13 +65,15 @@ class GradioUI():
                     config=self.config,
                     analytics=self.analytics
                 )
+                
+            self.component_feedback_handler = FeedbackHandler(
+                session_manager=self.component_session_manager,
+                config=self.config,
+                analytics=self.analytics
+            )
 
             # used to determine when to unload models etc
             self.app_last_image_generation = datetime.now()
-
-            # TODO: MOve to feedback handler
-            self.__feedback_file = self.config.user_feedback_filestorage
-            logger.info(f"Initialize Feedback file on '{self.__feedback_file}'")
 
             self.initialize_examples()
 
@@ -175,16 +177,24 @@ class GradioUI():
             image_count (int): The number of images to generate
         """
         session_state = SessionState.from_gradio_state(gr_state)
-        self.component_session_manager.record_active_session(session_state)
-        self.app_last_image_generation = datetime.now()
         analytics_image_creation_duration_start_time = None
         try:
+            # Record session activity
+            try:
+                self.component_session_manager.record_active_session(session_state)
+                self.app_last_image_generation = datetime.now()
+            except Exception as e:
+                logger.error("Failed to record session activity: %s", str(e))
+                # Continue execution as this is not critical
+
             if self.config.token_enabled and session_state.token < image_count:
                 msg = f"Not enough generation credits available.\n\nPlease wait {self.config.new_token_wait_time} minutes"
                 if self.config.feature_upload_images_for_new_token_enabled:
                     msg += ", or get new credits by sharing images for training"
                 if self.config.feature_sharing_links_enabled:
                     msg += ", or share the application link to other users"
+                logger.info("User %s attempted generation with insufficient credits (%s needed, %s available)", 
+                           session_state.session, image_count, session_state.token)
                 gr.Warning(msg, title="Image generation failed", duration=30)
                 return [], session_state, ""
 
@@ -193,23 +203,37 @@ class GradioUI():
             shared_reference_key = None
 
             if self.component_link_sharing_handler:
-                shared_reference_key = self.component_link_sharing_handler.record_image_generation_for_shared_link(
-                    request=request,
-                    image_count=image_count
-                )
+                try:
+                    shared_reference_key = self.component_link_sharing_handler.record_image_generation_for_shared_link(
+                        request=request,
+                        image_count=image_count
+                    )
+                except Exception as e:
+                    logger.error("Failed to record image generation for shared link: %s", str(e))
+                    # Continue execution as this is not critical for image generation
 
-            generated_images, session_state, prompt = self.component_image_generator.generate_images(
-                session_state=session_state,
-                prompt=prompt,
-                neg_prompt=neg_prompt,
-                aspect_ratio=aspect_ratio,
-                image_count=image_count,
-                user_activated_promptmagic=promptmagic_active
-            )
+            try:
+                generated_images, session_state, prompt = self.component_image_generator.generate_images(
+                    session_state=session_state,
+                    prompt=prompt,
+                    neg_prompt=neg_prompt,
+                    aspect_ratio=aspect_ratio,
+                    image_count=image_count,
+                    user_activated_promptmagic=promptmagic_active
+                )
+            except Exception as e:
+                logger.error("Image generation failed: %s", str(e))
+                logger.debug("Image generation exception details:", exc_info=True)
+                gr.Warning(f"Failed to generate images: {str(e)}", title="Image generation failed", duration=30)
+                return [], session_state, prompt
 
             # save image hashes to prevent upload
             if self.component_upload_handler:
-                self.component_upload_handler.block_created_images_from_upload(generated_images)
+                try:
+                    self.component_upload_handler.block_created_images_from_upload(generated_images)
+                except Exception as e:
+                    logger.error("Failed to block created images from upload: %s", str(e))
+                    # Continue execution as this is not critical
 
             if session_state.token <= 1:
                 logger.warning(f"session {session_state.session} running out of credits ({session_state.token}) left")
@@ -235,7 +259,10 @@ class GradioUI():
             return [], session_state, prompt
 
         finally:
-            self.analytics.stop_image_creation_timer(analytics_image_creation_duration_start_time)
+            try:
+                self.analytics.stop_image_creation_timer(analytics_image_creation_duration_start_time)
+            except Exception as e:
+                logger.error("Failed to stop analytics timer: %s", str(e))
 
     def create_interface(self):
 
@@ -364,49 +391,9 @@ class GradioUI():
                 download_btn = gr.DownloadButton("Download", visible=False)
 
             # Feedback row
-            with gr.Row(visible=(self.__feedback_file)):
-                with gr.Accordion("Feedback", open=False):
-                    with gr.Row():
-                        with gr.Column(scale=1):
-                            gr.Markdown("""
-                            ## We’d Love Your Feedback!
-
-                            We’re excited to bring you this Image Generator App, which is still in development!
-                            Your feedback is invaluable to us—please share your thoughts on the app and the images it creates so we can make it better for you.
-                            Your input helps shape the future of this tool, and we truly appreciate your time and suggestions.
-                            """)
-                        with gr.Column(scale=1):
-                            feedback_txt = gr.Textbox(label="Please share your feedback here", lines=3, max_length=300)
-                            feedback_button = gr.Button("Send Feedback", visible=True, interactive=False)
-                        feedback_txt.change(
-                            fn=lambda x: gr.Button(interactive=len(x.strip()) > 0),
-                            inputs=[feedback_txt],
-                            outputs=[feedback_button]
-                        )
-
-                        def send_feedback(gradio_state, text):
-                            session_state = SessionState.from_gradio_state(gradio_state)
-                            logger.info(f"User Feedback from {session_state.session}: {text}")
-                            try:
-                                with open(self.__feedback_file, "a") as f:
-                                    f.write(f"{datetime.now()} - {session_state.session}\n{text}\n\n")
-                            except Exception:
-                                pass
-                            gr.Info("""
-                            Thank you so much for taking the time to share your feedback!
-                            We really appreciate your input—it means a lot to us and helps us make the App better for everyone."
-                            """)
-                        feedback_button.click(
-                            fn=send_feedback,
-                            inputs=[user_session_storage, feedback_txt],
-                            outputs=[],
-                            concurrency_limit=None,
-                            concurrency_id="feedback"
-                        ).then(
-                            fn=lambda: (gr.Textbox(value="", interactive=False), gr.Button(interactive=False)),
-                            inputs=[],
-                            outputs=[feedback_txt, feedback_button]
-                        )
+            feedback_txt, feedback_button = None, None
+            if self.component_feedback_handler:
+                feedback_txt, feedback_button = self.component_feedback_handler.create_interface_elements(user_session_storage)
 
             def update_token_info(gradio_state):
                 # logger.debug("local_storage changed: SessionState: %s", gradio_state)
@@ -445,7 +432,7 @@ class GradioUI():
                 # enable feedback again
                 fn=lambda: (sleep(2)),
                 inputs=[],
-                outputs=[]
+                outputs=[feedback_txt]
             )
 
             # Make button interactive only when prompt has text

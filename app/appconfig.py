@@ -40,7 +40,7 @@ class AppConfig:
         self.output_directory = os.getenv("OUTPUT_DIRECTORY", "./output/")
 
         self.user_feedback_filestorage = os.path.join(
-            self.output_directory, get_date_subfolder(), "feedback.txt"
+            self.output_directory, "feedback.txt"
         )
 
         self.feature_prompt_magic_enabled = self.getbool("PROMPTMAGIC", False)
