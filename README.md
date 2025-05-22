@@ -26,8 +26,8 @@ Getting started is super easy! Just follow these steps:
 
 1. Clone the repository:
 ```bash
-git clone https://github.com/blndev/AI-ImageGeneration-Flux.git
-cd AI-ImageGeneration-Flux
+git clone https://github.com/blndev/AI-ImageGeneration.git
+cd AI-ImageGeneration
 ```
 
 2. Create your configuration:
@@ -35,9 +35,9 @@ cd AI-ImageGeneration-Flux
 cp .env.example .env
 ```
 
-3. Edit `.env` file and set your HuggingFace Credit:
+3. Edit `.env` file and set your HuggingFace Access token:
 ```bash
-HUGGINGFACE_Credit=your_Credit_here
+HUGGINGFACE_TOKEN=your_token_here
 ```
 
 > 📝 **Note**: You'll need to accept the license agreement for FLUX.1-schnell at [HuggingFace](https://huggingface.co/black-forest-labs/FLUX.1-schnell)
@@ -64,9 +64,10 @@ Customize your experience through environment variables in `.env`:
 - `LOG_LEVEL`: Set logging detail (DEBUG, INFO, WARNING, ERROR, CRITICAL)
 - `GRADIO_SHARED`: Enable public Gradio link
 - `NO_AI`: Development mode without AI processing
+- `FREE_MEMORY_AFTER_MINUTES_INACTIVITY`: release the used model from GPU memory after minutes of inactivity
 
 ### 🎫 Credit System
-- `INITIAL_GENERATION_TOKEN`: Starting Credits for new users
+- `INITIAL_GENERATION_TOKEN`: Starting Credits for new users (0=unlimited)
 - `NEW_TOKEN_WAIT_TIME`: Minutes to wait for Credit refreshes
 
 ### 🪄 Prompt Magic
@@ -74,11 +75,12 @@ Customize your experience through environment variables in `.env`:
 - `OLLAMA_MODEL`: Model for prompt enhancement (default: llava)
 
 ### 🖼️ Generation Settings
-- `GENERATION_MODEL`: Choose your model specified in modelconfig.json (default: black-forest-labs/FLUX.1-dev)
+- `GENERATION_MODEL`: Choose a model specified in modelconfig.json (default: black-forest-labs/FLUX.1-dev)
+- `MODELCONFIG`: optional, teh path and filename of teh modelconfig.json to be used (default: ./modelconfig.json)
 
 ### 🎯 Output Configuration
 - `MODEL_DIRECTORY`: Location for downloaded models and cache files form HF
-- `OUTPUT_DIRECTORY`: Where to save generation information e.g. hashes of generated images
+- `OUTPUT_DIRECTORY`: Where to save generation information e.g. hashes of generated images (empty = disabled)
 
 ### 📝 Model Configuration (modelconfig.json)
 
@@ -86,17 +88,60 @@ The `modelconfig.json` file supports a powerful inheritance system that allows y
 
 #### Inheritance Example
 ```json
-{
+ {
     "Model": "default",
     "Description": "default configuration flux-schnell",
-    "Parent": "flux1:schnell"
-}
+    "Parent": "flux1:schnell",
+    "Aspect_Ratio": {
+      "Square": "1024x1024"
+    }
+  },
+  {
+    "Model": "flux1:schnell",
+    "Path": "black-forest-labs/FLUX.1-schnell",
+    "Description": "Model Flux1-Schnell",
+    "Parent": "flux",
+    "Generation": {
+      "steps": 5,
+      "guidance": 0
+    },
+    "Examples": []
+  },
+  {
+    "Model": "flux1:dev",
+    "Path": "black-forest-labs/FLUX.1-dev",
+    "Description": "Model Flux1-Dev",
+    "Parent": "flux",
+    "Generation": {
+      "steps": 50,
+      "guidance": 7.5
+    },
+    "Examples": []
+  },
+  {
+    "Model": "flux",
+    "Parent": "",
+    "ModelType": "flux",
+    "Generation": {
+      "MAX_IMAGES": 2,
+      "GPU_ALLOW_XFORMERS": 0,
+      "GPU_ALLOW_ATTENTION_SLICING": 1,
+      "GPU_ALLOW_MEMORY_OFFLOAD": 1
+    },
+    "Aspect_Ratio": {
+      "Square": "1024x1024",
+      "Landscape": "1152x768",
+      "Portrait": "768x1152"
+    },
+    "Examples": []
+  }
 ```
 
 In this example:
 1. The "default" configuration inherits from "flux1:schnell"
 2. "flux1:schnell" inherits from "flux"
 3. "flux" is a base configuration with no parent
+4. "flux1:dev" is using same aspect rations and memory optimization but e.g. different guidance scale
 
 This creates an inheritance chain where:
 - Base settings are defined in the "flux" configuration
