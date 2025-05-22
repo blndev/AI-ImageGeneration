@@ -45,7 +45,7 @@ class UploadHandler:
 
         try:
             self.msg_share_image = ""
-            p = "./msgs/sift.md"  # TODO: make it configurable via env
+            p = "./msgs/share_images.md"
             if os.path.exists(p):
                 with open(p, "r") as f:
                     self.msg_share_image = f.read()
