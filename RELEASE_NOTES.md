@@ -1,27 +1,65 @@
-# Version 1.2
+# 🚀 Version 1.2
 
-## New Features
-- Link sharing for Credits
-- Upload of training material for Credits
-- NSFW detection for generated output and blocking / censorship if active
-- Model Configuration with inheritance support
+## ✨ New Features
 
-## Internal
-- complete refactoring of the User Interface and generation classes
+### 💳 Credit System Enhancements
+- Link sharing system for Credits - Share app links with other users to earn generation credits
+- Training material upload for Credits - Earn credits by contributing high-quality training data
 
-## Bugfixes
-- enhanced error handling in all classes
-- fix generation issues with wrong parameters
-- fix upload of generated images possible 
+### 🛡️ Content Safety
+- Advanced NSFW detection system for generated outputs
+  - Automatic content screening
+  - Configurable blocking/censorship options
+  - Real-time content validation
 
+### ⚙️ Technical Improvements
+- Enhanced Model Configuration system with inheritance support
+  - Hierarchical model configurations
+  - Flexible parameter inheritance
+  - Improved model management
 
-# Version 1.1
+## 🔧 Internal Improvements
+- Complete UI architecture refactoring
+  - Enhanced component separation
+  - Improved code maintainability
+  - Better user experience
+- Generation system restructuring
+  - Optimized generation pipeline
+  - Better resource utilization
+  - Enhanced error handling
 
-## New Features
-- Model Configuration with inheritance support
-- SDXL and SD1.5 support
-- Prompt Magic
-- NSFW check for prompt and generation
+## 🐛 Bug Fixes
+- Comprehensive error handling improvements across all classes
+- Resolution of generation parameter validation issues
+- Fixed image upload functionality for generated content
+- Various stability and performance improvements
+
+# 🚀 Version 1.1
+
+## ✨ New Features
+
+### 🎨 Model Support Expansion
+- SDXL and SD1.5 integration
+  - Support for latest Stable Diffusion models
+  - Enhanced image quality and capabilities
+  - Multiple model version compatibility
+
+### 🔮 Generation Enhancements
+- Prompt Magic system
+  - Intelligent prompt enhancement
+  - Better generation results
+  - Automated prompt optimization
+
+### ⚙️ Technical Improvements
+- Advanced Model Configuration with inheritance support
+  - Flexible model parameter management
+  - Simplified configuration updates
+  - Enhanced model customization
+
+### 🛡️ Content Safety
+- Comprehensive NSFW detection system
+  - Pre-generation prompt screening
+  - Enhanced safety controls
 
 
 # 🚀 Release Notes - Version 1.0
