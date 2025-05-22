@@ -366,7 +366,7 @@ class GradioUI():
                     # Examples
                     gr.Examples(
                         examples=self.examples,
-                        inputs=[prompt, neg_prompt, aspect_ratio, image_count],
+                        inputs=[prompt, neg_prompt, image_count],
                         label="Click an example to load it"
                     )
 

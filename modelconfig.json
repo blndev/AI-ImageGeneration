@@ -94,7 +94,7 @@
       }
     ],
     "Examples": [
-      "#wenn gesetzt werden diese genommen udn nicht die aus der standard example datei"
+      "Generation Prompt", "negative Prompt", 1
     ]
   }
 ]

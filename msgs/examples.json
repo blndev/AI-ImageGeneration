@@ -2,55 +2,46 @@
     [
         "A solo hiker standing on a mountain peak at sunset, detailed facial features, outdoor adventure clothing, backpack, looking at the horizon",
         "multiple people, groups, blurry face, unrealistic features",
-        "\u25a4 Landscape",
         1
     ],
     [
         "A single person walking their dog in a park, casual attire, natural lighting, realistic human proportions",
         "cartoon style, multiple humans, distorted body",
-        "\u25a4 Landscape",
         1
     ],
     [
         "A professional portrait of a female CEO in a modern office, business suit, confident pose, natural skin texture",
         "ugly face, multiple subjects, unrealistic proportions, cartoon style",
-        "\u25af Portrait",
         1
     ],
     [
         "A cinematic shot of a man with brown eyes, long hair, strong jawline, natural skin texture, intricate skin details, dramatic lighting, professional photography",
         "multiple people, unrealistic features, cartoon style",
-        "\u25af Portrait",
         1
     ],
     [
         "Photorealistic portrait of a young woman with short pink hair, blue eyes, detailed facial features, white background, elegant posture, wearing a traditional kimono with floral pattern",
         "squint, cross-eyed, multiple people, unrealistic anatomy, cartoon style",
-        "\u25a1 Square",
         1
     ],
     [
         "Highly realistic dark fantasy portrait of a woman warrior, sitting on a rock by a river, gigantic castle in background, misty waterfall, night scene with stars, wearing black armored dress with ornaments, short skirt, knee-high boots, dark purple hair",
         "worst quality, low quality, illustration, 3d, 2d, painting, cartoon, sketch, bad anatomy, multiple people",
-        "\u25a1 Square",
         1
     ],
     [
         "Natural skin texture, photorealistic portrait of a stylish woman in her early thirties, detailed facial features, standing in a confident pose, wearing a designer short dress, outside an Italian restaurant at night, city lights in background",
         "perfect hands, multiple people, unrealistic features, cartoon style",
-        "\u25af Portrait",
         1
     ],
     [
         "A cheerful child playing in a sunlit meadow, natural skin texture, detailed facial features, colorful casual clothing, genuine smile, soft natural lighting",
         "adults, multiple people, unrealistic features, cartoon style",
-        "\u25a1 Square",
         1
     ],
     [
         "An elderly man with weathered face, deep wrinkles, wise eyes, silver hair, sitting on a bench in a park, wearing a cardigan and glasses, natural lighting, detailed skin texture",
         "young person, multiple people, unrealistic features, smooth skin",
-        "\u25af Portrait",
         1
     ]
 ]
