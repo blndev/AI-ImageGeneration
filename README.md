@@ -14,6 +14,12 @@ Welcome to an exciting world of AI-powered image generation! This project levera
 - 🛠️ Memory optimization options for different hardware setups
 - 🪄 Smart prompt refinement with Ollama integration
 
+----
+Example:
+
+![Example](examples/disneystyle.png)
+----
+
 ## 🚀 Installation
 
 Getting started is super easy! Just follow these steps:
