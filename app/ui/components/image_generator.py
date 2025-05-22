@@ -59,8 +59,9 @@ class ImageGenerationHandler:
 
     def __status_callback(self, total_images, current_image):
         try:
-            current_progress = 0.1 + (current_image * 0.8 / total_images)
+            current_progress = 0.15 + (current_image * 0.75 / total_images)
             if current_progress < 0 or current_progress > 1: current_progress = 0.5
+            if total_images == 1: current_progress = 0.5
             logger.debug(f"Create image {current_image + 1} of {total_images}. Current Progress: {current_progress * 100}%")
             if type(self.gradio_progress_callback) is gr.helpers.Progress:
                 gradio_progress = self.gradio_progress_callback
@@ -85,7 +86,7 @@ class ImageGenerationHandler:
             userprompt = prompt
             neg_prompt = neg_prompt.strip()
 
-            progress(0.1, "validate prompt")
+            progress(0.1, "analyze prompt")
             # enhance / shrink prompt and remove nsfw
             prompt = self._apply_prompt_magic(session_state, userprompt, user_activated_promptmagic)
 

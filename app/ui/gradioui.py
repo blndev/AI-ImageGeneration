@@ -214,7 +214,7 @@ class GradioUI():
                     # Continue execution as this is not critical for image generation
 
             try:
-                progress(0.1, desc="start generation")
+                progress(0.05, desc="start generation")
                 generated_images, session_state, prompt = self.component_image_generator.generate_images(
                     progress=progress,
                     session_state=session_state,
@@ -375,7 +375,7 @@ class GradioUI():
                     )
 
             # Gallery row
-            with gr.Row():
+            with gr.Row(height=800, max_height=1200):
                 # Gallery for displaying generated images
                 gallery = gr.Gallery(
                     label="Generated Images",
@@ -384,10 +384,9 @@ class GradioUI():
                     show_download_button=True,
                     format="jpeg",
                     columns=4,
-                    rows=1,
-                    height="auto",
-                    object_fit="contain",
-                    preview=False
+                    rows=None,
+                    height="800px",
+                    object_fit="contain"
                 )
 
             # Download Button
@@ -448,9 +447,9 @@ class GradioUI():
 
             # Connect the generate button to the generate function and disable button and token timer while generation
             generate_btn.click(
-                fn=lambda: (gr.Timer(active=False), gr.Button(interactive=False), gr.Button(interactive=True)),
+                fn=lambda: (gr.Timer(active=False), gr.Button(interactive=False), gr.Button(interactive=True), gr.Gallery(preview=True)),
                 inputs=[],
-                outputs=[timer_check_token, generate_btn, cancel_btn],
+                outputs=[timer_check_token, generate_btn, cancel_btn, gallery],
             ).then(
                 fn=self.uiaction_generate_images,
                 inputs=[user_session_storage, prompt, aspect_ratio, neg_prompt, image_count, prompt_magic_checkbox],
