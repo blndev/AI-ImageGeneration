@@ -62,7 +62,7 @@ class SessionManager:
         try:
             new_token = 0
             self.record_active_session(session_state)
-            if self.config.token_enabled:
+            if self.config.feature_generation_credits_enabled:
                 current_token = session_state.token
                 if session_state.generation_before_minutes(self.config.new_token_wait_time) and session_state.token <= 2:
                     session_state.token = self.config.initial_token

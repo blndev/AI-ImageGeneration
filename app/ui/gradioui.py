@@ -159,7 +159,7 @@ class GradioUI():
         if self.config.feature_sharing_links_enabled:
             session_state, new_reference_token = self.component_link_sharing_handler.earn_link_rewards(session_state=session_state)
 
-        if self.config.token_enabled and (new_timer_token + new_reference_token) > 0:
+        if self.config.feature_generation_credits_enabled and (new_timer_token + new_reference_token) > 0:
             msgTimer = f"{new_timer_token} for waiting," if new_timer_token > 0 else ""
             msgReference = f"{new_reference_token} for sharing links" if new_reference_token > 0 else ""
             gr.Info(f"Congratulation, you received new generation credits: {msgTimer} {msgReference}!", duration=0)
@@ -188,7 +188,7 @@ class GradioUI():
                 logger.error("Failed to record session activity: %s", str(e))
                 # Continue execution as this is not critical
 
-            if self.config.token_enabled and session_state.token < image_count:
+            if self.config.feature_generation_credits_enabled and session_state.token < image_count:
                 msg = f"Not enough generation credits available.\n\nPlease wait {self.config.new_token_wait_time} minutes"
                 if self.config.feature_upload_images_for_new_token_enabled:
                     msg += ", or get new credits by sharing images for training"
@@ -238,8 +238,8 @@ class GradioUI():
                     logger.error("Failed to block created images from upload: %s", str(e))
                     # Continue execution as this is not critical
 
-            if session_state.token <= 1:
-                logger.warning(f"session {session_state.session} running out of credits ({session_state.token}) left")
+            if session_state.token <= 1 and self.config.feature_generation_credits_enabled:
+                logger.warning(f"session {session_state.session} is out of credits ({session_state.token}) left")
 
             try:
                 # TODO: create useful values for "content" eg. main focus (describe the main object create in the image in one word")
@@ -339,7 +339,7 @@ class GradioUI():
 
                 # generate and token count
                 with gr.Column(visible=True):
-                    with gr.Row(visible=self.config.token_enabled):
+                    with gr.Row(visible=self.config.feature_generation_credits_enabled):
                         # token count is restored from app.load
                         token_label = gr.Text(
                             show_label=False,
@@ -402,7 +402,7 @@ class GradioUI():
                 # logger.debug("local_storage changed: SessionState: %s", gradio_state)
                 ss = SessionState.from_gradio_state(gradio_state)
                 token = ss.token
-                if self.config.token_enabled is False:
+                if self.config.feature_generation_credits_enabled is False:
                     token = "unlimited"
                 n = ""
                 if self.config.feature_use_upload_for_age_check and ss.nsfw > 0:

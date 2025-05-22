@@ -26,7 +26,8 @@ class AppConfig:
         self.free_memory_after_minutes_inactivity = int(os.getenv("FREE_MEMORY_AFTER_MINUTES_INACTIVITY", 15))
 
         self.initial_token = int(os.getenv("INITIAL_GENERATION_TOKEN", 0))
-        self.token_enabled = self.initial_token > 0
+        self.feature_generation_credits_enabled = self.initial_token > 0
+        
         self.new_token_wait_time = int(os.getenv("NEW_TOKEN_WAIT_TIME", 10))
 
         self.feature_sharing_links_new_token_per_image = int(os.getenv("FEATURE_SHARING_LINK_NEW_TOKEN", 0))
