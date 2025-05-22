@@ -122,9 +122,9 @@ This system makes it easy to:
         "GPU_ALLOW_MEMORY_OFFLOAD": 0        // Use CPU memory for model handling
     },
     "Aspect_Ratio": {
-        "Square": "1024x1024",              // Square image dimensions
-        "Landscape": "1152x768",            // Landscape image dimensions
-        "Portrait": "768x1152"              // Portrait image dimensions
+        "Square": "1024x1024",               // Square image dimensions
+        "Landscape": "1152x768",             // Landscape image dimensions
+        "Portrait": "768x1152"               // Portrait image dimensions
     },
     "Embeddings": {
         "positive": [
@@ -134,31 +134,29 @@ This system makes it easy to:
                 "keyword": "trigger-word"    // Word that triggers this embedding
             }
         ],
-        "negative": []                      // Negative embeddings list
+        "negative": []                       // Negative embeddings list
     },
     "Loras": [
         {
-            "name": "lora-name",            // Name of the LoRA
-            "src": "lora.safetensors",      // Path to LoRA file
+            "name": "lora-name",             // Name of the LoRA
+            "src": "lora.safetensors",       // Path to LoRA file
             "trigger": "trigger-word",       // Word that activates this LoRA
-            "weight": 1.0,                  // LoRA weight (0.0 to 1.0)
-            "inject_when": [                // Keywords that trigger LoRA injection
+            "weight": 1.0,                   // LoRA weight (0.0 to 1.0)
+            "inject_when": [                 // Keywords that trigger LoRA injection
                 "keyword1",
                 "keyword2"
             ]
         }
     ],
-    "Examples": [                           // Optional example prompts
+    "Examples": [                            // Optional example prompts
         [
             "A majestic mountain landscape at sunset",  // Positive prompt
-            "ugly, blurry",                            // Negative prompt
-            "▤ Landscape",                             // Aspect ratio (▤ Landscape, ▯ Portrait, □ Square)
-            1                                          // Weight/priority
+            "ugly, blurry",                             // Negative prompt
+            1                                           // Weight/priority
         ],
         [
             "Professional portrait in modern office",
-            "bad anatomy, deformed",
-            "▯ Portrait",
+            "bad anatomy, deformed"
             1
         ]
     ]
