@@ -47,6 +47,22 @@
     "Examples": []
   },
   {
+    "Model": "SD1.5 Example",
+    "Parent": "",
+    "Path": "/models/sd15/sd15.safetensors",
+    "ModelType": "sd1.5",
+    "Generation": {
+      "steps": 30,
+      "guidance": 7
+    },
+    "Aspect_Ratio": {
+      "Square": "512x512",
+      "Landscape": "768x512",
+      "Portrait": "512x768"
+    },
+    "Examples": []
+  },
+  {
     "Model": "Name as referenced in config",
     "Path": "file or huggingface name",
     "Generation": {
