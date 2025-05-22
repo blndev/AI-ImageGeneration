@@ -1,3 +1,20 @@
+# Version 1.2
+
+## New Features
+- Link sharing for Credits
+- Upload of training material for Credits
+- NSFW detection for generated output and blocking / censorship if active
+- Model Configuration with inheritance support
+
+## Internal
+- complete refactoring of the User Interface and generation classes
+
+## Bugfixes
+- enhanced error handling in all classes
+- fix generation issues with wrong parameters
+- fix upload of generated images possible 
+
+
 # Version 1.1
 
 ## New Features
@@ -5,6 +22,7 @@
 - SDXL and SD1.5 support
 - Prompt Magic
 - NSFW check for prompt and generation
+
 
 # 🚀 Release Notes - Version 1.0
 
@@ -15,20 +33,18 @@ We're thrilled to announce the first stable release of our AI Image Generation p
 ### ✨ Key Features
 
 #### 🎨 Core Generation Capabilities
-- Integration with FLUX.1 model from black-forest-labs
+- Integration of FLUX.1 models from black-forest-labs
 - Support for multiple aspect ratios (1024x1024, 1152x768, 768x1152)
 - Configurable generation parameters for fine-tuned outputs
 - Intuitive text-to-image generation interface
 
 #### 🛠️ Technical Infrastructure
 - Robust auto-update system with version tracking
-- Python virtual environment management
-- Comprehensive dependency handling
 - User-friendly Gradio web interface
 
-#### 📊 User Management
-- Token-based usage system
-- Configurable token refresh intervals
+#### 📊 User Access Management
+- Credit-based usage system
+- Configurable Credit refresh intervals
 - Optional image sharing capabilities
 - User session management
 
@@ -43,7 +59,6 @@ We're thrilled to announce the first stable release of our AI Image Generation p
 #### 🔧 Configuration System
 - Environment-based configuration
 - Flexible logging levels
-- Development mode support
 
 ### 🏗️ Technical Requirements
 - Python 3.x (tested with 3.12)
@@ -59,7 +74,7 @@ We're thrilled to announce the first stable release of our AI Image Generation p
 ### 🔒 Security Features
 - Environment-based secret management
 - Configurable access controls
-- Token-based usage limitations
+- Credit-based usage limitations
 
 ---
 
