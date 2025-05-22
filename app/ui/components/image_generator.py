@@ -57,7 +57,21 @@ class ImageGenerationHandler:
 
         return prompt  # Return all created elements
 
+    def __status_callback(self, total_images, current_image):
+        try:
+            current_progress = 0.1 + (current_image * 0.8 / total_images)
+            if current_progress < 0 or current_progress > 1: current_progress = 0.5
+            logger.debug(f"Create image {current_image + 1} of {total_images}. Current Progress: {current_progress * 100}%")
+            if type(self.gradio_progress_callback) is gr.helpers.Progress:
+                gradio_progress = self.gradio_progress_callback
+                gradio_progress(progress=current_progress, desc=f"Generating image {current_image + 1} of {total_images}")
+            else:
+                logger.debug(f"No progress callback available. Create image {current_image} of {total_images}")
+        except Exception as e:
+            logger.error(f"Status Callback error: {e}")
+
     def generate_images(self,
+                        progress: gr.Progress,
                         session_state: SessionState,
                         prompt: str,
                         neg_prompt,
@@ -71,6 +85,7 @@ class ImageGenerationHandler:
             userprompt = prompt
             neg_prompt = neg_prompt.strip()
 
+            progress(0.1, "validate prompt")
             # enhance / shrink prompt and remove nsfw
             prompt = self._apply_prompt_magic(session_state, userprompt, user_activated_promptmagic)
 
@@ -85,6 +100,7 @@ class ImageGenerationHandler:
 
             # split aspect ratio selection to dimensions by using modelconfig
             width, height = self._get_image_dimensions(aspect_ratio)
+            progress(0.15, "load ai system")
 
             generation_details = GenerationParameters(
                 prompt=prompt,
@@ -93,15 +109,17 @@ class ImageGenerationHandler:
                 guidance_scale=float(self.selectedmodelconfig.generation.get("guidance", 1)),
                 num_images_per_prompt=image_count,
                 width=width,
-                height=height
+                height=height,
             )
-
-            generated_images = self.generator.generate_images(params=generation_details)
+            self.gradio_progress_callback = progress
+            generated_images = self.generator.generate_images(params=generation_details, status_callback=self.__status_callback)
             logger.debug(f"received {len(generated_images)} image(s) from generator")
+            self.gradio_progress_callback = None
 
             # reduce available credits after successful generation
             session_state.token -= image_count
 
+            progress(0.9, "validate generated images")
             # apply censorship if still nsfw content is contained
             result_images = self._censor_nsfw_images(session_state, generated_images)
 

@@ -65,7 +65,7 @@ class GradioUI():
                     config=self.config,
                     analytics=self.analytics
                 )
-                
+
             self.component_feedback_handler = FeedbackHandler(
                 session_manager=self.component_session_manager,
                 config=self.config,
@@ -167,7 +167,7 @@ class GradioUI():
         self.analytics.update_user_tokens(session_state.session, session_state.token)
         return session_state
 
-    def uiaction_generate_images(self, request: gr.Request, gr_state, prompt, aspect_ratio, neg_prompt, image_count, promptmagic_active):
+    def uiaction_generate_images(self, request: gr.Request, gr_state, prompt, aspect_ratio, neg_prompt, image_count, promptmagic_active, progress=gr.Progress()):
         """
         Generate images based on the given prompt and aspect ratio.
 
@@ -180,6 +180,7 @@ class GradioUI():
         analytics_image_creation_duration_start_time = None
         try:
             # Record session activity
+            progress(0, desc="prepare generation")
             try:
                 self.component_session_manager.record_active_session(session_state)
                 self.app_last_image_generation = datetime.now()
@@ -193,8 +194,8 @@ class GradioUI():
                     msg += ", or get new credits by sharing images for training"
                 if self.config.feature_sharing_links_enabled:
                     msg += ", or share the application link to other users"
-                logger.info("User %s attempted generation with insufficient credits (%s needed, %s available)", 
-                           session_state.session, image_count, session_state.token)
+                logger.info("User %s attempted generation with insufficient credits (%s needed, %s available)",
+                            session_state.session, image_count, session_state.token)
                 gr.Warning(msg, title="Image generation failed", duration=30)
                 return [], session_state, ""
 
@@ -213,7 +214,9 @@ class GradioUI():
                     # Continue execution as this is not critical for image generation
 
             try:
+                progress(0.1, desc="start generation")
                 generated_images, session_state, prompt = self.component_image_generator.generate_images(
+                    progress=progress,
                     session_state=session_state,
                     prompt=prompt,
                     neg_prompt=neg_prompt,
@@ -250,6 +253,7 @@ class GradioUI():
                 logger.warning(f"error while recording sucessful image generation for stats: {e}")
                 pass
 
+            progress(1, "image generation finished")
             return generated_images, session_state, prompt
         except Exception as e:
             logger.error(f"image generation failed: {e}")

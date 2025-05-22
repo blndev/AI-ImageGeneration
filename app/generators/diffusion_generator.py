@@ -168,7 +168,7 @@ class StabelDiffusionGenerator(BaseGenerator):
             logger.error(f"Error while changing text2img model: {e}")
             raise (f"Loading new img2img model '{self.modelconfig.model}' failed", e)
 
-    def generate_images(self, params: GenerationParameters) -> List[Image.Image]:
+    def generate_images(self, params: GenerationParameters, status_callback) -> List[Image.Image]:
         """
         Generate images using the current Stable Diffusion model.
 
@@ -249,6 +249,8 @@ class StabelDiffusionGenerator(BaseGenerator):
                 params.num_images_per_prompt = 1
                 for image in range(imagecount):
                     # TODO : add yield
+                    if status_callback:
+                        status_callback(imagecount, image)
                     result_images.append(current_pipeline(**params.to_dict()).images[0])
                 return result_images
 

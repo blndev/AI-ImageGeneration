@@ -157,7 +157,7 @@ class FluxGenerator(BaseGenerator):
             logger.error(f"Error while changing text2img model: {e}")
             raise (f"Loading new img2img model '{self.modelconfig.model}' failed", e)
 
-    def generate_images(self, params: GenerationParameters) -> List[Image.Image]:
+    def generate_images(self, params: GenerationParameters, status_callback) -> List[Image.Image]:
         """
         Generate images using the current Flux model.
 
@@ -236,6 +236,8 @@ class FluxGenerator(BaseGenerator):
                 for image in range(imagecount):
                     # TODO : add yield
                     result_images.append(current_pipeline(**params.to_dict()).images[0])
+                    if status_callback:
+                        status_callback(imagecount, image)
                 return result_images
 
             except RuntimeError as e:

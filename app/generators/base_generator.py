@@ -285,3 +285,7 @@ class BaseGenerator():
             NotImplementedError: If not implemented by concrete subclass
         """
         pass
+
+    @abc.abstractmethod
+    def generate_images(self, params: GenerationParameters, status_callback) -> List[Image.Image]:
+        pass
