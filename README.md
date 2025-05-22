@@ -1,4 +1,4 @@
-# 🎨 AI Image Generation with FLUX
+# 🎨 AI Image Generation with FLUX and Stabel Diffusion
 
 Welcome to an exciting world of AI-powered image generation! This project leverages the powerful FLUX model from black-forest-labs to create stunning, high-quality images from text descriptions. Whether you're an artist, developer, or just curious about AI art, this tool provides an intuitive interface for your creative endeavors!
 
@@ -9,7 +9,7 @@ Welcome to an exciting world of AI-powered image generation! This project levera
 - 🔄 Auto-update system with version tracking
 - 🎚️ Configurable generation parameters
 - 🎮 User-friendly Gradio interface
-- 📊 Token-based usage system (optional)
+- 📊 Credit-based usage system (optional)
 - 💾 Automatic model management and caching
 - 🛠️ Memory optimization options for different hardware setups
 - 🪄 Smart prompt refinement with Ollama integration
@@ -29,9 +29,9 @@ cd AI-ImageGeneration-Flux
 cp .env.example .env
 ```
 
-3. Edit `.env` file and set your HuggingFace token:
+3. Edit `.env` file and set your HuggingFace Credit:
 ```bash
-HUGGINGFACE_TOKEN=your_token_here
+HUGGINGFACE_Credit=your_Credit_here
 ```
 
 > 📝 **Note**: You'll need to accept the license agreement for FLUX.1-schnell at [HuggingFace](https://huggingface.co/black-forest-labs/FLUX.1-schnell)
@@ -59,14 +59,14 @@ Customize your experience through environment variables in `.env`:
 - `GRADIO_SHARED`: Enable public Gradio link
 - `NO_AI`: Development mode without AI processing
 
-### 🎫 Token System
-- `INITIAL_GENERATION_TOKEN`: Starting tokens for new users
-- `NEW_TOKEN_WAIT_TIME`: Minutes between token refreshes
-- `ALLOW_UPLOAD`: Enable image sharing for token rewards
+### 🎫 Credit System
+- `INITIAL_GENERATION_TOKEN`: Starting Credits for new users
+- `NEW_TOKEN_WAIT_TIME`: Minutes to wait for Credit refreshes
+- `ALLOW_UPLOAD`: Enable image sharing for model trainig to earn Credit
 
 ### 🪄 Prompt Magic
 - `OLLAMA_SERVER`: Custom Ollama server location (default: localhost)
-- `OLLAMA_MODEL`: Model for prompt enhancement (default: artifish/llama3.2-uncensored)
+- `OLLAMA_MODEL`: Model for prompt enhancement (default: llava)
 
 ### 🖼️ Generation Settings
 - `GENERATION_MODEL`: Choose your model specified in modelconfig.json (default: black-forest-labs/FLUX.1-dev)
@@ -176,10 +176,10 @@ This configuration shows all available settings that can be defined for a model.
 
 This application provides built-in monitoring capabilities using Prometheus metrics, exposed on port 9101. The following metrics are available:
 
-- `flux_image_creations_total`: Counter for total number of images created
-- `flux_sessions_total`: Counter for total number of user sessions
-- `flux_image_creation_duration_seconds`: Histogram of image creation duration
-- `flux_user_tokens`: Gauge showing available tokens per user
+- `imggen_image_creations_total`: Counter for total number of images created
+- `imggen_sessions_total`: Counter for total number of user sessions
+- `imggen_image_creation_duration_seconds`: Histogram of image creation duration
+- `imggen_user_Credits`: Gauge showing available Credits per user
 
 ### Prerequisites
 - Podman or Docker installed on your system
@@ -346,7 +346,7 @@ Add these jobs to your Prometheus configuration to collect metrics from all expo
 
 ```yaml
 scrape_configs:
-  - job_name: 'flux_app'
+  - job_name: 'imggen_app'
     static_configs:
       - targets: ['localhost:9101']
 

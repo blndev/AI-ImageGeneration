@@ -21,30 +21,30 @@ class Analytics:
             logger.info("Initializing Analytics")
             # Initialize Prometheus metrics
             self._image_creations = Counter(
-                'flux_image_creations_total',
+                'imggen_image_creations_total',
                 'Total number of images created',
                 labelnames=('model', 'content', 'reference_code')
             )
 
             self._sessions = Counter(
-                'flux_sessions_total',
+                'imggen_sessions_total',
                 'Total number of user sessions',
                 labelnames=('device_type', 'os', 'browser', 'language', 'reference_code')
             )
 
             self._active_sessions = Gauge(
-                'flux_active_sessions',
+                'imggen_active_sessions',
                 'Amount of users active in the last 30 minutes'
             )
 
             self._image_creation_time = Histogram(
-                'flux_image_creation_duration_seconds',
+                'imggen_image_creation_duration_seconds',
                 'Time taken to create an image',
                 buckets=[1, 2, 5, 10, 20, 30, 60]  # buckets in seconds
             )
 
             self._user_tokens = Gauge(
-                'flux_user_tokens',
+                'imggen_user_tokens',
                 'Current number of tokens available to users',
                 ['user_id']
             )
