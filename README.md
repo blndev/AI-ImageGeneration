@@ -151,13 +151,11 @@ This system makes it easy to:
     "Examples": [                            // Optional example prompts
         [
             "A majestic mountain landscape at sunset",  // Positive prompt
-            "ugly, blurry",                             // Negative prompt
-            1                                           // Weight/priority
+            "ugly, blurry"                              // Negative prompt
         ],
         [
             "Professional portrait in modern office",
             "bad anatomy, deformed"
-            1
         ]
     ]
 }

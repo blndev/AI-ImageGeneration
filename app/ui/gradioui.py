@@ -268,7 +268,7 @@ class GradioUI():
 
         # Create the interface components
         with gr.Blocks(
-            title=self.selectedmodelconfig.description + " Image Generator",
+            title=self.selectedmodelconfig.description + " Generator",
             css="""
             footer {visibility: hidden}
             """,
@@ -366,7 +366,7 @@ class GradioUI():
                     # Examples
                     gr.Examples(
                         examples=self.examples,
-                        inputs=[prompt, neg_prompt, image_count],
+                        inputs=[prompt, neg_prompt],
                         label="Click an example to load it"
                     )
 
