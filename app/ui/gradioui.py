@@ -447,7 +447,7 @@ class GradioUI():
 
             # Connect the generate button to the generate function and disable button and token timer while generation
             generate_btn.click(
-                fn=lambda: (gr.Timer(active=False), gr.Button(interactive=False), gr.Button(interactive=True), gr.Gallery(preview=True)),
+                fn=lambda: (gr.Timer(active=False), gr.Button(interactive=False), gr.Button(interactive=True), gr.Gallery(preview=False)),
                 inputs=[],
                 outputs=[timer_check_token, generate_btn, cancel_btn, gallery],
             ).then(
