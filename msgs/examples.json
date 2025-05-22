@@ -1,44 +1,38 @@
 [
     [
-        "A majestic mountain landscape at sunset with snow-capped peaks",
-        "painting",
-        "\u25a4 Landscape",
-        1
+        "A solo hiker standing on a mountain peak at sunset, detailed facial features, outdoor adventure clothing, backpack, looking at the horizon",
+        "multiple people, groups, blurry face, unrealistic features"
     ],
     [
-        "two dogs",
-        "painting",
-        "\u25a4 Landscape",
-        1
+        "A single person walking their dog in a park, casual attire, natural lighting, realistic human proportions",
+        "cartoon style, multiple humans, distorted body"
     ],
     [
-        "A professional portrait of a business person in a modern office",
-        "ugly face",
-        "\u25af Portrait",
-        1
+        "A professional portrait of a female CEO in a modern office, business suit, confident pose, natural skin texture",
+        "ugly face, multiple subjects, unrealistic proportions, cartoon style"
     ],
     [
-        "A cinematic shot of a man with a brown eye, long hair, neck, natural skin texture, intricate skin details, movie themed style,",
-        "",
-        "\u25af Portrait",
-        1
+        "A cinematic shot of a man with brown eyes, long hair, strong jawline, natural skin texture, intricate skin details, dramatic lighting, professional photography",
+        "multiple people, unrealistic features, cartoon style"
     ],
     [
-        "photorealistic background, detailed eyes, 1girl, solo, looking at viewer, short hair, blue eyes, hair ornament, white background, animal ears, hair between eyes, closed mouth, upper body, pink hair, flower, sidelocks, japanese clothes, hair flower, kimono, hair bun",
-        "squint. cross-eyed",
-        "\u25a1 Square",
-        1
+        "Photorealistic portrait of a young woman with short pink hair, blue eyes, detailed facial features, white background, elegant posture, wearing a traditional kimono with floral pattern",
+        "squint, cross-eyed, multiple people, unrealistic anatomy, cartoon style"
     ],
     [
-        "highly realistic, Dark Fantasy, one beautiful woman sitting on a rock by a river, behind her is a gigantic castle above a misty waterfall, starry sky, mountainous horizon, night, moon, girl wand is made from lightning, black armored dress with ornaments, short skirt, black knee high boots, looking at viewer, dark purple hair,",
-        "worst quality, low quality, illustration, 3d, 2d, painting, cartoons, sketch,  bad anatomy",
-        "\u25a1 Square",
-        1
+        "Highly realistic dark fantasy portrait of a woman warrior, sitting on a rock by a river, gigantic castle in background, misty waterfall, night scene with stars, wearing black armored dress with ornaments, short skirt, knee-high boots, dark purple hair",
+        "worst quality, low quality, illustration, 3d, 2d, painting, cartoon, sketch, bad anatomy, multiple people"
     ],
     [
-        "girl, natural skin texture, perfect eyes, detailed, photorealistic, slim and sassy woman in her early thirties, cute face, standing, sexy hips, sexy pose, closeup, wearing a designer short dress, perfect legs and feet, waiting for a cab outside a busy Italian restaurant late at night",
-        "perfect hands",
-        "\u25af Portrait",
-        1
+        "Natural skin texture, photorealistic portrait of a stylish woman in her early thirties, detailed facial features, standing in a confident pose, wearing a designer short dress, outside an Italian restaurant at night, city lights in background",
+        "perfect hands, multiple people, unrealistic features, cartoon style"
+    ],
+    [
+        "A cheerful child playing in a sunlit meadow, natural skin texture, detailed facial features, colorful casual clothing, genuine smile, soft natural lighting",
+        "adults, multiple people, unrealistic features, cartoon style"
+    ],
+    [
+        "An elderly man with weathered face, deep wrinkles, wise eyes, silver hair, sitting on a bench in a park, wearing a cardigan and glasses, natural lighting, detailed skin texture",
+        "young person, multiple people, unrealistic features, smooth skin"
     ]
 ]

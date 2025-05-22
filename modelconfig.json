@@ -1,0 +1,100 @@
+[
+  {
+    "Model": "default",
+    "Description": "default configuration flux-schnell",
+    "Parent": "flux1:schnell",
+    "Aspect_Ratio": {
+      "Square": "1024x1024"
+    }
+  },
+  {
+    "Model": "flux",
+    "Parent": "",
+    "ModelType": "flux",
+    "Generation": {
+      "MAX_IMAGES": 2,
+      "GPU_ALLOW_XFORMERS": 0,
+      "GPU_ALLOW_ATTENTION_SLICING": 1,
+      "GPU_ALLOW_MEMORY_OFFLOAD": 1
+    },
+    "Aspect_Ratio": {
+      "Square": "1024x1024",
+      "Landscape": "1152x768",
+      "Portrait": "768x1152"
+    },
+    "Examples": []
+  },
+  {
+    "Model": "flux1:schnell",
+    "Path": "black-forest-labs/FLUX.1-schnell",
+    "Description": "Model Flux1-Schnell",
+    "Parent": "flux",
+    "Generation": {
+      "steps": 5,
+      "guidance": 0
+    },
+    "Examples": []
+  },
+  {
+    "Model": "flux1:dev",
+    "Path": "black-forest-labs/FLUX.1-dev",
+    "Description": "Model Flux1-Dev",
+    "Parent": "flux",
+    "Generation": {
+      "steps": 50,
+      "guidance": 7.5
+    },
+    "Examples": []
+  },
+  {
+    "Model": "SD1.5 Example",
+    "Parent": "",
+    "Path": "/models/sd15/sd15.safetensors",
+    "ModelType": "sd1.5",
+    "Generation": {
+      "steps": 30,
+      "guidance": 7
+    },
+    "Aspect_Ratio": {
+      "Square": "512x512",
+      "Landscape": "768x512",
+      "Portrait": "512x768"
+    },
+    "Examples": []
+  },
+  {
+    "Model": "Name as referenced in config",
+    "Path": "file or huggingface name",
+    "Generation": {
+      "steps": 40,
+      "guidance": 4.0
+    },
+    "Aspect_Ratio": {
+      "Square": "1024x1024",
+      "Landscape": "1152x768",
+      "Portrait": "768x1152"
+    },
+    "Embeddings": {
+      "positive": [
+        {
+          "name": "Name",
+          "source": "xyz.pt",
+          "keyword": "keyword"
+        }
+      ],
+      "negative": []
+    },
+    "Loras": [
+      {
+        "name": "abc",
+        "src": "file.safetensors",
+        "trigger": "tree",
+        "weight": 1.0,
+        "inject_when": ["keyword liste", "keyword 2"]
+      }
+    ],
+    "Examples": [
+      "Generation Prompt", "negative Prompt", 1
+    ]
+  }
+]

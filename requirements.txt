@@ -5,10 +5,12 @@ colorlog        # Colored logging output
 Pillow          # PIL images
 numpy           # Image Manipulation (SKIP_AI)
 dotenv          # Load environment variables for config from file
+apscheduler     # Background scheduler for Gradio Server to count active sessions or free memory by unloading model
 
 ###############################################################
 # Analytics
 user-agents     # to parse user agents and split into 
+prometheus-client    # for metrics collection and exposition
 
 ###############################################################
 # AI
@@ -25,3 +27,8 @@ sentencepiece           # required by tokenizer
 insightface             # to detect faces in uploaded images
 onnxruntime             # required by insightface but not automatically installed          
 opencv-python           # to prepare PIL images for face detection
+nudenet                 # nsfw detector
+###############################################################
+# Prompt Analyzer
+langchain-ollama        # to query the system
+ollama                  # to pull the correct models

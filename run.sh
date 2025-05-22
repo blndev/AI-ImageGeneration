@@ -79,6 +79,9 @@ echo "Upgrading Python requirements..."
 pip install --quiet --upgrade pip
 pip install --quiet --require-virtualenv --requirement requirements.txt
 
+# download the correct model (TODO: use config in future)
+ollama pull artifish/llama3.2-uncensored
+
 # Function to start the main app
 start_main_app() {
     echo "Starting App..."
@@ -87,13 +90,13 @@ start_main_app() {
 
 # Function to start the analytics dashboard
 start_analytics() {
-    echo "Starting Analytics Dashboard..."
+    echo "Starting Telegram Bot..."
     python analytics_dashboard.py
 }
 
 # Function to start both components
 start_both() {
-    echo "Starting both AI Anime Maker and Analytics Dashboard..."
+    echo "Starting both App and Bot..."
     python main.py & 
     python analytics_dashboard.py &
     wait

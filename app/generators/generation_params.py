@@ -7,7 +7,7 @@ import torch
 
 
 @dataclass
-class FluxParameters:
+class GenerationParameters:
     """
     Usage
     # Basic setup
@@ -94,8 +94,7 @@ class FluxParameters:
             "guidance_scale": self.guidance_scale,
             "width": self.width,
             "height": self.height,
-            "num_images_per_prompt": self.num_images_per_prompt,
-            "guidance_scale": self.guidance_scale,
+            "num_images_per_prompt": self.num_images_per_prompt
         }
 
         if self.negative_prompt:
@@ -112,12 +111,12 @@ class FluxParameters:
 
         return params
 
-    def prepare_flux_schnell(self) -> 'FluxParameters':
+    def prepare_flux_schnell(self) -> 'GenerationParameters':
         """
         Adjusts parameters specifically for FLUX-SCHNELL model.
         Returns a new FluxParameters instance with optimized settings.
         """
-        params = FluxParameters(**self.__dict__)  # Create a copy
+        params = GenerationParameters(**self.to_dict())  # Create a copy
 
         # Enforce FLUX-SCHNELL specific constraints
         if params.num_inference_steps > 10:
@@ -137,12 +136,12 @@ class FluxParameters:
 
         return params
 
-    def prepare_flux_dev(self) -> 'FluxParameters':
+    def prepare_flux_dev(self) -> 'GenerationParameters':
         """
         Adjusts parameters specifically for FLUX-DEV model.
         Returns a new FluxParameters instance with optimized settings.
         """
-        params = FluxParameters(**self.__dict__)  # Create a copy
+        params = GenerationParameters(**self.__dict__)  # Create a copy
 
         # Warn if inference steps are too low for good quality
         if params.num_inference_steps < 50:
@@ -154,12 +153,14 @@ class FluxParameters:
             warnings.warn(f"FLUX-DEV typically works better with guidance_scale >= 7.0. "
                           f"Current setting: {params.guidance_scale}")
 
-    def prepare_sdxl(self) -> 'FluxParameters':
+        return params
+
+    def prepare_stablediffusion_std(self) -> 'GenerationParameters':
         """
         Adjusts parameters specifically for FLUX-DEV model.
         Returns a new FluxParameters instance with optimized settings.
         """
-        params = FluxParameters(**self.__dict__)  # Create a copy
+        params = GenerationParameters(**self.__dict__)  # Create a copy
 
         # Warn if inference steps are too low for good quality
         if params.num_inference_steps < 10:
