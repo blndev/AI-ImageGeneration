@@ -62,7 +62,6 @@ Customize your experience through environment variables in `.env`:
 ### 🎫 Credit System
 - `INITIAL_GENERATION_TOKEN`: Starting Credits for new users
 - `NEW_TOKEN_WAIT_TIME`: Minutes to wait for Credit refreshes
-- `ALLOW_UPLOAD`: Enable image sharing for model trainig to earn Credit
 
 ### 🪄 Prompt Magic
 - `OLLAMA_SERVER`: Custom Ollama server location (default: localhost)
@@ -72,8 +71,8 @@ Customize your experience through environment variables in `.env`:
 - `GENERATION_MODEL`: Choose your model specified in modelconfig.json (default: black-forest-labs/FLUX.1-dev)
 
 ### 🎯 Output Configuration
-- `MODEL_DIRECTORY`: Location for downloaded models
-- `OUTPUT_DIRECTORY`: Where to save generated images
+- `MODEL_DIRECTORY`: Location for downloaded models and cache files form HF
+- `OUTPUT_DIRECTORY`: Where to save generation information e.g. hashes of generated images
 
 ### 📝 Model Configuration (modelconfig.json)
 
