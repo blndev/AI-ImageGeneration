@@ -59,13 +59,14 @@ class ImageGenerationHandler:
 
     def __status_callback(self, total_images, current_image):
         try:
-            current_progress = 0.15 + (current_image * 0.75 / total_images)
+            current_image += 1
+            current_progress = 0.15 + (current_image * 0.65 / total_images)
             if current_progress < 0 or current_progress > 1: current_progress = 0.5
             if total_images == 1: current_progress = 0.5
-            logger.debug(f"Create image {current_image + 1} of {total_images}. Current Progress: {current_progress * 100}%")
+            logger.debug(f"Create image {current_image} of {total_images}. Current Progress: {current_progress * 100}%")
             if type(self.gradio_progress_callback) is gr.helpers.Progress:
                 gradio_progress = self.gradio_progress_callback
-                gradio_progress(progress=current_progress, desc=f"Generating image {current_image + 1} of {total_images}")
+                gradio_progress(progress=current_progress, desc=f"Generating image {current_image} of {total_images}")
             else:
                 logger.debug(f"No progress callback available. Create image {current_image} of {total_images}")
         except Exception as e:
