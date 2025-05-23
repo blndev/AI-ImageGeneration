@@ -192,9 +192,10 @@ class ImageGenerationHandler:
         if self.prompt_refiner and user_activated_promptmagic:
             logger.debug("Apply Prompt-Magic")
             # refine prompt multiple times for better reults
+            userprompt = prompt
             for _ in range(3):
                 new_prompt = self.prompt_refiner.magic_enhance(prompt, 200)
-                if len(new_prompt) > len(prompt): prompt = new_prompt
+                if len(new_prompt) > len(prompt) or prompt == userprompt: prompt = new_prompt
             if session_state.nsfw <= self.MAX_NSFW_WARNINGS and not self.prompt_refiner.is_safe_for_work(prompt):
                 prompt = self.prompt_refiner.make_prompt_sfw(prompt)
 

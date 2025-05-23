@@ -98,31 +98,33 @@ class UploadHandler:
         if not self.config.feature_upload_images_for_new_token_enabled: return
         self.load_components()
         # now start with interface
-        with gr.Row(visible=(self.config.output_directory and self.config.feature_upload_images_for_new_token_enabled)):
-            nsfw_msg = " and remove censorship by uploading images" if self.config.feature_use_upload_for_age_check else ""
-            with gr.Accordion("Get more generation credits" + nsfw_msg, open=False):
-                with gr.Row():
-                    with gr.Column(scale=2):
-                        gr.Markdown(self.msg_share_image)
-                    with gr.Column(scale=1):
-                        upload_image = gr.Image(sources="upload", type="filepath", format="jpeg", height=256)
-                        upload_button = gr.Button("Upload", visible=True, interactive=False)
+        #with gr.Row(visible=(self.config.output_directory and self.config.feature_upload_images_for_new_token_enabled)):
+        if not (self.config.output_directory and self.config.feature_upload_images_for_new_token_enabled): return
+        nsfw_msg = " and remove censorship by uploading explicit images" if self.config.feature_use_upload_for_age_check else ""
+        with gr.Row():
+            gr.Label("Get more image generation credits" + nsfw_msg, container=False, color="blue")
+        with gr.Row():
+            with gr.Column(scale=2):
+                gr.Markdown(self.msg_share_image)
+            with gr.Column(scale=1):
+                upload_image = gr.Image(sources="upload", type="filepath", format="jpeg", height=256)
+                upload_button = gr.Button("Upload", visible=True, interactive=False)
 
-                upload_image.change(
-                    fn=self._handle_upload,
-                    inputs=[user_session_storage, upload_image],
-                    outputs=[upload_button],
-                    concurrency_limit=None,
-                    concurrency_id="image upload"
-                )
+        upload_image.change(
+            fn=self._handle_upload,
+            inputs=[user_session_storage, upload_image],
+            outputs=[upload_button],
+            concurrency_limit=None,
+            concurrency_id="image upload"
+        )
 
-                upload_button.click(
-                    fn=self._handle_token_generation,
-                    inputs=[user_session_storage, upload_image],
-                    outputs=[user_session_storage, upload_button, upload_image],
-                    concurrency_limit=None,
-                    concurrency_id="gpu"
-                )
+        upload_button.click(
+            fn=self._handle_token_generation,
+            inputs=[user_session_storage, upload_image],
+            outputs=[user_session_storage, upload_button, upload_image],
+            concurrency_limit=None,
+            concurrency_id="gpu"
+        )
 
     def _handle_upload(self, gradio_state: str, image_path: str):
         """

@@ -282,35 +282,50 @@ class GradioUI():
         ) as self.interface:
             user_session_storage = gr.BrowserState()  # do not initialize it with any value!!! this is used as default
 
-            # with gr.Row():
-            #     gr.Markdown(value=self.selectedmodelconfig.description)
+            with gr.Row():
+                gr.Label(
+                    label="This App is made to test our AI System. It runs maximum of 2 days and as long as we have sponsored Hardware.",
+                    value=f"Generate {self.selectedmodelconfig.description} for free!"
+                )
             # Input Values & Generate row
             with gr.Row():
-                with gr.Column(scale=2):
-                    # Text prompt input
-                    prompt = gr.Textbox(
-                        label="What image you want to see?",
-                        info="Prompt",
-                        placeholder="Describe the image you want to generate...",
-                        value="",
-                        lines=3,
-                        max_length=340
-                    )
-                    # with gr.Column():
+                with gr.Tab("Text"):
+                    with gr.Row():
 
-                # generate and token count
-                with gr.Column():
-                    with gr.Group():
-                        with gr.Row():  # visible=self.config.feature_generation_credits_enabled):
-                            token_label = gr.Text(value="", container=True, show_label=False)
-                        with gr.Row():
-
-                            # Generate button that's interactive only when prompt has text
-                            generate_btn = gr.Button(
-                                "Start",
-                                interactive=False
+                        with gr.Column(scale=2):
+                            # Text prompt input
+                            prompt = gr.Textbox(
+                                label="What image you want to see?",
+                                info="Prompt",
+                                placeholder="Describe the image you want to generate...",
+                                value="",
+                                lines=3,
+                                max_length=340
                             )
-                            cancel_btn = gr.Button("Cancel", interactive=False, visible=False)
+                            # with gr.Column():
+
+                        # generate and token count
+                        with gr.Column():
+                            with gr.Group():
+                                with gr.Row():  # visible=self.config.feature_generation_credits_enabled):
+                                    token_label = gr.Text(value="", container=True, show_label=False)
+                                with gr.Row():
+
+                                    # Generate button that's interactive only when prompt has text
+                                    generate_btn = gr.Button(
+                                        "Start",
+                                        interactive=False
+                                    )
+                                    cancel_btn = gr.Button("Cancel", interactive=False, visible=False)
+                with gr.Tab("Assistant"):
+                    gr.Checkbox("Human")
+                with gr.Tab("Examples", visible=len(self.examples) > 0):
+                    # Examples
+                    gr.Examples(
+                        examples=self.examples,
+                        inputs=[prompt],
+                        label="Click an example to load it"
+                    )
             # Advanced row
             with gr.Row():
                 with gr.Accordion("Advanced generation Options", open=False):
@@ -341,7 +356,7 @@ class GradioUI():
                                     scale=1
                                 )
                             # TODO: STyles
-                    with gr.Tab("Prompt"):
+                    with gr.Tab("Styles & Negative Prompt"):
                         with gr.Row():
                             with gr.Column(visible=True):
                                 # Text prompt input
@@ -353,7 +368,7 @@ class GradioUI():
                                     lines=2,
                                     max_length=340
                                 )
-
+                    with gr.Tab("AI Prompt Magic"):
                         with gr.Row():
                             prompt_magic_checkbox = gr.Checkbox(
                                 label="Enable Prompt Magic",
@@ -382,18 +397,20 @@ class GradioUI():
                 label=f"Get Credits to generate more {("(uncensored)" if self.config.feature_use_upload_for_age_check else "")} images",
                 open=False
             ):
-                with gr.Tab("Upload"):
+                with gr.Tab("Share Link",
+                            visible=(self.config.feature_sharing_links_enabled)):
                     # Share Links to get credits
                     if self.component_link_sharing_handler:
                         self.component_link_sharing_handler.create_interface_elements(user_session_storage)
 
-                with gr.Tab("Share Link"):
+                with gr.Tab("Upload Images",
+                            visible=(self.config.output_directory and self.config.feature_upload_images_for_new_token_enabled)):
                     # Upload to get credits
                     if self.component_upload_handler:
                         self.component_upload_handler.create_interface_elements(user_session_storage)
 
             # Examples row
-            with gr.Row(visible=len(self.examples) > 0):
+            with gr.Row(visible=len(self.examples) > 100):
                 with gr.Accordion("Examples", open=False):
                     # Examples
                     gr.Examples(
