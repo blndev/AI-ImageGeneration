@@ -135,8 +135,40 @@ class PromptRefiner():
             if b in ai_response:
                 logger.warning(f"bla detected: {ai_response}")
                 return prompt
-
+        
         return ai_response
+
+        # TODO preparation for further enhancements
+        # # as this function is used to validate that the user prompt which may contain explicit content is correctly 
+        # # translated into a text without explicit content
+        # messages = [
+        #     SystemMessage("""
+        #                   Your are an expert in identifing the main object in a description.
+        #                   Main objects are people, group of people, animals or buildings. Ignore if they are naked or clothed and any other details.
+        #                   If you compare descriptions, you first identify the main object.
+                          
+        #                   Answer with 'yes' if the main object is identical. Stope then. If not identical, answer 'not same', followed by the main object and a short reason.
+        #                   """),
+        #     # HumanMessage("Compare: #'a man in a business suite is working in an office'# \nand\n#'a man in an office'#"),
+        #     # AIMessage("yes, same. Reason: main object is a man"),
+        #     # HumanMessage("Compare: #'a man and a woman are naked in the pool'#\n and \n#'A couple wearing colorful swimwear while swimming in blue water'#"),
+        #     # AIMessage("yes, same. Reason: main object is a man and a woman"),
+        #     # HumanMessage("Compare: #'a boy in classroom writing a letter'#\n and \n#'A girl in classroom writing a letter'#"),
+        #     # AIMessage("not same. Reason: main object in one description is a boy in the other a girl."),
+        #     # HumanMessage("Compare: #'A naked woman on the beach'#\n and \n#'a woman wearing a bikini on the beach'#"),
+        #     # AIMessage("yes, same. Reason: main object is a woman. I ignore any details"),
+        #     # HumanMessage("Compare: #'A naked man'#\n and \n#'a man wearing pantys'#"),
+        #     # AIMessage("yes, same. Reason: main object is a man. I ignore any details"),
+        #     HumanMessage(f"Compare: #'{prompt}'#\n and \n#'{ai_response}'#"),
+        # ]
+        # ai_msg = self.llm.invoke(messages)
+        # # activate only for test runs
+        # print(f"Prompt: {prompt}\nAIMessage: {ai_response}\nDecision: {ai_msg.content}")
+        # if ai_msg.content.lower().startswith("yes"):
+        #     return ai_response
+        # else:
+        #     logger.debug(ai_msg.content)
+        #     return prompt
 
     def make_prompt_sfw(self, prompt: str, is_nsfw: bool = False) -> str:
         if not self.llm: return prompt
