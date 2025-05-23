@@ -24,7 +24,6 @@ class PromptRefiner():
         self.ollama_server = os.getenv("OLLAMA_SERVER", None)
 
         self.llm = None
-        # TODO: check that the model is existing by running test query. if that fails set sel.llm to None
         try:
             olc = Client(self.ollama_server)
             olc.pull(self.model)
