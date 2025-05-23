@@ -100,9 +100,9 @@ class UploadHandler:
         # now start with interface
         #with gr.Row(visible=(self.config.output_directory and self.config.feature_upload_images_for_new_token_enabled)):
         if not (self.config.output_directory and self.config.feature_upload_images_for_new_token_enabled): return
-        nsfw_msg = " and remove censorship by uploading explicit images" if self.config.feature_use_upload_for_age_check else ""
+        nsfw_msg = " and remove censorship by uploading explicit images!" if self.config.feature_use_upload_for_age_check else ""
         with gr.Row():
-            gr.Label("Get more image generation credits" + nsfw_msg, container=False, color="blue")
+            gr.Label("Get more image generation credits" + nsfw_msg, container=False)
         with gr.Row():
             with gr.Column(scale=2):
                 gr.Markdown(self.msg_share_image)

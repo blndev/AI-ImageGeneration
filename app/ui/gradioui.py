@@ -289,43 +289,54 @@ class GradioUI():
                 )
             # Input Values & Generate row
             with gr.Row():
-                with gr.Tab("Text"):
-                    with gr.Row():
+                with gr.Tabs() as generation_tabs:
+                    with gr.TabItem("Text") as tabText:
+                        with gr.Row():
 
-                        with gr.Column(scale=2):
-                            # Text prompt input
-                            prompt = gr.Textbox(
-                                label="What image you want to see?",
-                                info="Prompt",
-                                placeholder="Describe the image you want to generate...",
-                                value="",
-                                lines=3,
-                                max_length=340
+                            with gr.Column(scale=2):
+                                # Text prompt input
+                                prompt = gr.Textbox(
+                                    label="What image you want to see?",
+                                    info="Prompt",
+                                    placeholder="Describe the image you want to generate...",
+                                    value="",
+                                    lines=3,
+                                    max_length=340
+                                )
+                                # with gr.Column():
+
+                            # generate and token count
+                            with gr.Column():
+                                with gr.Group():
+                                    with gr.Row():  # visible=self.config.feature_generation_credits_enabled):
+                                        token_label = gr.Text(value="", container=True, show_label=False)
+                                    with gr.Row():
+
+                                        # Generate button that's interactive only when prompt has text
+                                        generate_btn = gr.Button(
+                                            "Start",
+                                            interactive=False
+                                        )
+                                        cancel_btn = gr.Button("Cancel", interactive=False, visible=False)
+                    with gr.TabItem("Assistant"):
+                        gr.Checkbox("Human")
+                    with gr.TabItem("Examples", visible=len(self.examples) > 0):
+                        def example_selected(self):
+                            #FIXME generation_tabs.selected = tabText #is not working in any variation
+                            gr.Info(
+                                message=f"Switch now back to the Tab '{tabText.label}' to generate this image.",
+                                title="Example selected"
                             )
-                            # with gr.Column():
 
-                        # generate and token count
-                        with gr.Column():
-                            with gr.Group():
-                                with gr.Row():  # visible=self.config.feature_generation_credits_enabled):
-                                    token_label = gr.Text(value="", container=True, show_label=False)
-                                with gr.Row():
+                        # Examples
+                        gr.Examples(
+                            examples=self.examples,
+                            fn=example_selected,
+                            run_on_click=True,
+                            inputs=[prompt],
+                            label="Click an example to load it"
+                        )
 
-                                    # Generate button that's interactive only when prompt has text
-                                    generate_btn = gr.Button(
-                                        "Start",
-                                        interactive=False
-                                    )
-                                    cancel_btn = gr.Button("Cancel", interactive=False, visible=False)
-                with gr.Tab("Assistant"):
-                    gr.Checkbox("Human")
-                with gr.Tab("Examples", visible=len(self.examples) > 0):
-                    # Examples
-                    gr.Examples(
-                        examples=self.examples,
-                        inputs=[prompt],
-                        label="Click an example to load it"
-                    )
             # Advanced row
             with gr.Row():
                 with gr.Accordion("Advanced generation Options", open=False):
