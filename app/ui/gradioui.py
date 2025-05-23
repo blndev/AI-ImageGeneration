@@ -11,7 +11,7 @@ from app.utils.singleton import singleton
 from app.generators import ModelConfig
 from ..analytics import Analytics
 import json
-from .components import UploadHandler, SessionManager, LinkSharingHandler, ImageGenerationHandler, FeedbackHandler
+from .components import UploadHandler, SessionManager, LinkSharingHandler, ImageGenerationHandler, FeedbackHandler, PromptAssistantHandler
 
 # Set up module logger
 logger = logging.getLogger(__name__)
@@ -71,6 +71,8 @@ class GradioUI():
                 config=self.config,
                 analytics=self.analytics
             )
+
+            self.component_prompt_assistant_handler = PromptAssistantHandler(analytics=self.analytics)
 
             # used to determine when to unload models etc
             self.app_last_image_generation = datetime.now()
@@ -289,7 +291,7 @@ class GradioUI():
                 )
             # Input Values & Generate row
             with gr.Row():
-                with gr.Tabs() as generation_tabs:
+                with gr.Tabs():
                     with gr.TabItem("Text") as tabText:
                         with gr.Row():
 
@@ -319,12 +321,13 @@ class GradioUI():
                                         )
                                         cancel_btn = gr.Button("Cancel", interactive=False, visible=False)
                     with gr.TabItem("Assistant"):
-                        gr.Checkbox("Human")
+                        self.component_prompt_assistant_handler.create_interface_elements()
+
                     with gr.TabItem("Examples", visible=len(self.examples) > 0):
                         def example_selected(self):
                             #FIXME generation_tabs.selected = tabText #is not working in any variation
                             gr.Info(
-                                message=f"Switch now back to the Tab '{tabText.label}' to generate this image.",
+                                message=f"Switch now back to the Tab '{tabText.label}' and click 'Start' to generate this image.",
                                 title="Example selected"
                             )
 
