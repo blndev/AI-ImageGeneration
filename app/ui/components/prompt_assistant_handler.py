@@ -22,6 +22,9 @@ class PromptAssistantHandler:
         self.analytics = analytics
         self.image_generator = image_generator
 
+        # helpers
+        self._human_style_objects = ["Human", "Robot", "Alien", "Fairy", "Woman", "Girl", "Man", "Boy"]
+
     def _load_ui_dependencies(self):
         """load configuration values for the ui from external sources or generate them"""
         try:
@@ -43,7 +46,7 @@ class PromptAssistantHandler:
                 gr.Markdown("Choose Main Object")
                 # chkFemale = gr.Checkbox(label="Female", value=True)
                 gr_image_object = gr.Dropdown(choices=["Human", "Fairy", "Alien", "Robot", "Dog", "Bird",
-                                                       "Cow", "Custom"], label="Main Object", interactive=True)
+                                                       "Cow", "Custom"], label="Main Object", interactive=True, allow_custom_value=True)
                 gr_txt_custom_object = gr.Textbox(
                     value="",
                     label="Custom Object",
@@ -55,73 +58,68 @@ class PromptAssistantHandler:
                                    step=10, label="Age", info="Choose the Age of that Object")
 
                 with gr.Group(visible=True) as human_details_group:
-                    gr_image_object.change(
-                        fn=lambda o: gr.Textbox(visible=(o == "Custom")),
-                        inputs=gr_image_object,
-                        outputs=gr_txt_custom_object
-                    ).then(
-                        fn=lambda o: gr.Group(visible=(o in ["Human", "Robot", "Alien"])),
-                        inputs=gr_image_object,
-                        outputs=human_details_group
-                    ).then(
-                        fn=lambda o: gr.Info("loctions = self.get_locations(object) # via llm or static config as fallback with caching!!!"),
-                        inputs=gr_image_object
-                    )
-    
-                    gr_gender = gr.Radio(["Female", "Male"], value="Female")
 
+                    gr_gender = gr.Radio(["Female", "Male"], value="Female")
+                    gr_body_details = gr.Dropdown(
+                        ["Random"],
+                        value=["Random"],
+                        multiselect=True, label="Body details", allow_custom_value=True,
+                        interactive=True
+                    )
                     gr_facial_expression = gr.Dropdown(
                         ["Smiling", "Neutral", "Angry", "Sad"],
                         value="Smiling",
-                        multiselect=False, label="Facial expression",
+                        multiselect=False, label="Facial expression", allow_custom_value=True,
                         interactive=True
                     )
                     gr_pose = gr.Dropdown(
                         ["Posing", "Sitting", "Walking", "Dynamic Pose"],
                         value="Posing",
-                        multiselect=False, label="Pose",
+                        multiselect=False, label="Pose", allow_custom_value=True,
                         interactive=True
                     )
                     gr_cloth = gr.Dropdown(
                         ["Shorts", "Tank Top", "Casual", "Swimwear", "Sunglasses"],
                         value=["Casual", "Sunglasses"],
-                        multiselect=True, label="Clothes",
+                        multiselect=True, label="Clothes", allow_custom_value=True,
                         interactive=True
                     )
-                # Ensure the female group is always visible
-                # chkFemale.change(fn=self.toggle_people_details_visibility, inputs=chkFemale, outputs=female_group)
-
-                # chkMale = gr.Checkbox(label="Male", value=False)
-                # with gr.Group() as male_group:
-                #     gr.Slider(interactive=True, minimum=5, maximum=80, value=25, step=10, label="Age", info="Choose the Age of that People")
-                #     gr.Dropdown(
-                #         ["Smiling", "Neutral", "Angry", "Sad"],
-                #         value="Smiling",
-                #         multiselect=False, label="Facial expression",
-                #         interactive=True
-                #     )
-                #     gr.Dropdown(
-                #         ["Standing", "Sitting", "Walking", "Dynamic Pose"],
-                #         value="Standing",
-                #         multiselect=False, label="Pose",
-                #         interactive=True
-                #     )
-                #     gr.Dropdown(
-                #         ["Casual", "Business dress", "Shorts", "Hat"],
-                #         value=["Business dress"],
-                #         multiselect=True, label="Clothes",
-                #         interactive=True
-                #     )
-                # chkMale.change(fn=self.toggle_people_details_visibility, inputs=chkMale, outputs=male_group)
 
             with gr.Column():
                 gr.Markdown("Environment")
                 gr_location = gr.Dropdown(
                     ["Random", "Home", "Backyard", "Forest", "Beach", "Castle", "Photo Studio"],
                     value="Random",
-                    multiselect=False, label="Location",
+                    multiselect=False, label="Location", allow_custom_value=True,
                     interactive=True
                 )
+
+        gr_image_object.change(
+            fn=lambda o: gr.Textbox(visible=(o == "Custom")),
+            inputs=gr_image_object,
+            outputs=gr_txt_custom_object
+        ).then(
+            fn=lambda o: gr.Group(visible=(o in self._human_style_objects)),
+            inputs=gr_image_object,
+            outputs=human_details_group
+        ).then(  # TODO move to dedicated function and use it also for other change handlers,
+            # TODO: add a caching for the combinations of g o a in a dict to prevent alwways regenerations
+            fn=lambda o, a, g: gr.Dropdown(choices=self.image_generator.prompt_refiner.create_list_of_x_for_y(
+                "cloths", self.image_generator.prompt_refiner.create_better_words_for(f"{g} {o} age {a}"))),
+            inputs=[gr_image_object, gr_age, gr_gender],
+            outputs=gr_cloth
+        ).then(
+            fn=lambda o, a, g: gr.Dropdown(choices=self.image_generator.prompt_refiner.create_list_of_x_for_y(
+                "locations", self.image_generator.prompt_refiner.create_better_words_for(f"{g} {o} age {a}"))),
+            inputs=[gr_image_object, gr_age, gr_gender],
+            outputs=gr_location
+        ).then(
+            fn=lambda o, a, g: gr.Dropdown(choices=self.image_generator.prompt_refiner.create_list_of_x_for_y(
+                "individual body details (examples:  green eyes, dark hair, tall, fat)", self.image_generator.prompt_refiner.create_better_words_for(f"{g} {o} age {a}"))),
+            inputs=[gr_image_object, gr_age, gr_gender],
+            outputs=gr_body_details
+        )
+
         with gr.Row():
             gr_button_create_image = gr.Button("Create Image", visible=True, interactive=True)
 
@@ -131,7 +129,7 @@ class PromptAssistantHandler:
             # TODO reference also aspect_ratio etc
             # IDEA: create_image should write the prompt to "assistant_prompt" (a hidden text field) and then call FIXME
             # the ui#_create_image from gradio_ui, that will solve aspect, gallery etc.
-            # TODO prompt magic prompt must be copied to standrad prompt field 
+            # TODO prompt magic prompt must be copied to standrad prompt field
             gr_button_create_image.click(
                 fn=self.create_image,
                 inputs=[
@@ -142,6 +140,7 @@ class PromptAssistantHandler:
                     gr_age,
                     gr_location,
                     gr_facial_expression,
+                    gr_body_details,
                     gr_pose,
                     gr_cloth],
                 outputs=[generated_image],
@@ -162,6 +161,7 @@ class PromptAssistantHandler:
             age,
             location,
             gr_facial_expression,
+            gr_body_details,
             gr_pose,
             gr_cloth,
             progress=gr.Progress()):
@@ -180,9 +180,17 @@ class PromptAssistantHandler:
             if age < 20: txtage = "young"
             if age < 10: txtage = "very young"
             humanprompt = ""
-            if txt_custom_object in ["Human", "Robot", "Alien", "Woman", "Girl", "Man", "Boy"]:
-                humanprompt = f"{gr_facial_expression} wearing {gr_cloth}, {gr_pose}"
-            prompt = f"photo of a {txtage} {gender} {txt_custom_object}, {humanprompt}, in {location} location"
+            if txt_custom_object in self._human_style_objects:
+                humanprompt = f"{gr_facial_expression} with {gr_body_details}, wearing {gr_cloth}, {gr_pose}"
+
+            # optimize wording
+            better_object = f"{txtage} {gender} {txt_custom_object}"
+            if self.image_generator.prompt_refiner:
+                better_object = self.image_generator.prompt_refiner.create_better_words_for(better_object)
+                # FIXME TODO: must be in change function to fill other elements
+                cloths = self.image_generator.prompt_refiner.create_list_of_x_for_y("cloths", better_object)
+                logger.warning(cloths)
+            prompt = f"photo of a {better_object}, {humanprompt}, in {location} location"
             logger.debug(f"Assistant Prompt: {prompt}")
             image, _, _ = self.image_generator.generate_images(
                 progress=progress,
