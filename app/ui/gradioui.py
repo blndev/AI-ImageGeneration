@@ -72,9 +72,13 @@ class GradioUI():
                 analytics=self.analytics
             )
 
-            self.component_prompt_assistant_handler = PromptAssistantHandler(analytics=self.analytics)
+            self.component_prompt_assistant_handler = PromptAssistantHandler(
+                analytics=self.analytics,
+                image_generator=self.component_image_generator
+            )
 
             # used to determine when to unload models etc
+            # TODO: needs to take generation via assistant into account, maybe move to image generator object as this is used for both
             self.app_last_image_generation = datetime.now()
 
             self.initialize_examples()
@@ -190,6 +194,7 @@ class GradioUI():
                 logger.error("Failed to record session activity: %s", str(e))
                 # Continue execution as this is not critical
 
+            # TODO: must be supported also for assistant based images, maybe add a optional parameter like "assistant_prompt" and then this function can be called
             if self.config.feature_generation_credits_enabled and session_state.token < image_count:
                 msg = f"Not enough generation credits available.\n\nPlease wait {self.config.new_token_wait_time} minutes"
                 if self.config.feature_upload_images_for_new_token_enabled:
@@ -321,7 +326,9 @@ class GradioUI():
                                         )
                                         cancel_btn = gr.Button("Cancel", interactive=False, visible=False)
                     with gr.TabItem("Assistant"):
-                        self.component_prompt_assistant_handler.create_interface_elements()
+                        self.component_prompt_assistant_handler.create_interface_elements(
+                            session_state=user_session_storage,
+                        )
 
                     with gr.TabItem("Examples", visible=len(self.examples) > 0):
                         def example_selected(self):
