@@ -40,7 +40,7 @@ class PromptAssistantHandler:
         self._load_ui_dependencies()
 
         with gr.Row():
-            gr.Markdown("This section helps you to create a prompt. Just select the elements you want to have in the image")
+            gr.Markdown("This section helps you to create an image. Just select the elements you want to have in the image")
         with gr.Row():
             with gr.Column():
                 gr.Markdown("Choose Main Object")
@@ -55,11 +55,11 @@ class PromptAssistantHandler:
                 )
 
                 gr_age = gr.Slider(interactive=True, minimum=5, maximum=85, value=25,
-                                   step=10, label="Age", info="Choose the Age of that Object")
+                                   step=8, label="Age", info="Choose the Age of that Object")
 
                 with gr.Group(visible=True) as human_details_group:
 
-                    gr_gender = gr.Radio(["Female", "Male"], value="Female")
+                    gr_gender = gr.Radio(["Female", "Male"], value="Female", label="Gender")
                     gr_body_details = gr.Dropdown(
                         ["Random"],
                         value=["Random"],
@@ -104,13 +104,14 @@ class PromptAssistantHandler:
             outputs=human_details_group
         ).then(  # TODO move to dedicated function and use it also for other change handlers,
             # TODO: add a caching for the combinations of g o a in a dict to prevent alwways regenerations
+            # TODO: keep selected values in the list
             fn=lambda o, a, g: gr.Dropdown(choices=self.image_generator.prompt_refiner.create_list_of_x_for_y(
-                "cloths", self.image_generator.prompt_refiner.create_better_words_for(f"{g} {o} age {a}"))),
+                "cloths weared", self.image_generator.prompt_refiner.create_better_words_for(f"{g} {o} age {a}"))),
             inputs=[gr_image_object, gr_age, gr_gender],
             outputs=gr_cloth
         ).then(
             fn=lambda o, a, g: gr.Dropdown(choices=self.image_generator.prompt_refiner.create_list_of_x_for_y(
-                "locations", self.image_generator.prompt_refiner.create_better_words_for(f"{g} {o} age {a}"))),
+                "locations", self.image_generator.prompt_refiner.create_better_words_for(f"{g} {o} age {a}"), element_count=20)),
             inputs=[gr_image_object, gr_age, gr_gender],
             outputs=gr_location
         ).then(

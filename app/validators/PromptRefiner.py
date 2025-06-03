@@ -292,7 +292,7 @@ Don't write any summary or explanation. If you can't fulfill the task, echo the 
         return better
 
     # TODO: unittests
-    def create_list_of_x_for_y(self, x: str, y: str, defaults: list[str] = ["random"]) -> list[str]:
+    def create_list_of_x_for_y(self, x: str, y: str, element_count: int = 10, defaults: list[str] = ["random"]) -> list[str]:
         result = defaults
         try:
             messages = [
@@ -302,7 +302,7 @@ Don't write any summary or explanation. If you can't fulfill the task, echo the 
                               """),
                 HumanMessage(f"create a list of 3 potential locations for a dog"),
                 AIMessage("Beach\nGarden\ndog basket"),
-                HumanMessage(f"create a list of 10 potential {x} for a {y}"),
+                HumanMessage(f"create a list of {element_count} potential {x} for a {y}"),
             ]
             ai_msg = self.llm_creative.invoke(messages)
             logger.debug(f"create_list_of_{x}_for_{y} results in '{ai_msg.content}'")
