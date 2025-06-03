@@ -51,8 +51,7 @@ class PromptAssistantHandler:
                     visible=False, interactive=True
                 )
 
-                gr_gender = gr.Radio(["Female", "Male"], value="Female")
-                gr_age = gr.Slider(interactive=True, minimum=5, maximum=80, value=25,
+                gr_age = gr.Slider(interactive=True, minimum=5, maximum=85, value=25,
                                    step=10, label="Age", info="Choose the Age of that Object")
 
                 with gr.Group(visible=True) as human_details_group:
@@ -61,24 +60,29 @@ class PromptAssistantHandler:
                         inputs=gr_image_object,
                         outputs=gr_txt_custom_object
                     ).then(
-                        fn=lambda o: gr.Group(visible=(o == "Human")),
+                        fn=lambda o: gr.Group(visible=(o in ["Human", "Robot", "Alien"])),
                         inputs=gr_image_object,
                         outputs=human_details_group
+                    ).then(
+                        fn=lambda o: gr.Info("loctions = self.get_locations(object) # via llm or static config as fallback with caching!!!"),
+                        inputs=gr_image_object
                     )
+    
+                    gr_gender = gr.Radio(["Female", "Male"], value="Female")
 
-                    gr.Dropdown(
+                    gr_facial_expression = gr.Dropdown(
                         ["Smiling", "Neutral", "Angry", "Sad"],
                         value="Smiling",
                         multiselect=False, label="Facial expression",
                         interactive=True
                     )
-                    gr.Dropdown(
+                    gr_pose = gr.Dropdown(
                         ["Posing", "Sitting", "Walking", "Dynamic Pose"],
                         value="Posing",
                         multiselect=False, label="Pose",
                         interactive=True
                     )
-                    gr.Dropdown(
+                    gr_cloth = gr.Dropdown(
                         ["Shorts", "Tank Top", "Casual", "Swimwear", "Sunglasses"],
                         value=["Casual", "Sunglasses"],
                         multiselect=True, label="Clothes",
@@ -112,18 +116,13 @@ class PromptAssistantHandler:
 
             with gr.Column():
                 gr.Markdown("Environment")
-                gr.Dropdown(
-                    ["Home", "Backyard", "Forest", "Beach", "Castle", "Photo Studio"],
-                    value="Photo Studio",
+                gr_location = gr.Dropdown(
+                    ["Random", "Home", "Backyard", "Forest", "Beach", "Castle", "Photo Studio"],
+                    value="Random",
                     multiselect=False, label="Location",
                     interactive=True
                 )
         with gr.Row():
-            gr_button_create_prompt = gr.Button("Create Prompt to edit manually", visible=True, interactive=True)
-            gr_button_create_prompt.click(
-                fn=lambda: gr.Info("To be implemented, but must copy teh prompt to txtPrompt")  # TODO
-            )
-
             gr_button_create_image = gr.Button("Create Image", visible=True, interactive=True)
 
         with gr.Row():
@@ -132,9 +131,19 @@ class PromptAssistantHandler:
             # TODO reference also aspect_ratio etc
             # IDEA: create_image should write the prompt to "assistant_prompt" (a hidden text field) and then call FIXME
             # the ui#_create_image from gradio_ui, that will solve aspect, gallery etc.
+            # TODO prompt magic prompt must be copied to standrad prompt field 
             gr_button_create_image.click(
                 fn=self.create_image,
-                inputs=[session_state, gr_image_object, gr_txt_custom_object, gr_gender, gr_age],
+                inputs=[
+                    session_state,
+                    gr_image_object,
+                    gr_txt_custom_object,
+                    gr_gender,
+                    gr_age,
+                    gr_location,
+                    gr_facial_expression,
+                    gr_pose,
+                    gr_cloth],
                 outputs=[generated_image],
                 concurrency_limit=None,
                 concurrency_id=""
@@ -144,7 +153,18 @@ class PromptAssistantHandler:
             #     outputs=[gr_button_create_image]
             # )
 
-    def create_image(self, gr_state, image_object, txt_custom_object, gender, age, progress=gr.Progress()):
+    def create_image(
+            self,
+            gr_state,
+            image_object,
+            txt_custom_object,
+            gender,
+            age,
+            location,
+            gr_facial_expression,
+            gr_pose,
+            gr_cloth,
+            progress=gr.Progress()):
         """
         Handle prompt creation
         """
@@ -159,14 +179,17 @@ class PromptAssistantHandler:
             if age < 30: txtage = "younger"
             if age < 20: txtage = "young"
             if age < 10: txtage = "very young"
-            prompt = f"prtfrvt photo of a {txtage} {gender} {txt_custom_object}"
+            humanprompt = ""
+            if txt_custom_object in ["Human", "Robot", "Alien", "Woman", "Girl", "Man", "Boy"]:
+                humanprompt = f"{gr_facial_expression} wearing {gr_cloth}, {gr_pose}"
+            prompt = f"photo of a {txtage} {gender} {txt_custom_object}, {humanprompt}, in {location} location"
             logger.debug(f"Assistant Prompt: {prompt}")
             image, _, _ = self.image_generator.generate_images(
                 progress=progress,
                 session_state=session_state,
                 prompt=prompt,
                 neg_prompt="",
-                aspect_ratio="1024x1024",
+                aspect_ratio="Square",
                 user_activated_promptmagic=True,  # always use prompt magic to make a nice prompt from such keywords
                 image_count=1  # TODO: get from external
             )

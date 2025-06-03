@@ -220,9 +220,9 @@ class ImageGenerationHandler:
             logger.warning(f"error while saving images: {e}")
 
     def _get_image_dimensions(self, aspect_ratio):
-        width, height = 512, 512  # fallback
+        width, height = self.selectedmodelconfig.aspect_ratio.values[0]  # fallback is teh first configured value
         for supported_ratio in self.selectedmodelconfig.aspect_ratio.keys():
-            if supported_ratio.lower() in aspect_ratio.lower():
+            if aspect_ratio.lower() in supported_ratio.lower():
                 ratio = self.selectedmodelconfig.aspect_ratio[supported_ratio]
                 width, height = ModelConfig.split_aspect_ratio(ratio)
                 break
