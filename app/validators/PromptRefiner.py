@@ -135,18 +135,18 @@ class PromptRefiner():
             if b in ai_response:
                 logger.warning(f"bla detected: {ai_response}")
                 return prompt
-        
+
         return ai_response
 
         # TODO preparation for further enhancements
-        # # as this function is used to validate that the user prompt which may contain explicit content is correctly 
+        # # as this function is used to validate that the user prompt which may contain explicit content is correctly
         # # translated into a text without explicit content
         # messages = [
         #     SystemMessage("""
         #                   Your are an expert in identifing the main object in a description.
         #                   Main objects are people, group of people, animals or buildings. Ignore if they are naked or clothed and any other details.
         #                   If you compare descriptions, you first identify the main object.
-                          
+
         #                   Answer with 'yes' if the main object is identical. Stope then. If not identical, answer 'not same', followed by the main object and a short reason.
         #                   """),
         #     # HumanMessage("Compare: #'a man in a business suite is working in an office'# \nand\n#'a man in an office'#"),
@@ -265,3 +265,49 @@ Don't write any summary or explanation. If you can't fulfill the task, echo the 
 
     def magic_shortener(self, prompt: str, max_words: int) -> str:
         return self._magic_prompt_tweaks(prompt=prompt, max_words=max_words, enhance=False)
+
+    # TODO: unittests
+    def create_better_words_for(self, words: str) -> str:
+        better = words
+        try:
+            messages = [
+                SystemMessage("""
+                              You are an helpful assistant to find better description for the user input.
+                              You always answer onyl with the new description.
+                              """),
+                HumanMessage("Average female Human"),
+                AIMessage("Woman"),
+                HumanMessage("young female Human"),
+                AIMessage("teenage girl"),
+                HumanMessage("very young femal human"),
+                AIMessage("child girl"),
+                HumanMessage(words),
+            ]
+            ai_msg = self.llm_creative.invoke(messages)
+            logger.debug(f"create_better_words_for '{words}' results in '{ai_msg.content}'")
+            better = ai_msg.content
+        except Exception as e:
+            logger.warning(f"Validation of PromptRefiner failed with {e}")
+
+        return better
+
+    # TODO: unittests
+    def create_list_of_x_for_y(self, x: str, y: str, defaults: list[str] = ["random"]) -> list[str]:
+        result = defaults
+        try:
+            messages = [
+                SystemMessage("""
+                              You are an helpful assistant.
+                              You always answer only with the requested output, one element per line without a number.
+                              """),
+                HumanMessage(f"create a list of 3 potential locations for a dog"),
+                AIMessage("Beach\nGarden\ndog basket"),
+                HumanMessage(f"create a list of 10 potential {x} for a {y}"),
+            ]
+            ai_msg = self.llm_creative.invoke(messages)
+            logger.debug(f"create_list_of_{x}_for_{y} results in '{ai_msg.content}'")
+            result = ai_msg.content.splitlines()
+        except Exception as e:
+            logger.warning(f"Validation of PromptRefiner failed with {e}")
+
+        return result
