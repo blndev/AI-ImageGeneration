@@ -187,9 +187,7 @@ class PromptAssistantHandler:
             better_object = f"{txtage} {gender} {txt_custom_object}"
             if self.image_generator.prompt_refiner:
                 better_object = self.image_generator.prompt_refiner.create_better_words_for(better_object)
-                # FIXME TODO: must be in change function to fill other elements
-                cloths = self.image_generator.prompt_refiner.create_list_of_x_for_y("cloths", better_object)
-                logger.warning(cloths)
+
             prompt = f"photo of a {better_object}, {humanprompt}, in {location} location"
             logger.debug(f"Assistant Prompt: {prompt}")
             image, _, _ = self.image_generator.generate_images(
