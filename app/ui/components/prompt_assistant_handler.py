@@ -1,4 +1,5 @@
 from datetime import datetime
+import json
 import os
 import gradio as gr
 import logging
@@ -18,18 +19,35 @@ class PromptAssistantHandler:
     Handler for user feedback functionality
     """
 
-    def __init__(self, analytics: Analytics, image_generator: ImageGenerationHandler):
+    def __init__(self, analytics: Analytics, config: AppConfig, image_generator: ImageGenerationHandler):
         self.analytics = analytics
+        self.config = config
         self.image_generator = image_generator
 
         # helpers
         self._human_style_objects = ["Human", "Robot", "Alien", "Fairy", "Woman", "Girl", "Man", "Boy"]
+        self._suggestions_cache = {}
+        self._initialize_database_assistant_suggestions()
+
+    def _initialize_database_assistant_suggestions(self):
+        self._created_images_data = {}
+
+        try:
+            # check maybe it's better to add the data folder as well
+            self.__suggestions_cache_path = os.path.join(self.config.output_directory, "assistant_suggestions.json")
+            if os.path.exists(self.__suggestions_cache_path):
+                with open(self.__suggestions_cache_path, "r") as f:
+                    self._suggestions_cache.update(json.load(f))
+            logger.info(f"Initialized assistant_suggestions from '{self.__suggestions_cache_path}'")
+        except Exception as e:
+            logger.error(f"Error while loading assistant_suggestions.json: {e}")
 
     def _load_ui_dependencies(self):
         """load configuration values for the ui from external sources or generate them"""
         try:
             # TODO: Place things like object and location here
-            self.feedback_message = ""
+
+            self._suggestions_cache
         except Exception as e:
             logger.error(f"Error while loading assistant dependencies: {e}")
 
@@ -37,7 +55,8 @@ class PromptAssistantHandler:
         return gr.Group(visible=is_checked)
 
     def _is_image_human_style(self, object_description):
-        # TODO replace with intelligence and use list as fallback
+        # check if the object description is pointing somehow to human style objects
+        # this is used to optimize the generated prompt and show ui details
         object_description = object_description.lower()
         value = object_description in self._human_style_objects \
             or "man" in object_description \
@@ -59,6 +78,7 @@ class PromptAssistantHandler:
 
         if self.image_generator.prompt_refiner:
             better = self.image_generator.prompt_refiner.create_better_words_for(f"{gender} {subject} age {age}")
+            better = better.replace("[", "")
             if not self._is_image_human_style(better):
                 better = f"{text_age} {subject}"
         else:
@@ -76,6 +96,55 @@ class PromptAssistantHandler:
             better = f"{text_age} {subject}"
 
         return better
+
+    def create_suggestions_for_assistant(self, main_object_of_image) -> tuple:
+        logger.debug(f"get suggestions for '{main_object_of_image}'")
+        cloths = []
+        locations = []
+        body_details = []
+        stereotypes = []
+        retVal = self.__create_suggestions_ui_retval(cloths, locations, body_details, stereotypes)
+
+        if main_object_of_image in self._suggestions_cache:
+            logger.warning("cache used")
+            o = self._suggestions_cache[main_object_of_image]
+            cloths = o["cloths"]
+            locations = o["locations"]
+            body_details = o["body_details"]
+            stereotypes = o["stereotypes"]
+            return self.__create_suggestions_ui_retval(cloths, locations, body_details, stereotypes)
+
+        if self.image_generator.prompt_refiner:
+            cloths = self.image_generator.prompt_refiner.create_list_of_x_for_y("cloths weared", main_object_of_image)
+            locations = self.image_generator.prompt_refiner.create_list_of_x_for_y("locations", main_object_of_image, element_count=20)
+            body_details = self.image_generator.prompt_refiner.create_list_of_x_for_y(
+                "well defined body details (examples:  green eyes, dark hair, tall, makeup, eyeliners)",
+                main_object_of_image)
+            stereotypes = self.image_generator.prompt_refiner.create_list_of_x_for_y("stereotypes, jobs or roles", main_object_of_image)
+            retVal = self.__create_suggestions_ui_retval(cloths, locations, body_details, stereotypes)
+            try:
+                # caching for the combinations of g o a in a dict to prevent always regenerations
+                # it can later also be used to offer suggestions without an llm
+                o = {}
+                o["cloths"] = cloths
+                o["locations"] = locations
+                o["body_details"] = body_details
+                o["stereotypes"] = stereotypes
+                self._suggestions_cache[main_object_of_image] = o
+                with open(self.__suggestions_cache_path, "w") as f:
+                    json.dump(self._suggestions_cache, f, indent=4)
+            except Exception as e:
+                logger.error(f"Error while saving {self.__suggestions_cache_path}: {e}")
+
+        return retVal
+
+    def __create_suggestions_ui_retval(self, cloths, locations, body_details, stereotypes):
+        retVal = (gr.Dropdown(value=[], choices=cloths),
+                  gr.Dropdown(value="", choices=locations),
+                  gr.Dropdown(value=[], choices=body_details),
+                  gr.Dropdown(value="", choices=stereotypes))
+
+        return retVal
 
     def _list_to_simple_string(self, source_list: list) -> str:
         string = ""
@@ -203,28 +272,10 @@ class PromptAssistantHandler:
             inputs=gr_txt_custom_object,
             outputs=human_details_group
         )
-        gr_button_update_suggestions.click(  # TODO move to dedicated function and use it also for other change handlers,
-            # TODO: add a caching for the combinations of g o a in a dict to prevent alwways regenerations
-            # TODO: keep selected values in the list
-            fn=lambda o: gr.Dropdown(value=[], choices=self.image_generator.prompt_refiner.create_list_of_x_for_y(
-                "cloths weared", o)),
+        gr_button_update_suggestions.click(
+            fn=self.create_suggestions_for_assistant,
             inputs=[gr_txt_custom_object],
-            outputs=gr_cloth
-        ).then(
-            fn=lambda o, current: gr.Dropdown(value=None, choices=self.image_generator.prompt_refiner.create_list_of_x_for_y(
-                "locations", o, element_count=20)),  # TODO .append(current)
-            inputs=[gr_txt_custom_object, gr_location],
-            outputs=gr_location
-        ).then(
-            fn=lambda o: gr.Dropdown(value=[], choices=self.image_generator.prompt_refiner.create_list_of_x_for_y(
-                "individual body details (examples:  green eyes, dark hair, tall, lipstick, eyeliners)", o)),
-            inputs=[gr_txt_custom_object],
-            outputs=gr_body_details
-        ).then(
-            fn=lambda o, current: gr.Dropdown(value=None, choices=self.image_generator.prompt_refiner.create_list_of_x_for_y(
-                "stereotypes or jobs", o)),  # TODO .append(current)
-            inputs=[gr_txt_custom_object, gr_stereotype],
-            outputs=gr_stereotype
+            outputs=[gr_cloth, gr_location, gr_body_details, gr_stereotype]
         )
 
         with gr.Row():
@@ -239,6 +290,10 @@ class PromptAssistantHandler:
             # the ui#_create_image from gradio_ui, that will solve aspect, gallery etc.
             # TODO prompt magic prompt must be copied to standrad prompt field
             gr_button_create_image.click(
+                fn=lambda: (gr.Button(interactive=False)),
+                inputs=[],
+                outputs=gr_button_create_image
+            ).then(
                 fn=self.create_image,
                 inputs=[
                     session_state,
@@ -253,11 +308,11 @@ class PromptAssistantHandler:
                 outputs=[generated_image],
                 concurrency_limit=None,
                 concurrency_id=""
-            )  # .then(
-            #     fn=lambda: (gr.Button(interactive=False)),
-            #     inputs=[],
-            #     outputs=[gr_button_create_image]
-            # )
+            ).then(
+                fn=lambda: (gr.Button(interactive=True)),
+                inputs=[],
+                outputs=gr_button_create_image
+            )
 
     def create_image(
             self,
@@ -296,9 +351,9 @@ class PromptAssistantHandler:
                 pose = ""
                 if gr_pose:
                     pose = f"while {gr_pose}"
-                humanprompt = f"{body} {face} {cloth} {stereotype}"
+                humanprompt = f"{body} {face} {cloth} {pose} {stereotype}"
             if location:
-                location = "in {location} location,"
+                location = f"in {location} location,"
             prompt = f"a {object_description} {location} {humanprompt}"
             # TODO refactor in dedicated function, load styles from files or modelconfig
             if "PopArt" in style: prompt = f"pop art collage style with red lipstick, comic style speech bubbles style: {prompt}"
@@ -315,7 +370,7 @@ class PromptAssistantHandler:
             elif "Cybernetic Human" in style: prompt = f"cybernetic style {prompt} . futuristic, technological, cybernetic enhancements, robotics, artificial intelligence themes"
             elif "Cybernetic Robot" in style: prompt = f"cybernetic robot {prompt} . android, AI, machine, metal, wires, tech, futuristic, highly detailed"
             elif "Painting" in style: prompt = f"impressionist painting {prompt} . loose brushwork, vibrant color, light and shadow play, captures feeling over form"
-            elif "Comic" in style: prompt = f"comic {prompt} . graphic illustration, comic art, graphic novel art, vibrant, highly detailed"
+            elif "Comic" in style: prompt = f"comic of {prompt} . graphic illustration, comic art, graphic novel art, vibrant, highly detailed"
             elif "{prompt}" in style: prompt = style.replace("{prompt}", prompt)
             else: prompt = f"{style} style: {prompt}"
 
