@@ -74,6 +74,7 @@ class GradioUI():
 
             self.component_prompt_assistant_handler = PromptAssistantHandler(
                 analytics=self.analytics,
+                config=self.config,
                 image_generator=self.component_image_generator
             )
 
@@ -328,7 +329,8 @@ class GradioUI():
                                         # Generate button that's interactive only when prompt has text
                                         generate_btn = gr.Button(
                                             "Start",
-                                            interactive=False
+                                            interactive=False,
+                                            variant="primary"
                                         )
                                         cancel_btn = gr.Button("Cancel", interactive=False, visible=False)
 
