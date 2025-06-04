@@ -289,7 +289,7 @@ class GradioUI():
             analytics_enabled=False
         ) as self.interface:
             user_session_storage = gr.BrowserState()  # do not initialize it with any value!!! this is used as default
-
+            gr_assistant_prompt = gr.Textbox(value=None, visible=False)
             with gr.Row():
                 gr.Label(
                     label="This App is made to test our AI System. It runs maximum of 2 days and as long as we have sponsored Hardware.",
@@ -299,8 +299,9 @@ class GradioUI():
             with gr.Row():
                 with gr.Tabs():
                     with gr.TabItem("Assistant"):
-                        self.component_prompt_assistant_handler.create_interface_elements(
+                        gr_assistant_create_image, gr_assistant_token_info = self.component_prompt_assistant_handler.create_interface_elements(
                             session_state=user_session_storage,
+                            assistant_prompt=gr_assistant_prompt
                         )
 
                     # TODO: move to generate Image UI
@@ -309,7 +310,7 @@ class GradioUI():
 
                             with gr.Column(scale=2):
                                 # Text prompt input
-                                prompt = gr.Textbox(
+                                gr_freestyle_prompt = gr.Textbox(
                                     label="What image you want to see?",
                                     info="Prompt",
                                     placeholder="Describe the image you want to generate...",
@@ -327,16 +328,15 @@ class GradioUI():
                                     with gr.Row():
 
                                         # Generate button that's interactive only when prompt has text
-                                        generate_btn = gr.Button(
+                                        gr_freestyle_generate_btn = gr.Button(
                                             "Start",
                                             interactive=False,
                                             variant="primary"
                                         )
-                                        cancel_btn = gr.Button("Cancel", interactive=False, visible=False)
 
                     with gr.TabItem("Examples", visible=len(self.examples) > 0):
                         def example_selected(self):
-                            #FIXME generation_tabs.selected = tabText #is not working in any variation
+                            # FIXME generation_tabs.selected = tabText #is not working in any variation
                             gr.Info(
                                 message=f"Switch now back to the Tab '{tabText.label}' and click 'Start' to generate this image.",
                                 title="Example selected"
@@ -347,7 +347,7 @@ class GradioUI():
                             examples=self.examples,
                             fn=example_selected,
                             run_on_click=True,
-                            inputs=[prompt],
+                            inputs=[gr_freestyle_prompt],
                             label="Click an example to load it"
                         )
 
@@ -355,45 +355,50 @@ class GradioUI():
             with gr.Row():
                 with gr.Accordion("Advanced generation Options", open=False):
                     with gr.Tab("Image"):
-                        with gr.Column(visible=True):
-                            with gr.Row():
-                                image_count = gr.Slider(
-                                    label="Amount of Images to create",
-                                    show_reset_button=False,
-                                    minimum=1,
-                                    maximum=int(self.selectedmodelconfig.generation.get("max_images", 2)),
-                                    value=1,
-                                    step=1,
-                                    scale=1
-                                )
-                            with gr.Row():
-                                # Aspect ratio selection
-                                ratios = []
-                                for k in self.selectedmodelconfig.aspect_ratio.keys():
-                                    ratios.append(k)
-                                if len(ratios) == 0:
-                                    ratios.append("default")
-                                aspect_ratio = gr.Radio(
-                                    # choices=["□ Square", "▤ Landscape", "▯ Portrait"],
-                                    choices=ratios,
-                                    value=ratios[0],
-                                    label="Aspect Ratio",
-                                    scale=1
-                                )
-                            # TODO: STyles
-                    with gr.Tab("Styles & Negative Prompt"):
+                        with gr.Row():
+                            with gr.Column(visible=True, scale=1):
+                                with gr.Row():
+                                    image_count = gr.Slider(
+                                        label="Amount of Images to create",
+                                        show_reset_button=False,
+                                        minimum=1,
+                                        maximum=int(self.selectedmodelconfig.generation.get("max_images", 2)),
+                                        value=1,
+                                        step=1,
+                                        scale=1
+                                    )
+                                with gr.Row():
+                                    # Aspect ratio selection
+                                    ratios = []
+                                    for k in self.selectedmodelconfig.aspect_ratio.keys():
+                                        ratios.append(k)
+                                    if len(ratios) == 0:
+                                        ratios.append("default")
+                                    aspect_ratio = gr.Radio(
+                                        # choices=["□ Square", "▤ Landscape", "▯ Portrait"],
+                                        choices=ratios,
+                                        value=ratios[0],
+                                        label="Aspect Ratio",
+                                        scale=1
+                                    )
+                            with gr.Column(visible=True, scale=3):
+                                gr.Markdown("more options will be added here soon.")
+
+                    with gr.Tab("Negative Prompt"):
                         with gr.Row():
                             with gr.Column(visible=True):
                                 # Text prompt input
+                                gr.Markdown("Write down what our generator should not create in the images:")
                                 neg_prompt = gr.Textbox(
                                     label="Negative Prompt, avoid the following Elements",
                                     placeholder="Describe what you don't want...",
                                     value="",
                                     scale=3,
                                     lines=2,
-                                    max_length=340
+                                    max_length=340,
+                                    container=False
                                 )
-                    with gr.Tab("AI Prompt Magic"):
+                    with gr.Tab("Prompt Magic"):
                         with gr.Row():
                             prompt_magic_checkbox = gr.Checkbox(
                                 label="Enable Prompt Magic",
@@ -434,16 +439,6 @@ class GradioUI():
                     if self.component_upload_handler:
                         self.component_upload_handler.create_interface_elements(user_session_storage)
 
-            # Examples row
-            with gr.Row(visible=len(self.examples) > 100):
-                with gr.Accordion("Examples", open=False):
-                    # Examples
-                    gr.Examples(
-                        examples=self.examples,
-                        inputs=[prompt, neg_prompt],
-                        label="Click an example to load it"
-                    )
-
             # Gallery row
             with gr.Row(height=800, max_height=1200):
                 # Gallery for displaying generated images
@@ -464,9 +459,9 @@ class GradioUI():
                 download_btn = gr.DownloadButton("Download", visible=False)
 
             # Feedback row
-            feedback_txt, feedback_button = None, None
+            feedback_txt = None
             if self.component_feedback_handler:
-                feedback_txt, feedback_button = self.component_feedback_handler.create_interface_elements(user_session_storage)
+                feedback_txt, _ = self.component_feedback_handler.create_interface_elements(user_session_storage)
 
             def update_token_info(gradio_state):
                 # logger.debug("local_storage changed: SessionState: %s", gradio_state)
@@ -477,12 +472,13 @@ class GradioUI():
                 n = ""
                 if self.config.feature_use_upload_for_age_check and ss.nsfw > 0:
                     n = f"(Uncensored: {ss.nsfw})"
-                return f"Amount of images you can generate: {token} {n}"
+                msg = f"Amount of images you can generate: {token} {n}"
+                return msg, msg
             user_session_storage.change(
                 # update the UI with current token count
                 fn=update_token_info,
                 inputs=[user_session_storage],
-                outputs=[token_label],
+                outputs=[token_label, gr_assistant_token_info],
                 concurrency_limit=None,
                 show_api=False,
                 show_progress=False
@@ -496,42 +492,29 @@ class GradioUI():
                 concurrency_id="check_token",
                 concurrency_limit=30
             )
-            # button_check_token.click(
-            #     fn=self.uiaction_timer_check_token,
-            #     inputs=[user_session_storage],
-            #     outputs=[user_session_storage],
-            #     concurrency_id="check_token",
-            # ).then(
-            #     # enable feedback again
-            #     fn=lambda: (sleep(2)),
-            #     inputs=[],
-            #     outputs=[feedback_txt]
-            # )
-
             # Make button interactive only when prompt has text
-            prompt.change(
+            gr_freestyle_prompt.change(
                 fn=lambda x: gr.Button(interactive=len(x.strip()) > 0),
-                inputs=[prompt],
-                outputs=[generate_btn]
+                inputs=[gr_freestyle_prompt],
+                outputs=[gr_freestyle_generate_btn]
             )
 
-            # Connect the generate button to the generate function and disable button and token timer while generation
-            generate_btn.click(
-                fn=lambda: (gr.Timer(active=False), gr.Button(interactive=False), gr.Button(interactive=True), gr.Gallery(preview=False)),
+            #it's an invisiblöe text field used to transport teh assistant prompt
+            gr_assistant_prompt.change(
+                fn=lambda: (gr.Timer(active=False), gr.Button(interactive=False), gr.Button(interactive=False)),
                 inputs=[],
-                outputs=[timer_check_token, generate_btn, cancel_btn, gallery],
+                outputs=[timer_check_token, gr_freestyle_generate_btn, gr_assistant_create_image],
             ).then(
                 fn=self.uiaction_generate_images,
-                inputs=[user_session_storage, prompt, aspect_ratio, neg_prompt, image_count, prompt_magic_checkbox],
+                inputs=[user_session_storage, gr_assistant_prompt, aspect_ratio, neg_prompt, image_count, prompt_magic_checkbox],
                 outputs=[gallery, user_session_storage, magic_prompt],
                 concurrency_id="gpu",
                 show_progress="full",
-                show_progress_on=token_label
+                show_progress_on=[token_label, gr_assistant_token_info]
             ).then(
-                fn=lambda: (gr.Timer(active=True), gr.Button(interactive=True),
-                            gr.Button(interactive=False), gr.Gallery(preview=False)),
+                fn=lambda: (gr.Timer(active=True), gr.Button(interactive=True)),
                 inputs=[],
-                outputs=[timer_check_token, generate_btn, cancel_btn, gallery]
+                outputs=[timer_check_token, gr_assistant_create_image]
             ).then(
                 # enable feedback again
                 fn=lambda: (gr.Textbox(interactive=True)),
@@ -539,16 +522,28 @@ class GradioUI():
                 outputs=[feedback_txt]
             )
 
-            stop_signal = gr.State(False)
-
-            def cancel_generation():
-                gr.close_all()
-                return True, gr.Button(interactive=True), gr.Button(interactive=False)
-
-            cancel_btn.click(
-                fn=cancel_generation,
+            # Connect the generate button to the generate function and disable button and token timer while generation
+            gr_freestyle_generate_btn.click(
+                fn=lambda: (gr.Timer(active=False), gr.Button(interactive=False), gr.Button(interactive=False), gr.Gallery(preview=False)),
                 inputs=[],
-                outputs=[stop_signal, generate_btn, cancel_btn]
+                outputs=[timer_check_token, gr_freestyle_generate_btn, gr_assistant_create_image, gallery],
+            ).then(
+                fn=self.uiaction_generate_images,
+                inputs=[user_session_storage, gr_freestyle_prompt, aspect_ratio, neg_prompt, image_count, prompt_magic_checkbox],
+                outputs=[gallery, user_session_storage, magic_prompt],
+                concurrency_id="gpu",
+                show_progress="full",
+                show_progress_on=token_label
+            ).then(
+                fn=lambda: (gr.Timer(active=True), gr.Button(interactive=True),
+                            gr.Button(interactive=True), gr.Gallery(preview=False)),
+                inputs=[],
+                outputs=[timer_check_token, gr_freestyle_generate_btn, gr_assistant_create_image, gallery]
+            ).then(
+                # enable feedback again
+                fn=lambda: (gr.Textbox(interactive=True)),
+                inputs=[],
+                outputs=[feedback_txt]
             )
 
             def prepare_download(selection: gr.SelectData):

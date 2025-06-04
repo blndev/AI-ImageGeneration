@@ -1,6 +1,7 @@
 from datetime import datetime
 import json
 import os
+import random
 import gradio as gr
 import logging
 from app import SessionState
@@ -106,7 +107,7 @@ class PromptAssistantHandler:
         retVal = self.__create_suggestions_ui_retval(cloths, locations, body_details, stereotypes)
 
         if main_object_of_image in self._suggestions_cache:
-            logger.warning("cache used")
+            logger.debug("cache used for suggestions")
             o = self._suggestions_cache[main_object_of_image]
             cloths = o["cloths"]
             locations = o["locations"]
@@ -152,80 +153,104 @@ class PromptAssistantHandler:
             string += f"{element},"
         return string
 
-    def create_interface_elements(self, session_state):
+    def create_interface_elements(self, session_state, assistant_prompt):
         self._load_ui_dependencies()
 
         with gr.Row():
-            gr.Markdown("""Our Assistanthelps you to create an image. 
+            gr.Markdown("""This Assistant helps you to create an image.
                         Just select the elements you want to have in the image, or write missing things into the fields.
-                        To get more precice output, deactivate Prompt Magic in the "Advanced" section.
+                        To get a more precice output, copy the generated prompt from Prompt Magic in the "Advanced"
+                        section into the free-style prompt box.
+                        Be aware that we make your prompts silent safe for work or censor unsafe content until *you* turn this protection off.
                         """)
         with gr.Row():
+            with gr.Column(scale=1):
+                with gr.Group(visible=True):
+                    gr.Markdown("Choose Main Object")
+                    # chkFemale = gr.Checkbox(label="Female", value=True)
+                    gr_image_object = gr.Dropdown(
+                        choices=["Human", "Fairy", "Alien", "Robot", "Dog", "Bird",
+                                 "Cow", "Unicorn"],
+                        label="Main Object",
+                        info="add anything you Imagine",
+                        interactive=True,
+                        allow_custom_value=True)
+                    # used as main input for the prompt and ai suggestions
+                    gr_txt_custom_object = gr.Textbox(
+                        value="",
+                        label="Optimized Object description (read only)",
+                        placeholder="",
+                        visible=False, interactive=False
+                    )
+
+                    gr_age = gr.Slider(
+                        interactive=True,
+                        minimum=1,
+                        maximum=100,
+                        value=25,
+                        step=2,
+                        label="Age",
+                        info="Choose the Age of that Object")
+
+                    gr_style = gr.Dropdown(
+                        ["Random",
+                            "Photo",
+                            "Full-Body Portrait",
+                            "Minimalistic",
+                            "Monochrome",
+                            "Tribal",
+                            "Futurism", "Cyperpunk", "Cybernetic Human", "Cybernetic Robot",
+                            "PopArt", "Comic",
+                            "Gothic", "Neon",
+                            "Painting",
+                            "Line Art",
+                            "Abstract drawing"],
+                        value="Random",
+                        multiselect=False,
+                        label="Style",
+                        info="You can add a whole style and using'{prompt}' as placeholder",
+                        allow_custom_value=True,
+                        interactive=True
+                    )
+
+            with gr.Column(scale=2):
+                with gr.Group(visible=True):
+                    gr.Markdown("Environment and Details")
+                    gr_location = gr.Dropdown(
+                        ["Random", "Home", "Backyard", "Forest", "Beach", "Castle", "Photo Studio", "Pizza Restaurant", "Moon"],
+                        value="Random",
+                        multiselect=False,
+                        label="Location",
+                        allow_custom_value=True,
+                        interactive=True
+                    )
+
+                    gr_body_details = gr.Dropdown(
+                        ["Random", "perfect Face", "blue Eyes", "red Lipstick", "intense Makeup"],
+                        value=["Random"],
+                        multiselect=True, label="Body details", allow_custom_value=True,
+                        interactive=True
+                    )
+
+                    gr_stereotype = gr.Dropdown(
+                        ["Developer", "Analyst", "CEO", "Doctor", "Nurse", "Wizzard", "Witch", "Teacher", "Student", "Schoolgirl"],
+                        value="",
+                        multiselect=False, label="Stereotype", allow_custom_value=True,
+                        interactive=True
+                    )
+
+                    gr_button_update_suggestions = gr.Button(
+                        value="Update suggestions for Environment and Details",
+                        visible=self.image_generator.prompt_refiner is not None,
+                        size="md",
+                    )
+            with gr.Column(scale=1):
+                with gr.Group():
+                    gr_token_info = gr.Text(value="", container=True, show_label=False)
+                    gr_button_create_image = gr.Button("Create Image", visible=True, interactive=True, variant="primary")
+
+        with gr.Row() as human_details_group:
             with gr.Column():
-                gr.Markdown("Choose Main Object")
-                # chkFemale = gr.Checkbox(label="Female", value=True)
-                gr_image_object = gr.Dropdown(
-                    choices=["Human", "Fairy", "Alien", "Robot", "Dog", "Bird",
-                             "Cow", "Custom"],
-                    label="Main Object",
-                    info="add anything you Imagine",
-                    interactive=True,
-                    allow_custom_value=True)
-                # used as main input for the prompt and ai suggestions
-                gr_txt_custom_object = gr.Textbox(
-                    value="",
-                    label="Optimized Object description (read only)",
-                    placeholder="",
-                    visible=False, interactive=False
-                )
-
-                gr_age = gr.Slider(interactive=True, minimum=1, maximum=100, value=25,
-                                   step=2, label="Age", info="Choose the Age of that Object")
-
-                gr_button_update_suggestions = gr.Button(
-                    value="Update suggestions for Location, Cloth and more",
-                    visible=self.image_generator.prompt_refiner is not None
-                )
-
-            with gr.Column():
-                gr.Markdown("Environment and Styles")
-                gr_location = gr.Dropdown(
-                    ["Random", "Home", "Backyard", "Forest", "Beach", "Castle", "Photo Studio", "Pizza Restaurant", "Moon"],
-                    value="Random",
-                    multiselect=False, label="Location", allow_custom_value=True,
-                    interactive=True
-                )
-                gr_style = gr.Dropdown(
-                    ["Random",
-                     "Photo",
-                     "Full-Body Portrait",
-                     "Minimalistic",
-                     "Monochrome",
-                     "Tribal",
-                     "Futurism", "Cyperpunk", "Cybernetic Human", "Cybernetic Robot",
-                     "PopArt", "Comic",
-                     "Gothic", "Neon",
-                     "Painting",
-                     "abstract expressionist"],
-                    value="Random",
-                    multiselect=False,
-                    label="Style",
-                    info="You can add a whole style and using'{prompt}' as placeholder",
-                    allow_custom_value=True,
-                    interactive=True
-                )
-
-        with gr.Row():
-
-            with gr.Group(visible=True) as human_details_group:
-
-                gr_gender = gr.Radio(["Female", "Male"], value="Female", label="Gender")
-                gr_body_details = gr.Dropdown(
-                    ["Random", "perfect Face", "blue Eyes", "red Lipstick", "intense Makeup"],
-                    value=["Random"],
-                    multiselect=True, label="Body details", allow_custom_value=True,
-                    interactive=True
-                )
                 gr_facial_expression = gr.Dropdown(
                     ["Smiling", "Neutral", "Angry", "Sad", "Shy", "Surprised"],
                     value="Smiling",
@@ -238,85 +263,79 @@ class PromptAssistantHandler:
                     multiselect=False, label="Pose or Action", allow_custom_value=True,
                     interactive=True
                 )
+            with gr.Column(scale=2):
                 gr_cloth = gr.Dropdown(
                     ["Shorts", "Tank Top", "Casual", "Swimwear", "Sunglasses", "no clothes"],
                     value=["Casual", "Sunglasses"],
                     multiselect=True, label="Wearing", allow_custom_value=True,
                     interactive=True
                 )
-                gr_stereotype = gr.Dropdown(
-                    ["Random", "Developer", "Analyst", "CEO", "Doctor", "Nurse", "Wizzard", "Witch", "Teacher", "Student", "Schoolgirl"],
-                    value="Random",
-                    multiselect=False, label="Stereotype", allow_custom_value=True,
-                    interactive=True
-                )
+            with gr.Column():
+                gr_gender = gr.Radio(["Female", "Male"], value="Female", label="Gender")
 
-        gr_age.change(
-            fn=self._create_better_words_for,
-            inputs=[gr_image_object, gr_age, gr_gender],
-            outputs=gr_txt_custom_object
-        )
-        gr_image_object.change(
-            fn=self._create_better_words_for,
-            inputs=[gr_image_object, gr_age, gr_gender],
-            outputs=gr_txt_custom_object
-        )
-        gr_gender.change(
-            fn=self._create_better_words_for,
-            inputs=[gr_image_object, gr_age, gr_gender],
-            outputs=gr_txt_custom_object
-        )
-
-        gr_txt_custom_object.change(
-            fn=lambda o: gr.Group(visible=(self._is_image_human_style(o))),
-            inputs=gr_txt_custom_object,
-            outputs=human_details_group
-        )
-        gr_button_update_suggestions.click(
-            fn=self.create_suggestions_for_assistant,
-            inputs=[gr_txt_custom_object],
-            outputs=[gr_cloth, gr_location, gr_body_details, gr_stereotype]
-        )
-
-        with gr.Row():
-            gr_button_create_image = gr.Button("Create Image (99 creating left, 3 uncensored)",
-                                               visible=True, interactive=True, variant="primary")
-            # TODO add token count same as in freestyle box
-        with gr.Row():
-            generated_image = gr.Image()  # TODO: just temporary until we get the gallery referenced
-
-            # TODO reference also aspect_ratio etc
-            # IDEA: create_image should write the prompt to "assistant_prompt" (a hidden text field) and then call FIXME
-            # the ui#_create_image from gradio_ui, that will solve aspect, gallery etc.
-            # TODO prompt magic prompt must be copied to standrad prompt field
-            gr_button_create_image.click(
-                fn=lambda: (gr.Button(interactive=False)),
-                inputs=[],
-                outputs=gr_button_create_image
-            ).then(
-                fn=self.create_image,
-                inputs=[
-                    session_state,
-                    gr_style,
-                    gr_txt_custom_object,
-                    gr_location,
-                    gr_facial_expression,
-                    gr_body_details,
-                    gr_pose,
-                    gr_stereotype,
-                    gr_cloth],
-                outputs=[generated_image],
-                concurrency_limit=None,
-                concurrency_id=""
-            ).then(
-                fn=lambda: (gr.Button(interactive=True)),
-                inputs=[],
-                outputs=gr_button_create_image
+            ################################################
+            # handle recreation of target object description
+            ################################################
+            gr_age.change(
+                fn=self._create_better_words_for,
+                inputs=[gr_image_object, gr_age, gr_gender],
+                outputs=gr_txt_custom_object
             )
+            gr_image_object.change(
+                fn=self._create_better_words_for,
+                inputs=[gr_image_object, gr_age, gr_gender],
+                outputs=gr_txt_custom_object
+            )
+            gr_gender.change(
+                fn=self._create_better_words_for,
+                inputs=[gr_image_object, gr_age, gr_gender],
+                outputs=gr_txt_custom_object
+            )
+
+            ################################################
+            # switch visibility of human specific properties
+            gr_txt_custom_object.change(
+                fn=lambda o: gr.Group(visible=(self._is_image_human_style(o))),
+                inputs=gr_txt_custom_object,
+                outputs=human_details_group
+            )
+
+            ######################################################################
+            # reload or regenerate all suggestions for location, body details etc.
+            gr_button_update_suggestions.click(
+                fn=self.create_suggestions_for_assistant,
+                inputs=[gr_txt_custom_object],
+                outputs=[gr_cloth, gr_location, gr_body_details, gr_stereotype]
+            )
+
+        ####################################################
+        # start of final event handlers
+        ####################################################
+        gr_button_create_image.click(
+            fn=lambda: (gr.Button(interactive=False)),
+            inputs=[],
+            outputs=gr_button_create_image
+        ).then(
+            fn=self.create_image,
+            inputs=[
+                gr_style,
+                gr_txt_custom_object,
+                gr_location,
+                gr_facial_expression,
+                gr_body_details,
+                gr_pose,
+                gr_stereotype,
+                gr_cloth],
+            outputs=[assistant_prompt],
+            concurrency_limit=None,
+            concurrency_id=""
+        )
+        # we need to return the button to deactivate him from external and the label which
+        # receives the token info and the generation status
+        return gr_button_create_image, gr_token_info
 
     def create_image(
             self,
-            gr_state: SessionState,
             style: str,
             object_description: str,
             location: str,
@@ -324,22 +343,15 @@ class PromptAssistantHandler:
             gr_body_details: list,
             gr_pose: str,
             stereotype: str,
-            gr_cloth: list,
-            progress=gr.Progress()):
+            gr_cloth: list
+    ):
         """
-        Handle prompt creation
+        Handle prompt creation and trigger image creation via assistant_prompt_change
         """
         # logger.debug(f"User Feedback from {session_state.session}: {text}")
         try:
-            session_state = SessionState.from_gradio_state(gr_state)
-
             humanprompt = ""
             if self._is_image_human_style(object_description):
-                body = ""
-                if gr_body_details is not None and len(gr_body_details) > 0:
-                    body = f"with {self._list_to_simple_string(gr_body_details)}"
-                if stereotype:
-                    stereotype = f"stereotype: {stereotype}"
                 face = ""
                 if gr_facial_expression and len(gr_facial_expression) > 0:
                     face = f"and prefect face with {gr_facial_expression} expression,"
@@ -351,16 +363,21 @@ class PromptAssistantHandler:
                 pose = ""
                 if gr_pose:
                     pose = f"while {gr_pose}"
-                humanprompt = f"{body} {face} {cloth} {pose} {stereotype}"
+                humanprompt = f"{face} {cloth} {pose}"
             if location:
                 location = f"in {location} location,"
-            prompt = f"a {object_description} {location} {humanprompt}"
+            if stereotype:
+                stereotype = f"stereotype: {stereotype}"
+            body = ""
+            if gr_body_details is not None and len(gr_body_details) > 0:
+                body = f"with {self._list_to_simple_string(gr_body_details)}"
+            prompt = f"a {object_description} {location} {body} {humanprompt} {stereotype}"
             # TODO refactor in dedicated function, load styles from files or modelconfig
             if "PopArt" in style: prompt = f"pop art collage style with red lipstick, comic style speech bubbles style: {prompt}"
-            elif "Photo" in style: prompt = f"iphone photo {prompt} . large depth of field, deep depth of field, highly detailed"
+            elif "Photo" in style: prompt = f"Professional photo {prompt} . large depth of field, deep depth of field, highly detailed"
             elif "Futurism" in style: prompt = f"futuristic cityscape, futurism: {prompt} . flying cars, dynamic lines and vibrant colors,"
             elif "Gothic" in style: prompt = f"gothic style {prompt} . dark, mysterious, haunting, dramatic, ornate, detailed"
-            elif "abstract expressionist" in style: prompt = f"abstract expressionist painting: {prompt} . energetic brushwork, bold colors, abstract forms, expressive, emotional"
+            elif "Abstract drawing" in style: prompt = f"abstract expressionist painting: {prompt} . energetic brushwork, bold colors, abstract forms, expressive, emotional"
             elif "Disco" in style: prompt = f"disco-themed {prompt} . vibrant, groovy, retro 70s style, shiny disco balls, neon lights, dance floor, highly detailed"
             elif "Minimalistic" in style: prompt = f"minimalist style {prompt} . simple, clean, uncluttered, modern, elegant"
             elif "Monochrome" in style: prompt = f"monochrome {prompt} . black and white, contrast, tone, texture, detailed"
@@ -371,20 +388,28 @@ class PromptAssistantHandler:
             elif "Cybernetic Robot" in style: prompt = f"cybernetic robot {prompt} . android, AI, machine, metal, wires, tech, futuristic, highly detailed"
             elif "Painting" in style: prompt = f"impressionist painting {prompt} . loose brushwork, vibrant color, light and shadow play, captures feeling over form"
             elif "Comic" in style: prompt = f"comic of {prompt} . graphic illustration, comic art, graphic novel art, vibrant, highly detailed"
+            elif "Line Art" in style: prompt = f"line art drawing {prompt} . professional, sleek, modern, minimalist, graphic, line art, vector graphics"
             elif "{prompt}" in style: prompt = style.replace("{prompt}", prompt)
             else: prompt = f"{style} style: {prompt}"
 
             logger.debug(f"Assistant Prompt: {prompt}")
-            image, _, _ = self.image_generator.generate_images(
-                progress=progress,
-                session_state=session_state,
-                prompt=prompt,
-                neg_prompt="",
-                aspect_ratio="Square",
-                user_activated_promptmagic=True,  # TODO get from prompt magic setting in advanced ui
-                image_count=1  # TODO: get from external
-            )
-            return image[0]
+            # image, _, _ = self.image_generator.generate_images(
+            #     progress=progress,
+            #     session_state=session_state,
+            #     prompt=prompt,
+            #     neg_prompt="",
+            #     aspect_ratio="Square",
+            #     user_activated_promptmagic=True,  # TODO get from prompt magic setting in advanced ui
+            #     image_count=1  # TODO: get from external
+            # )
+            # return image[0]
+
+            # trick to create a change event on the textbox, as the prompt is always struiped, we can add a random amount of spaces
+            spaces = ""
+            for _ in range(random.randint(1, 55)):
+                spaces += " "
+            # logger.warning(len(spaces))
+            return prompt + spaces
         except Exception as e:
             logger.error(f"Error creating assistant based image: {e}")
             gr.Error(e)
