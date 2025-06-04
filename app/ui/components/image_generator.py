@@ -1,4 +1,5 @@
 import os
+import random
 import gradio as gr
 import logging
 from app.generators import FluxGenerator, GenerationParameters, ModelConfig, StabelDiffusionGenerator
@@ -193,7 +194,7 @@ class ImageGenerationHandler:
             logger.debug("Apply Prompt-Magic")
             # refine prompt multiple times for better reults
             userprompt = prompt
-            for _ in range(3):
+            for _ in range(random.randrange(3)):
                 new_prompt = self.prompt_refiner.magic_enhance(prompt, 200)
                 if len(new_prompt) > len(prompt) or prompt == userprompt: prompt = new_prompt
             if session_state.nsfw <= self.MAX_NSFW_WARNINGS and not self.prompt_refiner.is_safe_for_work(prompt):
