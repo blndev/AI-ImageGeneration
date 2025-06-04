@@ -297,7 +297,13 @@ class GradioUI():
             # Input Values & Generate row
             with gr.Row():
                 with gr.Tabs():
-                    with gr.TabItem("Text") as tabText:
+                    with gr.TabItem("Assistant"):
+                        self.component_prompt_assistant_handler.create_interface_elements(
+                            session_state=user_session_storage,
+                        )
+
+                    # TODO: move to generate Image UI
+                    with gr.TabItem("Free style") as tabText:
                         with gr.Row():
 
                             with gr.Column(scale=2):
@@ -325,10 +331,6 @@ class GradioUI():
                                             interactive=False
                                         )
                                         cancel_btn = gr.Button("Cancel", interactive=False, visible=False)
-                    with gr.TabItem("Assistant"):
-                        self.component_prompt_assistant_handler.create_interface_elements(
-                            session_state=user_session_storage,
-                        )
 
                     with gr.TabItem("Examples", visible=len(self.examples) > 0):
                         def example_selected(self):
