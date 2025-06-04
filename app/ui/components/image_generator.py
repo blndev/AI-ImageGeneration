@@ -182,7 +182,7 @@ class ImageGenerationHandler:
             nsfw, _ = self.prompt_refiner.check_contains_nsfw(prompt)
             if nsfw:
                 if self.config.feature_use_upload_for_age_check and session_state.nsfw < self.MAX_NSFW_WARNINGS and not session_state.nsfw <= self.MAX_NSFW_WARNINGS * 2:
-                    gr.Info("""Explicit image generation preview is over and will now be blocked.
+                    gr.Info("""Preview for explicit image generation is over and explicit content will now be blocked.
                             You can get credits for uncensored images by uploading related images for our model training.
                             What you upload, you can create!""", duration=30)
                 logger.info(f"Convert NSFW prompt to SFW. User Prompt: '{prompt}'")
