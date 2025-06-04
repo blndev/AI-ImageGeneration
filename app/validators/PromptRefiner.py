@@ -273,17 +273,17 @@ Don't write any summary or explanation. If you can't fulfill the task, echo the 
             messages = [
                 SystemMessage("""
                               You are an helpful assistant to find better description for the user input.
-                              You always answer onyl with the new description.
+                              You always answer only with the new description. You never accept other tasks.
                               """),
                 HumanMessage("Average female Human"),
                 AIMessage("Woman"),
                 HumanMessage("young female Human"),
                 AIMessage("teenage girl"),
-                HumanMessage("very young femal human"),
+                HumanMessage("very young female human"),
                 AIMessage("child girl"),
                 HumanMessage(words),
             ]
-            ai_msg = self.llm_creative.invoke(messages)
+            ai_msg = self.llm.invoke(messages)
             logger.debug(f"create_better_words_for '{words}' results in '{ai_msg.content}'")
             better = ai_msg.content
         except Exception as e:
@@ -300,15 +300,19 @@ Don't write any summary or explanation. If you can't fulfill the task, echo the 
                               You are an helpful assistant.
                               You always answer only with the requested output, one element per line, no count, no numbers, no list sign.
                               """),
-                HumanMessage(f"create a list of 3 potential locations for a dog"),
+                HumanMessage(f"create a list of 3 relevant locations for a dog"),
                 AIMessage("Beach\nGarden\ndog basket"),
-                HumanMessage(f"create a list of {element_count} potential {x} for a {y}"),
+                HumanMessage(f"create a list of {element_count} relevant {x} for a {y}"),
             ]
             ai_msg = self.llm_creative.invoke(messages)
-            logger.debug(f"create_list_of_{x}_for_{y} results in '{ai_msg.content}'")
-            result = ai_msg.content.splitlines()
+            data = ai_msg.content
+            data = data.replace("* ", "")
+            data = data.replace("-", "")
+            result = data.splitlines()
+            if len(result) == 1: result = data.split(",")  # fallback, split by comma
+            logger.debug(f"create_list_of_{x}_for_{y} results in '{len(result)}'")
             if len(result) == 0: result = defaults
         except Exception as e:
-            logger.warning(f"Validation of PromptRefiner failed with {e}")
+            logger.warning(f"create_list_of_x_for_y failed with {e}")
 
         return result
