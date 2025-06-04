@@ -77,17 +77,31 @@ class PromptAssistantHandler:
 
         return better
 
+    def _list_to_simple_string(self, source_list: list) -> str:
+        string = ""
+        for element in source_list:
+            string += f"{element},"
+        return string
+
     def create_interface_elements(self, session_state):
         self._load_ui_dependencies()
 
         with gr.Row():
-            gr.Markdown("This section helps you to create an image. Just select the elements you want to have in the image")
+            gr.Markdown("""Our Assistanthelps you to create an image. 
+                        Just select the elements you want to have in the image, or write missing things into the fields.
+                        To get more precice output, deactivate Prompt Magic in the "Advanced" section.
+                        """)
         with gr.Row():
             with gr.Column():
                 gr.Markdown("Choose Main Object")
                 # chkFemale = gr.Checkbox(label="Female", value=True)
-                gr_image_object = gr.Dropdown(choices=["Human", "Fairy", "Alien", "Robot", "Dog", "Bird",
-                                                       "Cow", "Custom"], label="Main Object", interactive=True, allow_custom_value=True)
+                gr_image_object = gr.Dropdown(
+                    choices=["Human", "Fairy", "Alien", "Robot", "Dog", "Bird",
+                             "Cow", "Custom"],
+                    label="Main Object",
+                    info="add anything you Imagine",
+                    interactive=True,
+                    allow_custom_value=True)
                 # used as main input for the prompt and ai suggestions
                 gr_txt_custom_object = gr.Textbox(
                     value="",
@@ -104,40 +118,6 @@ class PromptAssistantHandler:
                     visible=self.image_generator.prompt_refiner is not None
                 )
 
-                with gr.Group(visible=True) as human_details_group:
-
-                    gr_gender = gr.Radio(["Female", "Male"], value="Female", label="Gender")
-                    gr_body_details = gr.Dropdown(
-                        ["Random", "perfect Face", "blue Eyes", "red Lipstick", "intense Makeup"],
-                        value=["Random"],
-                        multiselect=True, label="Body details", allow_custom_value=True,
-                        interactive=True
-                    )
-                    gr_facial_expression = gr.Dropdown(
-                        ["Smiling", "Neutral", "Angry", "Sad", "Shy"],
-                        value="Smiling",
-                        multiselect=False, label="Facial expression", allow_custom_value=True,
-                        interactive=True
-                    )
-                    gr_pose = gr.Dropdown(
-                        ["Posing", "Sitting", "Walking", "Dancing", "Eating"],
-                        value="Posing",
-                        multiselect=False, label="Pose or Action", allow_custom_value=True,
-                        interactive=True
-                    )
-                    gr_cloth = gr.Dropdown(
-                        ["Shorts", "Tank Top", "Casual", "Swimwear", "Sunglasses"],
-                        value=["Casual", "Sunglasses"],
-                        multiselect=True, label="Clothes", allow_custom_value=True,
-                        interactive=True
-                    )
-                    gr_stereotype = gr.Dropdown(
-                        ["Random", "Doctor", "Nurse", "Teacher", "Wizzard", "Student"],
-                        value="Random",
-                        multiselect=False, label="Stereotype", allow_custom_value=True,
-                        interactive=True
-                    )
-
             with gr.Column():
                 gr.Markdown("Environment and Styles")
                 gr_location = gr.Dropdown(
@@ -147,9 +127,58 @@ class PromptAssistantHandler:
                     interactive=True
                 )
                 gr_style = gr.Dropdown(
-                    ["Random", "Photo", "Full-Body Portrait", "Futurism", "PopArt", "Gothic", "Neon Style", "Painting"],
+                    ["Random",
+                     "Photo",
+                     "Full-Body Portrait",
+                     "Minimalistic",
+                     "Monochrome",
+                     "Tribal",
+                     "Futurism", "Cyperpunk", "Cybernetic Human", "Cybernetic Robot",
+                     "PopArt", "Comic",
+                     "Gothic", "Neon",
+                     "Painting",
+                     "abstract expressionist"],
                     value="Random",
-                    multiselect=False, label="Style", allow_custom_value=True,
+                    multiselect=False,
+                    label="Style",
+                    info="You can add a whole style and using'{prompt}' as placeholder",
+                    allow_custom_value=True,
+                    interactive=True
+                )
+
+        with gr.Row():
+
+            with gr.Group(visible=True) as human_details_group:
+
+                gr_gender = gr.Radio(["Female", "Male"], value="Female", label="Gender")
+                gr_body_details = gr.Dropdown(
+                    ["Random", "perfect Face", "blue Eyes", "red Lipstick", "intense Makeup"],
+                    value=["Random"],
+                    multiselect=True, label="Body details", allow_custom_value=True,
+                    interactive=True
+                )
+                gr_facial_expression = gr.Dropdown(
+                    ["Smiling", "Neutral", "Angry", "Sad", "Shy", "Surprised"],
+                    value="Smiling",
+                    multiselect=False, label="Facial expression", allow_custom_value=True,
+                    interactive=True
+                )
+                gr_pose = gr.Dropdown(
+                    ["Posing", "Sitting", "Walking", "Dancing", "Eating", "Watching"],
+                    value="Posing",
+                    multiselect=False, label="Pose or Action", allow_custom_value=True,
+                    interactive=True
+                )
+                gr_cloth = gr.Dropdown(
+                    ["Shorts", "Tank Top", "Casual", "Swimwear", "Sunglasses", "no clothes"],
+                    value=["Casual", "Sunglasses"],
+                    multiselect=True, label="Wearing", allow_custom_value=True,
+                    interactive=True
+                )
+                gr_stereotype = gr.Dropdown(
+                    ["Random", "Developer", "Analyst", "CEO", "Doctor", "Nurse", "Wizzard", "Witch", "Teacher", "Student", "Schoolgirl"],
+                    value="Random",
+                    multiselect=False, label="Stereotype", allow_custom_value=True,
                     interactive=True
                 )
 
@@ -199,7 +228,8 @@ class PromptAssistantHandler:
         )
 
         with gr.Row():
-            gr_button_create_image = gr.Button("Create Image", visible=True, interactive=True)
+            gr_button_create_image = gr.Button("Create Image (99 creating left, 3 uncensored)",
+                                               visible=True, interactive=True, variant="primary")
             # TODO add token count same as in freestyle box
         with gr.Row():
             generated_image = gr.Image()  # TODO: just temporary until we get the gallery referenced
@@ -231,15 +261,15 @@ class PromptAssistantHandler:
 
     def create_image(
             self,
-            gr_state,
-            style,
-            object_description,
-            location,
-            gr_facial_expression,
-            gr_body_details,
-            gr_pose,
-            stereotype,
-            gr_cloth,
+            gr_state: SessionState,
+            style: str,
+            object_description: str,
+            location: str,
+            gr_facial_expression: str,
+            gr_body_details: list,
+            gr_pose: str,
+            stereotype: str,
+            gr_cloth: list,
             progress=gr.Progress()):
         """
         Handle prompt creation
@@ -250,17 +280,45 @@ class PromptAssistantHandler:
 
             humanprompt = ""
             if self._is_image_human_style(object_description):
-                if gr_body_details and (len(gr_body_details) == 0 or "Random" in gr_body_details):
-                    gr_body_details = "random body details"
-                    if not stereotype: stereotype = "average"
-                humanprompt = f"{gr_facial_expression} with {gr_body_details} and prefect face, wearing {gr_cloth}, {gr_pose}, stereotype: {stereotype}"
+                body = ""
+                if gr_body_details is not None and len(gr_body_details) > 0:
+                    body = f"with {self._list_to_simple_string(gr_body_details)}"
+                if stereotype:
+                    stereotype = f"stereotype: {stereotype}"
+                face = ""
+                if gr_facial_expression and len(gr_facial_expression) > 0:
+                    face = f"and prefect face with {gr_facial_expression} expression,"
+                if gr_body_details and len(gr_body_details) > 0:
+                    body = f"with {self._list_to_simple_string(gr_body_details)}"
 
+                cloth = f"wearing {self._list_to_simple_string(gr_cloth)}" if len(gr_cloth) > 0 else ""
+
+                pose = ""
+                if gr_pose:
+                    pose = f"while {gr_pose}"
+                humanprompt = f"{body} {face} {cloth} {stereotype}"
+            if location:
+                location = "in {location} location,"
+            prompt = f"a {object_description} {location} {humanprompt}"
             # TODO refactor in dedicated function, load styles from files or modelconfig
-            if style == "PopArt": style = "pop art collage style with red lipstick, comic style speech bubbles"
-            if style == "Futurism": style = "futuristic cityscape, flying cars, dynamic lines and vibrant colors, futurism"
-            if style == "Gothic": style = "Gothic scene, ornate cathedral, eerie colored light, dark hair, black velvet, dark gemstones, dark smoky eyes and deep red lipstick"
+            if "PopArt" in style: prompt = f"pop art collage style with red lipstick, comic style speech bubbles style: {prompt}"
+            elif "Photo" in style: prompt = f"iphone photo {prompt} . large depth of field, deep depth of field, highly detailed"
+            elif "Futurism" in style: prompt = f"futuristic cityscape, futurism: {prompt} . flying cars, dynamic lines and vibrant colors,"
+            elif "Gothic" in style: prompt = f"gothic style {prompt} . dark, mysterious, haunting, dramatic, ornate, detailed"
+            elif "abstract expressionist" in style: prompt = f"abstract expressionist painting: {prompt} . energetic brushwork, bold colors, abstract forms, expressive, emotional"
+            elif "Disco" in style: prompt = f"disco-themed {prompt} . vibrant, groovy, retro 70s style, shiny disco balls, neon lights, dance floor, highly detailed"
+            elif "Minimalistic" in style: prompt = f"minimalist style {prompt} . simple, clean, uncluttered, modern, elegant"
+            elif "Monochrome" in style: prompt = f"monochrome {prompt} . black and white, contrast, tone, texture, detailed"
+            elif "Tribal" in style: prompt = f"tribal style {prompt} . indigenous, ethnic, traditional patterns, bold, natural colors, highly detailed"
+            elif "Neon" in style: prompt = f"neon noir {prompt} . cyberpunk, dark, rainy streets, neon signs, high contrast, low light, vibrant, highly detailed"
+            elif "Cyberpunk" in style: prompt = f"biomechanical cyberpunk {prompt} . cybernetics, human-machine fusion, dystopian, organic meets artificial, dark, intricate, highly detailed"
+            elif "Cybernetic Human" in style: prompt = f"cybernetic style {prompt} . futuristic, technological, cybernetic enhancements, robotics, artificial intelligence themes"
+            elif "Cybernetic Robot" in style: prompt = f"cybernetic robot {prompt} . android, AI, machine, metal, wires, tech, futuristic, highly detailed"
+            elif "Painting" in style: prompt = f"impressionist painting {prompt} . loose brushwork, vibrant color, light and shadow play, captures feeling over form"
+            elif "Comic" in style: prompt = f"comic {prompt} . graphic illustration, comic art, graphic novel art, vibrant, highly detailed"
+            elif "{prompt}" in style: prompt = style.replace("{prompt}", prompt)
+            else: prompt = f"{style} style: {prompt}"
 
-            prompt = f"{style} style: a {object_description}, {humanprompt}, in {location} location"
             logger.debug(f"Assistant Prompt: {prompt}")
             image, _, _ = self.image_generator.generate_images(
                 progress=progress,
