@@ -298,7 +298,7 @@ Don't write any summary or explanation. If you can't fulfill the task, echo the 
             messages = [
                 SystemMessage("""
                               You are an helpful assistant.
-                              You always answer only with the requested output, one element per line without a number.
+                              You always answer only with the requested output, one element per line, no count, no numbers, no list sign.
                               """),
                 HumanMessage(f"create a list of 3 potential locations for a dog"),
                 AIMessage("Beach\nGarden\ndog basket"),
@@ -307,6 +307,7 @@ Don't write any summary or explanation. If you can't fulfill the task, echo the 
             ai_msg = self.llm_creative.invoke(messages)
             logger.debug(f"create_list_of_{x}_for_{y} results in '{ai_msg.content}'")
             result = ai_msg.content.splitlines()
+            if len(result) == 0: result = defaults
         except Exception as e:
             logger.warning(f"Validation of PromptRefiner failed with {e}")
 
