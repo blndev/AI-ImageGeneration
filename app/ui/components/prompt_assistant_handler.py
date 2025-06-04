@@ -177,7 +177,7 @@ class PromptAssistantHandler:
                         allow_custom_value=True)
                     # used as main input for the prompt and ai suggestions
                     gr_txt_custom_object = gr.Textbox(
-                        value="",
+                        value="25 yearl old woman", # based on defaults of the other controls
                         label="Optimized Object description (read only)",
                         placeholder="",
                         visible=False, interactive=False
