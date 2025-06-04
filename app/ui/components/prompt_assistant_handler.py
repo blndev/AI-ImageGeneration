@@ -108,21 +108,21 @@ class PromptAssistantHandler:
 
                     gr_gender = gr.Radio(["Female", "Male"], value="Female", label="Gender")
                     gr_body_details = gr.Dropdown(
-                        ["Random"],
+                        ["Random", "perfect Face", "blue Eyes", "red Lipstick", "intense Makeup"],
                         value=["Random"],
                         multiselect=True, label="Body details", allow_custom_value=True,
                         interactive=True
                     )
                     gr_facial_expression = gr.Dropdown(
-                        ["Smiling", "Neutral", "Angry", "Sad"],
+                        ["Smiling", "Neutral", "Angry", "Sad", "Shy"],
                         value="Smiling",
                         multiselect=False, label="Facial expression", allow_custom_value=True,
                         interactive=True
                     )
                     gr_pose = gr.Dropdown(
-                        ["Posing", "Sitting", "Walking", "Dancing"],
+                        ["Posing", "Sitting", "Walking", "Dancing", "Eating"],
                         value="Posing",
-                        multiselect=False, label="Pose", allow_custom_value=True,
+                        multiselect=False, label="Pose or Action", allow_custom_value=True,
                         interactive=True
                     )
                     gr_cloth = gr.Dropdown(
@@ -132,22 +132,22 @@ class PromptAssistantHandler:
                         interactive=True
                     )
                     gr_stereotype = gr.Dropdown(
-                        ["Random", "Doctor", "Nurse", "Teacher"],
+                        ["Random", "Doctor", "Nurse", "Teacher", "Wizzard", "Student"],
                         value="Random",
-                        multiselect=False, label="Job / Stereotype", allow_custom_value=True,
+                        multiselect=False, label="Stereotype", allow_custom_value=True,
                         interactive=True
                     )
 
             with gr.Column():
                 gr.Markdown("Environment and Styles")
                 gr_location = gr.Dropdown(
-                    ["Random", "Home", "Backyard", "Forest", "Beach", "Castle", "Photo Studio"],
+                    ["Random", "Home", "Backyard", "Forest", "Beach", "Castle", "Photo Studio", "Pizza Restaurant", "Moon"],
                     value="Random",
                     multiselect=False, label="Location", allow_custom_value=True,
                     interactive=True
                 )
                 gr_style = gr.Dropdown(
-                    ["Random", "Photo", "Futurism", "PopArt", "Gothic", "Neon Style", "Painting"],
+                    ["Random", "Photo", "Full-Body Portrait", "Futurism", "PopArt", "Gothic", "Neon Style", "Painting"],
                     value="Random",
                     multiselect=False, label="Style", allow_custom_value=True,
                     interactive=True
@@ -188,7 +188,7 @@ class PromptAssistantHandler:
             outputs=gr_location
         ).then(
             fn=lambda o: gr.Dropdown(value=[], choices=self.image_generator.prompt_refiner.create_list_of_x_for_y(
-                "individual body details (examples:  green eyes, dark hair, tall, fat)", o)),
+                "individual body details (examples:  green eyes, dark hair, tall, lipstick, eyeliners)", o)),
             inputs=[gr_txt_custom_object],
             outputs=gr_body_details
         ).then(
@@ -252,6 +252,7 @@ class PromptAssistantHandler:
             if self._is_image_human_style(object_description):
                 if gr_body_details and (len(gr_body_details) == 0 or "Random" in gr_body_details):
                     gr_body_details = "random body details"
+                    if not stereotype: stereotype = "average"
                 humanprompt = f"{gr_facial_expression} with {gr_body_details} and prefect face, wearing {gr_cloth}, {gr_pose}, stereotype: {stereotype}"
 
             # TODO refactor in dedicated function, load styles from files or modelconfig
@@ -267,7 +268,7 @@ class PromptAssistantHandler:
                 prompt=prompt,
                 neg_prompt="",
                 aspect_ratio="Square",
-                user_activated_promptmagic=True,  # always use prompt magic to make a nice prompt from such keywords
+                user_activated_promptmagic=True,  # TODO get from prompt magic setting in advanced ui
                 image_count=1  # TODO: get from external
             )
             return image[0]
