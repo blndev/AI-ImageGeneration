@@ -214,7 +214,6 @@ class GradioUI():
 
             analytics_image_creation_duration_start_time = self.analytics.start_image_creation_timer()
             session_state.save_last_generation_activity()
-            shared_reference_key = None
 
             if self.component_link_sharing_handler:
                 try:
@@ -441,10 +440,16 @@ class GradioUI():
                     show_share_button=False,
                     show_download_button=True,
                     format="jpeg",
-                    columns=int(self.selectedmodelconfig.generation.get("max_images", 2)),
-                    rows=None,
+                    columns=1,
+                    rows=None, # dynamic linked to image count slider
                     height="800px",
                     object_fit="cover"
+                )
+                # optimize space for displayed images
+                image_count.change(
+                    fn=lambda v: gr.Gallery(columns=v),
+                    inputs=[image_count],
+                    outputs=[gallery]
                 )
 
             # Download Button
