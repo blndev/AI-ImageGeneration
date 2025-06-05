@@ -72,7 +72,7 @@ class AnalyticsDataGenerator:
                 content=content,
                 reference=reference
             )
-            
+            self.analytics.record_prompt_usage(True, True)
             # Stop timer
             self.analytics.stop_image_creation_timer(start_time)
             
@@ -106,5 +106,8 @@ class AnalyticsDataGenerator:
                 time.sleep(5)
 
 if __name__ == "__main__":
+    #analytics = Analytics()
+    #analytics.record_prompt_usage(True, True)
+    #input("ha")
     generator = AnalyticsDataGenerator()
     generator.run()

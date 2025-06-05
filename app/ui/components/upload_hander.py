@@ -98,7 +98,7 @@ class UploadHandler:
         if not self.config.feature_upload_images_for_new_token_enabled: return
         self.load_components()
         # now start with interface
-        #with gr.Row(visible=(self.config.output_directory and self.config.feature_upload_images_for_new_token_enabled)):
+        # with gr.Row(visible=(self.config.output_directory and self.config.feature_upload_images_for_new_token_enabled)):
         if not (self.config.output_directory and self.config.feature_upload_images_for_new_token_enabled): return
         nsfw_msg = " and remove censorship by uploading explicit images!" if self.config.feature_use_upload_for_age_check else ""
         with gr.Row():
@@ -156,7 +156,7 @@ class UploadHandler:
                 return gr.Button(interactive=True)
 
             dir = self.config.output_directory
-            #dir = os.path.join(dir, get_date_subfolder(), "upload")
+            # dir = os.path.join(dir, get_date_subfolder(), "upload")
             dir = os.path.join(dir, "upload")
             targetpath = os.path.join(dir, str(session_state.session) + '_' + image_sha1 + "_" + filename)
             # copy file from source to outdir
@@ -167,7 +167,7 @@ class UploadHandler:
             logger.error(f"save image failed: {e}")
         return gr.Button(interactive=True)
 
-    def _handle_token_generation(self, gradio_state: str, image_path):
+    def _handle_token_generation(self, request: gr.Request, gradio_state: str, image_path):
         """
         Handle token generation for image upload
         """
@@ -182,6 +182,7 @@ class UploadHandler:
             image = Image.open(image_path)
             logger.info(f"Analyze upload to receive credits from {session_state.session}")
             token = self.config.feature_upload_images_token_reward
+            analytics_detected_content = "safe"
             msg = ""
             image_sha1 = sha1(image.tobytes()).hexdigest()
             already_used = self._uploaded_images_data.get(image_sha1)
@@ -189,6 +190,7 @@ class UploadHandler:
                 msg = """The image signature matches a previous submission, so the full credit reward isn't possible.
                 We’re awarding you 5 credits as a thank you for your involvement."""
                 token = 5
+                analytics_detected_content = "repeat"
                 if already_used.get(session_state.session):
                     msg = "You've already submitted this image, and it won't generate any credits."
                     token = 0
@@ -197,11 +199,13 @@ class UploadHandler:
             elif self._created_images_data.get(image_sha1):
                 msg = "This image is already known, and it won't generate any credits."
                 token = 0
+                analytics_detected_content = "generated"
                 # gr.Warning(msg, title="Upload failed")
                 # return session_state, gr.Button(interactive=False), None
             elif (image.width <= 768 and image.height <= 768) or (image.width <= 512 or image.height <= 512):
                 msg = "This image is too small to be used for training of our generator. Please use a resolution with more then 768x768 to get more credits."
                 token = 1
+                analytics_detected_content = "to_small"
             else:
                 # prepare upload state, will be adapted later
                 self._uploaded_images_data[image_sha1] = {session_state.session: {"token": token, "msg": ""}}
@@ -214,12 +218,13 @@ class UploadHandler:
                         msg = "Image probably AI generated"
                         logger.info(msg + " Reason: " + reason)
                         token = 1
+                        analytics_detected_content = "ai"
                     elif len(faces) == 0:
                         msg = """No face detected in the image. Could happen that the face is to narrow or the resolution is too low.
                                 Try another pictrue to get more credits!"""
                         token = 5
                         logger.debug(f"No Face detected on image {image_sha1} from {session_state.session}")
-
+                        analytics_detected_content = "no_face"
                     else:
                         # prepare for auto removal of critical images
                         logger.debug(f"{len(faces)} Face(s) detected on upload from {session_state.session}")
@@ -240,8 +245,12 @@ class UploadHandler:
                             logger.info(f"Upload NSFW check: {nsfw_result.category}")
                             if session_state.nsfw < 0: session_state.nsfw = 0
                             nsfwtoken = token // 2
-                            if nsfw_result.category == NSFWCategory.EXPLICIT: nsfwtoken = token - 2
-                            if nsfw_result.category == NSFWCategory.SUGGESTIVE: nsfwtoken = 3
+                            if nsfw_result.category == NSFWCategory.EXPLICIT:
+                                nsfwtoken = token - 2
+                                analytics_detected_content = "explicit"
+                            if nsfw_result.category == NSFWCategory.SUGGESTIVE:
+                                nsfwtoken = 3
+                                analytics_detected_content = "suggestive"
 
                             # token += nsfwtoken
                             session_state.nsfw += nsfwtoken
@@ -251,6 +260,12 @@ class UploadHandler:
                     logger.error(f"Error while analyzing uploaded image: {e}")
 
             if (token > 0):
+                self.analytics.record_new_upload(
+                    content=analytics_detected_content,
+                    user_agent=request.headers["user-agent"],
+                    languages=request.headers["accept-language"]
+                )
+
                 session_state.token += token
                 logger.info(f"Received token for upload: {token} - {msg}")
                 if msg != "":

@@ -46,9 +46,7 @@ class PromptAssistantHandler:
     def _load_ui_dependencies(self):
         """load configuration values for the ui from external sources or generate them"""
         try:
-            # TODO: Place things like object and location here
-
-            self._suggestions_cache
+            pass
         except Exception as e:
             logger.error(f"Error while loading assistant dependencies: {e}")
 
@@ -218,7 +216,7 @@ class PromptAssistantHandler:
                     gr.Markdown("Environment and Details")
                     gr_location = gr.Dropdown(
                         ["Random", "Home", "Backyard", "Forest", "Beach", "Castle", "Photo Studio", "Pizza Restaurant", "Moon"],
-                        value="Random",
+                        value="",
                         multiselect=False,
                         label="Location",
                         allow_custom_value=True,
@@ -226,8 +224,8 @@ class PromptAssistantHandler:
                     )
 
                     gr_body_details = gr.Dropdown(
-                        ["Random", "perfect Face", "blue Eyes", "red Lipstick", "intense Makeup"],
-                        value=["Random"],
+                        ["red Hair", "curly Hair", "perfect Face", "blue Eyes", "red Lipstick", "intense Makeup"],
+                        value=[],
                         multiselect=True, label="Body details", allow_custom_value=True,
                         interactive=True
                     )
@@ -372,7 +370,8 @@ class PromptAssistantHandler:
             if gr_body_details is not None and len(gr_body_details) > 0:
                 body = f"with {self._list_to_simple_string(gr_body_details)}"
             prompt = f"a {object_description} {location} {body} {humanprompt} {stereotype}"
-            # TODO refactor in dedicated function, load styles from files or modelconfig
+
+            # TODO Vx - IDEA place styles in dedicated function, load styles from files or modelconfig 
             if "PopArt" in style: prompt = f"pop art collage style with red lipstick, comic style speech bubbles style: {prompt}"
             elif "Photo" in style: prompt = f"Professional photo {prompt} . large depth of field, deep depth of field, highly detailed"
             elif "Futurism" in style: prompt = f"futuristic cityscape, futurism: {prompt} . flying cars, dynamic lines and vibrant colors,"
@@ -393,16 +392,6 @@ class PromptAssistantHandler:
             else: prompt = f"{style} style: {prompt}"
 
             logger.debug(f"Assistant Prompt: {prompt}")
-            # image, _, _ = self.image_generator.generate_images(
-            #     progress=progress,
-            #     session_state=session_state,
-            #     prompt=prompt,
-            #     neg_prompt="",
-            #     aspect_ratio="Square",
-            #     user_activated_promptmagic=True,  # TODO get from prompt magic setting in advanced ui
-            #     image_count=1  # TODO: get from external
-            # )
-            # return image[0]
 
             # trick to create a change event on the textbox, as the prompt is always struiped, we can add a random amount of spaces
             spaces = ""

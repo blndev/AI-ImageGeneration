@@ -79,7 +79,6 @@ class GradioUI():
             )
 
             # used to determine when to unload models etc
-            # TODO: needs to take generation via assistant into account, maybe move to image generator object as this is used for both
             self.app_last_image_generation = datetime.now()
 
             self.initialize_examples()
@@ -149,10 +148,16 @@ class GradioUI():
         logger.info("Session - %s - initialized with %i (%i) credits for: %s",
                     session_state.session, session_state.token, session_state.nsfw, request.client.host)
 
+        reference_code = ""
         if self.component_link_sharing_handler:
-            self.component_link_sharing_handler.initialize_session_references(request=request)
+            reference_code = self.component_link_sharing_handler.initialize_session_references(request=request)
         if self.component_session_manager:
             self.component_session_manager.record_active_session(session_state)
+
+        self.analytics.record_new_session(
+            user_agent=request.headers["user-agent"],
+            languages=request.headers["accept-language"],
+            reference=reference_code)
 
     def uiaction_timer_check_token(self, gradio_state: str):
         if gradio_state is None:
@@ -213,7 +218,7 @@ class GradioUI():
 
             if self.component_link_sharing_handler:
                 try:
-                    shared_reference_key = self.component_link_sharing_handler.record_image_generation_for_shared_link(
+                    self.component_link_sharing_handler.record_image_generation_for_shared_link(
                         request=request,
                         image_count=image_count
                     )
@@ -249,18 +254,6 @@ class GradioUI():
             if session_state.token <= 1 and self.config.feature_generation_credits_enabled:
                 logger.warning(f"session {session_state.session} is out of credits ({session_state.token}) left")
 
-            try:
-                # TODO: create useful values for "content" eg. main focus (describe the main object create in the image in one word")
-                # use blib or ollama image descibe
-                self.analytics.record_image_creation(
-                    count=image_count,
-                    model=self.selectedmodelconfig.model,
-                    content="",
-                    reference=shared_reference_key)
-            except Exception as e:
-                logger.warning(f"error while recording sucessful image generation for stats: {e}")
-                pass
-
             progress(1, "image generation finished")
             return generated_images, session_state, prompt
         except Exception as e:
@@ -272,7 +265,7 @@ class GradioUI():
 
         finally:
             try:
-                self.analytics.stop_image_creation_timer(analytics_image_creation_duration_start_time)
+                self.analytics.stop_image_creation_timer(analytics_image_creation_duration_start_time, image_count=image_count)
             except Exception as e:
                 logger.error("Failed to stop analytics timer: %s", str(e))
 
@@ -499,11 +492,15 @@ class GradioUI():
                 outputs=[gr_freestyle_generate_btn]
             )
 
-            #it's an invisiblöe text field used to transport teh assistant prompt
+            # it's an invisiblöe text field used to transport teh assistant prompt
             gr_assistant_prompt.change(
                 fn=lambda: (gr.Timer(active=False), gr.Button(interactive=False), gr.Button(interactive=False)),
                 inputs=[],
                 outputs=[timer_check_token, gr_freestyle_generate_btn, gr_assistant_create_image],
+            ).then(
+                fn=lambda pm, ic: self.analytics.record_prompt_usage(assistant_used=True, promptmagic_used=pm, image_count=ic),
+                inputs=[prompt_magic_checkbox, image_count],
+                outputs=[]
             ).then(
                 fn=self.uiaction_generate_images,
                 inputs=[user_session_storage, gr_assistant_prompt, aspect_ratio, neg_prompt, image_count, prompt_magic_checkbox],
@@ -527,6 +524,10 @@ class GradioUI():
                 fn=lambda: (gr.Timer(active=False), gr.Button(interactive=False), gr.Button(interactive=False), gr.Gallery(preview=False)),
                 inputs=[],
                 outputs=[timer_check_token, gr_freestyle_generate_btn, gr_assistant_create_image, gallery],
+            ).then(
+                fn=lambda pm, ic: self.analytics.record_prompt_usage(assistant_used=False, promptmagic_used=pm, image_count=ic),
+                inputs=[prompt_magic_checkbox, image_count],
+                outputs=[]
             ).then(
                 fn=self.uiaction_generate_images,
                 inputs=[user_session_storage, gr_freestyle_prompt, aspect_ratio, neg_prompt, image_count, prompt_magic_checkbox],

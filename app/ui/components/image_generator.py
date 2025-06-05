@@ -80,7 +80,7 @@ class ImageGenerationHandler:
                         neg_prompt,
                         aspect_ratio: str,
                         user_activated_promptmagic: bool,
-                        image_count):
+                        image_count: int):
         try:
 
             # cleanup input data
@@ -144,12 +144,13 @@ class ImageGenerationHandler:
         result_images = []
         try:
             show_nsfw_censor_warning = False
+            nsfw_count = 0
             for image in generated_images:
                 nsfw_check = self.nsfw_detector.detect(image)
                 if not nsfw_check.is_safe:
                     # just for debugging purposes
                     logger.debug(f"Generated NSFW Image detected. Category: {nsfw_check.category}, Confidence: {nsfw_check.confidence}")
-
+                    nsfw_count += 1
                 # we check against nsfw<=0 to apply censorship on the explicit regions, if that happen more often (-2),
                 # the prompt refiner is used in advance to avoid nsfw generation (trigger value is NSFW_WARNINGS)
                 if not nsfw_check.is_safe and nsfw_check.category == NSFWCategory.EXPLICIT and session_state.nsfw <= 0:
@@ -171,6 +172,18 @@ class ImageGenerationHandler:
                 gr.Info("""We censored at least one of your images.
                         You can remove the censorship by uploading images to train our System for better results, or by sharing Links of this app.
                         Thanks for your understanding""", duration=0)
+
+            try:
+                # analytics
+                self.analytics.record_image_creation(
+                    count=len(generated_images),
+                    nsfw_count=nsfw_count,
+                    model=self.selectedmodelconfig.model
+                )
+            except Exception as e:
+                logger.warning(f"error while recording sucessful image generation for stats: {e}")
+                pass
+
         except Exception as e:
             logger.warning(f"Error while NSFW check: {e}")
             result_images = generated_images

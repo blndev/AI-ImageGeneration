@@ -64,13 +64,10 @@ class LinkSharingHandler:
                 reference_counts += 1  # 1 point for a new session
                 self._session_references_database[shared_reference_key] = reference_counts
                 logger.debug(f"session reference saved for reference: {shared_reference_key}")
-
-            self.analytics.record_new_session(
-                user_agent=request.headers["user-agent"],
-                languages=request.headers["accept-language"],
-                reference=shared_reference_key)
+            return shared_reference_key
         except Exception as e:
             logger.debug(f"Error while extracting reference keyfor new session: {e}")
+        return ""
 
     def record_image_generation_for_shared_link(self, request: gr.Request, image_count: int):
         try:
@@ -80,6 +77,7 @@ class LinkSharingHandler:
                 reference_counts += image_count * self.config.feature_sharing_links_new_token_per_image
                 self._session_references_database[shared_reference_key] = reference_counts
                 logger.debug(f"session reference saved for reference: {shared_reference_key}")
+                self.analytics.record_reference_usage(shared_reference_key, image_count)
             return shared_reference_key
         except Exception as e:
             logger.debug(f"Error while extracting reference keyfor new session: {e}")
