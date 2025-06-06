@@ -21,65 +21,60 @@ class Analytics:
         try:
             logger.info("Initializing Analytics")
             # Initialize Prometheus metrics
-            self._image_creations = Counter(
+            self._counter_image_creations = Counter(
                 'imggen_image_creations',
                 'number of images created',
-                labelnames=('model', 'content')
-            )
-            self._image_creations.labels('', '')
-
-            self._nsfw_image_creations = Counter(
-                'imggen_image_nsfw_creations',
-                'number of nsfw images detected',
-                labelnames=('model', 'content')
+                labelnames=('model', 'content', 'nsfw')
             )
 
-            self._prompt_freestyle = Counter(
-                'imggen_prompt_freestyle_used',
-                'number of freestyle prompt usage',
-                ['magicprompt']
-            )
+            # # deficated nsfw as not images in a run will be nsfw
+            # self._nsfw_image_creations = Counter(
+            #     'imggen_image_nsfw_creations',
+            #     'number of nsfw images detected',
+            #     labelnames=('model', 'content')
+            # )
 
-            self._reference_usage = Counter(
+            self._counter_prompt = Counter(
+                'imggen_prompt_usage',
+                'number of prompt usage',
+                labelnames=('source', 'magicprompt')
+            )
+            self._counter_prompt.labels('freestyle', 'false')
+            self._counter_prompt.labels('assistant', 'true')
+
+            self._counter_reference_usage = Counter(
                 'imggen_image_creation_with_reference',
                 'number of images created by a reference link',
                 ['reference']
             )
+            self._counter_reference_usage.labels('')
 
-            self._prompt_assistant = Counter(
-                'imggen_prompt_assistant_used',
-                'number of assistant based prompt usage',
-                ['magicprompt']
-            )
-
-            self._sessions = Counter(
-                'imggen_sessions_total',
+            self._counter_sessions = Counter(
+                'imggen_sessions',
                 'Total number of user sessions',
                 labelnames=('device_type', 'os', 'browser', 'language', 'reference_code')
             )
+            self._counter_sessions.labels('', '', '', '', '')
 
-            self._uploads = Counter(
-                'imggen_uploads_total',
+            self._counter_uploads = Counter(
+                'imggen_uploads',
                 'Total number of uploaded files',
                 labelnames=('device_type', 'os', 'browser', 'language', 'content')
             )
+            self._counter_uploads.labels('', '', '', '', '')
 
-            self._errors = Counter(
+            self._counter_errors = Counter(
                 'imggen_errors',
                 'Total number of occured errors',
                 labelnames=('module', 'criticality')
             )
+            self._counter_errors.labels('', '')
 
             self._active_sessions = Gauge(
                 'imggen_active_sessions',
                 'Amount of users active in the last 30 minutes'
             )
-
-            self._image_creation_time = Histogram(
-                'imggen_image_creation_duration_seconds',
-                'Time taken to create an image including queue wait time',
-                buckets=[1, 2, 5, 10, 20, 30, 60]  # buckets in seconds
-            )
+            self._active_sessions.set(0)
 
             self._user_tokens = Gauge(
                 'imggen_user_tokens',
@@ -92,12 +87,23 @@ class Analytics:
         except Exception as e:
             logger.error(f"Failed to initialize Analytics: {e}")
 
+    def register_model(self, modelname):
+        """start the counter with a 0 value instead of none"""
+        self._counter_image_creations.labels(
+            model=modelname,
+            content='',
+            nsfw=str(False).lower())
+        self._counter_image_creations.labels(
+            model=modelname,
+            content='',
+            nsfw=str(True).lower())
+
     def record_application_error(self, module: str, criticality: str):
         """
         criticality = warning, error, critical
         """
         try:
-            self._errors.labels(
+            self._counter_errors.labels(
                 module=module,
                 criticality=criticality.lower()
             ).inc()
@@ -106,7 +112,7 @@ class Analytics:
 
     def record_reference_usage(self, shared_reference_key, image_count):
         try:
-            self._reference_usage.labels(
+            self._counter_reference_usage.labels(
                 reference=shared_reference_key,
             ).inc(amount=image_count)
         except Exception as e:
@@ -128,15 +134,22 @@ class Analytics:
             content (str): Content type or description (default: "unknown")
         """
         try:
-            self._image_creations.labels(
-                model=model,
-                content=content
-            ).inc(amount=count)
-            if nsfw_count > 0:
-                self._nsfw_image_creations.labels(
+            for i in range(count):
+                nsfw = False
+                if nsfw_count > 0:
+                    nsfw = True
+                    nsfw_count -= 1
+                self._counter_image_creations.labels(
                     model=model,
-                    content=content
-                ).inc(amount=nsfw_count)
+                    content=content,
+                    nsfw=str(nsfw).lower()
+                ).inc()
+
+            # if nsfw_count > 0:
+            #     self._nsfw_image_creations.labels(
+            #         model=model,
+            #         content=content
+            #     ).inc(amount=nsfw_count)
         except Exception as e:
             logger.warning(f"Failed to record image creation: {e}")
 
@@ -194,7 +207,7 @@ class Analytics:
             if reference is None: reference = ""
             reference = reference.split()
             os, browser, dt, lng = self._parse_user_agent(user_agent, languages)
-            self._sessions.labels(
+            self._counter_sessions.labels(
                 os=os,
                 browser=browser,
                 device_type=dt,
@@ -218,7 +231,7 @@ class Analytics:
         """
         try:
             os, browser, dt, lng = self._parse_user_agent(user_agent, languages)
-            self._uploads.labels(
+            self._counter_uploads.labels(
                 os=os,
                 browser=browser,
                 device_type=dt,
@@ -238,20 +251,11 @@ class Analytics:
         """
         try:
             logger.debug(f"record prompt usage Assistant: {assistant_used}, Prompt Magic: {promptmagic_used}")
-            if assistant_used:
-                # print("assistant")
-                # p = self._prompt_assistant
-                # print (p._labelnames)
-                # print(self._uploads._labelnames)
-                # p.labels(magicprompt="True").inc()
-                self._prompt_assistant.labels(
-                    magicprompt=promptmagic_used
-                ).inc(amount=image_count)
-            else:
-                # print("frestyle")
-                self._prompt_freestyle.labels(
-                    magicprompt=promptmagic_used
-                ).inc(amount=image_count)
+            source = "assistant" if assistant_used else "freestyle"
+            self._counter_prompt.labels(
+                source=source,
+                magicprompt=str(promptmagic_used).lower()
+            ).inc(amount=image_count)
 
         except Exception as e:
             logger.warning(f"Failed to record a prompt usage: {e}")
@@ -268,35 +272,6 @@ class Analytics:
             self._active_sessions.set(sessioncount)
         except Exception as e:
             logger.warning(f"Failed to update active sessions: {e}")
-
-    def start_image_creation_timer(self) -> Optional[float]:
-        """
-        Start timing an image creation.
-
-        Returns:
-            float: Current timestamp or None if operation fails
-        """
-        try:
-            return time.time()
-        except Exception as e:
-            logger.warning(f"Failed to start image creation timer: {e}")
-            return None
-
-    def stop_image_creation_timer(self, start_time: Optional[float], image_count: int = 1) -> None:
-        """
-        Stop timing an image creation and record the duration.
-
-        Args:
-            start_time (float, optional): Start time returned by start_image_creation_timer
-        """
-        if start_time is None:
-            return
-
-        try:
-            duration = (time.time() - start_time) / image_count
-            self._image_creation_time.observe(duration)
-        except Exception as e:
-            logger.warning(f"Failed to stop image creation timer: {e}")
 
     def update_user_tokens(self, user_id: str, tokens: int) -> None:
         """

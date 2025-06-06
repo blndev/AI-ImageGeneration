@@ -41,6 +41,7 @@ class GradioUI():
                 exit(1)
 
             self.analytics = Analytics()
+            self.analytics.register_model(selectedmodel)
             self.component_session_manager = SessionManager(config=self.config, analytics=self.analytics)
 
             self.component_image_generator = ImageGenerationHandler(
@@ -216,7 +217,6 @@ class GradioUI():
                 gr.Warning(msg, title="Image generation failed", duration=30)
                 return [], session_state, ""
 
-            analytics_image_creation_duration_start_time = self.analytics.start_image_creation_timer()
             session_state.save_last_generation_activity()
 
             if self.component_link_sharing_handler:
@@ -265,12 +265,6 @@ class GradioUI():
 
             gr.Warning(f"Error while generating the image: {e}", title="Image generation failed", duration=30)
             return [], session_state, prompt
-
-        finally:
-            try:
-                self.analytics.stop_image_creation_timer(analytics_image_creation_duration_start_time, image_count=image_count)
-            except Exception as e:
-                logger.error("Failed to stop analytics timer: %s", str(e))
 
     def create_interface(self):
 
