@@ -70,6 +70,11 @@ class PromptAssistantHandler:
     def _create_better_words_for(self, subject, age):
         better = ""
         text_age = ""
+
+        # required as in the logs where issues from gradio which references NoneType for age (could be timing issue in JS)
+        if not age: age = 25
+        if not subject: subject = "clown"
+
         if age > 50: text_age = "old"
         if age > 70: text_age = "very old"
         if age < 20: text_age = "young"
@@ -82,7 +87,7 @@ class PromptAssistantHandler:
                 better = f"{text_age} {subject}"
         else:
             # fallback
-            if "woman"  in subject.lower():
+            if "woman" in subject.lower():
                 subject = "Girl" if age < 18 else "Woman"
             elif "man" in subject.lower():
                 subject = "Boy" if age < 18 else "Man"
@@ -180,7 +185,7 @@ class PromptAssistantHandler:
 
                     # used as main input for the prompt and ai suggestions
                     gr_txt_custom_object = gr.Textbox(
-                        value= f" {gr_age.value} year old {gr_image_object.value}",  # based on defaults of the other controls
+                        value=f" {gr_age.value} year old {gr_image_object.value}",  # based on defaults of the other controls
                         label="Optimized Object description (read only)",
                         placeholder="",
                         visible=False, interactive=False
@@ -356,10 +361,10 @@ class PromptAssistantHandler:
             # for all objects
             if location:
                 location = f"at {location} location,"
-            
+
             if stereotype:
                 stereotype = f"(stereotype: {stereotype})"
-            
+
             # handling lists
             body = ""
             if gr_body_details is not None and len(gr_body_details) > 0:
