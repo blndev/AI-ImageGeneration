@@ -193,14 +193,17 @@ class ImageGenerationHandler:
 
     def _apply_prompt_magic(self, session_state: SessionState, prompt: str, user_activated_promptmagic: bool) -> str:
         # check if nsfw or preview is allowed, enforce SFW prompt if not
-        if session_state.nsfw <= self.MAX_NSFW_WARNINGS and self.prompt_refiner:
+        if session_state.nsfw < self.MAX_NSFW_WARNINGS and self.prompt_refiner:
             nsfw, _ = self.prompt_refiner.check_contains_nsfw(prompt)
             if nsfw:
-                if self.config.feature_use_upload_for_age_check and session_state.nsfw < self.MAX_NSFW_WARNINGS and not session_state.nsfw <= self.MAX_NSFW_WARNINGS * 2:
-                    gr.Info("""Preview for explicit image generation is over and explicit content will now be blocked.
+                if self.config.feature_use_upload_for_age_check and not session_state.nsfw <= self.MAX_NSFW_WARNINGS * 2:
+                    # and not session_state.nsfw <= self.MAX_NSFW_WARNINGS * 2: means shows warning only limited amout of time
+                    gr.Info("""Your 'Preview' for explicit image generation is over and explicit content creation will now
+                            be blocked by adapting your prompt.
                             You can get credits for uncensored images by uploading related images for our model training.
-                            What you upload, you can create!""", duration=30)
-                logger.info(f"Convert NSFW prompt to SFW. User Prompt: '{prompt}'")
+                            Or by sharing the Application Link. What you upload, you can create!""", duration=60)
+
+                logger.info(f"Convert NSFW prompt to SFW. Original User-Prompt: '{prompt}'")
                 prompt = self.prompt_refiner.make_prompt_sfw(prompt, True)
             else:
                 logger.debug("prompt is SFW")
@@ -212,7 +215,8 @@ class ImageGenerationHandler:
             for _ in range(random.randrange(3)):
                 new_prompt = self.prompt_refiner.magic_enhance(prompt, 200)
                 if len(new_prompt) > len(prompt) or prompt == userprompt: prompt = new_prompt
-            if session_state.nsfw <= self.MAX_NSFW_WARNINGS and not self.prompt_refiner.is_safe_for_work(prompt):
+            # finally check that we not created nsfw by llm mistakes
+            if session_state.nsfw < self.MAX_NSFW_WARNINGS and not self.prompt_refiner.is_safe_for_work(prompt):
                 prompt = self.prompt_refiner.make_prompt_sfw(prompt)
 
         return prompt

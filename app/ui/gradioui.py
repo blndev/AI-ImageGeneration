@@ -194,7 +194,6 @@ class GradioUI():
             image_count (int): The number of images to generate
         """
         session_state = SessionState.from_gradio_state(gr_state)
-        analytics_image_creation_duration_start_time = None
         try:
             # Record session activity
             progress(0, desc="prepare generation")
@@ -205,19 +204,29 @@ class GradioUI():
                 logger.error("Failed to record session activity: %s", str(e))
                 # Continue execution as this is not critical
 
-            # TODO: must be supported also for assistant based images, maybe add a optional parameter like "assistant_prompt" and then this function can be called
+            session_state.save_last_generation_activity()
+
+            # reduct image count and inform the User
+            if self.config.feature_generation_credits_enabled and session_state.token > 0 and session_state.token < image_count:
+                image_count = session_state.token
+                msg = "You using your last generations credits!"
+                if self.config.feature_upload_images_for_new_token_enabled:
+                    msg += "You can get more credits by sharing images for training. Please check the section 'Upload image'."
+                if self.config.feature_sharing_links_enabled:
+                    msg += "Or share the application link with your reference code to other users. More details in 'Share Links'."
+                gr.Warning(msg)
+
+            # check for end of token
             if self.config.feature_generation_credits_enabled and session_state.token < image_count:
                 msg = f"Not enough generation credits available.\n\nPlease wait {self.config.new_token_wait_time} minutes"
                 if self.config.feature_upload_images_for_new_token_enabled:
                     msg += ", or get new credits by sharing images for training"
                 if self.config.feature_sharing_links_enabled:
-                    msg += ", or share the application link to other users"
+                    msg += ", or share the application link to other users via the section 'Sharing' ."
                 logger.info("User %s attempted generation with insufficient credits (%s needed, %s available)",
                             session_state.session, image_count, session_state.token)
                 gr.Warning(msg, title="Image generation failed", duration=30)
                 return [], session_state, ""
-
-            session_state.save_last_generation_activity()
 
             if self.component_link_sharing_handler:
                 try:
@@ -439,7 +448,7 @@ class GradioUI():
                     show_download_button=True,
                     format="jpeg",
                     columns=1,
-                    rows=None, # dynamic linked to image count slider
+                    rows=None,  # dynamic linked to image count slider
                     height="800px",
                     object_fit="cover"
                 )
