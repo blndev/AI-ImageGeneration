@@ -159,7 +159,7 @@ class PromptAssistantHandler:
         with gr.Row():
             with gr.Column(scale=1):
                 with gr.Group(visible=True):
-                    gr.Markdown("Choose Main Object")
+                    gr.Markdown("General Settings")
                     # chkFemale = gr.Checkbox(label="Female", value=True)
                     gr_image_object = gr.Dropdown(
                         choices=["Clown", "Woman", "Man", "Fairy", "Alien", "Robot", "Dog", "Bird",
@@ -210,63 +210,62 @@ class PromptAssistantHandler:
             with gr.Column(scale=2):
                 with gr.Group(visible=True):
                     gr.Markdown("Environment and Details")
-                    gr_location = gr.Dropdown(
-                        ["Random", "Home", "Backyard", "Forest", "Beach", "Castle", "Photo Studio", "Pizza Restaurant", "Moon"],
-                        value="",
-                        multiselect=False,
-                        label="Location",
-                        allow_custom_value=True,
-                        interactive=True
-                    )
+                    with gr.Row():
+                        with gr.Column():
+                            gr_location = gr.Dropdown(
+                                ["", "Random", "Home", "Backyard", "Forest", "Beach", "Castle", "Photo Studio", "Pizza Restaurant", "Moon"],
+                                value="",
+                                multiselect=False,
+                                label="Location",
+                                allow_custom_value=True,
+                                interactive=True
+                            )
+                        with gr.Column():
+                            gr_stereotype = gr.Dropdown(
+                                ["", "Developer", "Analyst", "CEO", "Doctor", "Nurse", "Wizzard", "Witch", "Teacher", "Student", "Schoolgirl"],
+                                value="",
+                                multiselect=False, label="Stereotype", allow_custom_value=True,
+                                interactive=True
+                            )
 
-                    gr_body_details = gr.Dropdown(
-                        ["red Hair", "curly Hair", "perfect Face", "blue Eyes", "red Lipstick", "intense Makeup"],
-                        value=[],
-                        multiselect=True, label="Body details", allow_custom_value=True,
-                        interactive=True
-                    )
-
-                    gr_stereotype = gr.Dropdown(
-                        ["Developer", "Analyst", "CEO", "Doctor", "Nurse", "Wizzard", "Witch", "Teacher", "Student", "Schoolgirl"],
-                        value="",
-                        multiselect=False, label="Stereotype", allow_custom_value=True,
-                        interactive=True
-                    )
-
-                    gr_button_update_suggestions = gr.Button(
-                        value="Update suggestions for Environment and Details",
-                        visible=self.image_generator.prompt_refiner is not None,
-                        size="md")
+                    with gr.Row():
+                        gr_body_details = gr.Dropdown(
+                            ["red Hair", "curly Hair", "perfect Face", "blue Eyes", "red Lipstick", "intense Makeup"],
+                            value=[],
+                            multiselect=True, label="Body details", allow_custom_value=True,
+                            interactive=True
+                        )
+                    with gr.Row():
+                        gr_cloth = gr.Dropdown(
+                            ["Shorts", "Tank Top", "Casual", "Swimwear", "Sunglasses", "Collar", "no clothes"],
+                            value=["Casual", "Sunglasses"],
+                            multiselect=True, label="Wearing", allow_custom_value=True,
+                            interactive=True
+                        )
+                    with gr.Row():
+                        gr_button_update_suggestions = gr.Button(
+                            value="Update suggestions for Environment and Details",
+                            visible=self.image_generator.prompt_refiner is not None,
+                            size="md")
 
             with gr.Column(scale=1):
+                with gr.Group(visible=False) as human_details_group:
+                    gr.Markdown("Advanced Details")
+                    gr_facial_expression = gr.Dropdown(
+                        ["", "Smiling", "Neutral", "Angry", "Sad", "Shy", "Surprised"],
+                        value="Smiling",
+                        multiselect=False, label="Facial expression", allow_custom_value=True,
+                        interactive=True
+                    )
+                    gr_pose = gr.Dropdown(
+                        ["", "Posing", "Sitting", "Walking", "Dancing", "Eating", "Watching"],
+                        value="Posing",
+                        multiselect=False, label="Pose or Action", allow_custom_value=True,
+                        interactive=True
+                    )
                 with gr.Group():
                     gr_token_info = gr.Text(value="", container=True, show_label=False)
                     gr_button_create_image = gr.Button("Create Image", visible=True, interactive=True, variant="primary")
-
-        with gr.Row() as human_details_group:
-            with gr.Column():
-                gr_facial_expression = gr.Dropdown(
-                    ["Smiling", "Neutral", "Angry", "Sad", "Shy", "Surprised"],
-                    value="Smiling",
-                    multiselect=False, label="Facial expression", allow_custom_value=True,
-                    interactive=True
-                )
-                gr_pose = gr.Dropdown(
-                    ["Posing", "Sitting", "Walking", "Dancing", "Eating", "Watching"],
-                    value="Posing",
-                    multiselect=False, label="Pose or Action", allow_custom_value=True,
-                    interactive=True
-                )
-            with gr.Column(scale=2):
-                gr_cloth = gr.Dropdown(
-                    ["Shorts", "Tank Top", "Casual", "Swimwear", "Sunglasses", "Collar", "no clothes"],
-                    value=["Casual", "Sunglasses"],
-                    multiselect=True, label="Wearing", allow_custom_value=True,
-                    interactive=True
-                )
-            with gr.Column():
-                gr.Markdown("If you have more Ideas, please use the Feedback function below.")
-                # gr_gender = gr.Radio(["Female", "Male"], value="Female", label="Gender")
 
             ################################################
             # handle recreation of target object description
@@ -281,11 +280,6 @@ class PromptAssistantHandler:
                 inputs=[gr_image_object, gr_age],
                 outputs=gr_txt_custom_object
             )
-            # gr_gender.change(
-            #     fn=self._create_better_words_for,
-            #     inputs=[gr_image_object, gr_age, gr_gender],
-            #     outputs=gr_txt_custom_object
-            # )
 
             ################################################
             # switch visibility of human specific properties
@@ -348,27 +342,33 @@ class PromptAssistantHandler:
         # logger.debug(f"User Feedback from {session_state.session}: {text}")
         try:
             humanprompt = ""
+            # dedicated to humans
             if self._is_image_human_style(object_description):
                 face = ""
                 if gr_facial_expression and len(gr_facial_expression) > 0:
-                    face = f"and prefect face with {gr_facial_expression} expression,"
-                if gr_body_details and len(gr_body_details) > 0:
-                    body = f"with {self._list_to_simple_string(gr_body_details)}"
-
-                cloth = f"wearing {self._list_to_simple_string(gr_cloth)}" if len(gr_cloth) > 0 else ""
+                    face = f"is {gr_facial_expression},"
 
                 pose = ""
                 if gr_pose:
-                    pose = f"while {gr_pose}"
-                humanprompt = f"{face} {cloth} {pose}"
+                    pose = f"and {gr_pose}"
+                humanprompt = f"{face} {pose}."
+
+            # for all objects
             if location:
-                location = f"in {location} location,"
+                location = f"at {location} location,"
+            
             if stereotype:
-                stereotype = f"stereotype: {stereotype}"
+                stereotype = f"(stereotype: {stereotype})"
+            
+            # handling lists
             body = ""
             if gr_body_details is not None and len(gr_body_details) > 0:
                 body = f"with {self._list_to_simple_string(gr_body_details)}"
-            prompt = f"a {object_description} {location} {body} {humanprompt} {stereotype}"
+
+            cloth = f"wearing {self._list_to_simple_string(gr_cloth)}," if gr_cloth and len(gr_cloth) > 0 else ""
+
+            # compose prompt
+            prompt = f"{location} a {object_description} {body} {cloth} {humanprompt} {stereotype}"
 
             if style == "Random": style = random.choice(
                 ["PopArt", "Photo", "Futurism", "Gothic", "Disco", "Minimalistic",
