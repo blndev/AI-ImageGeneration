@@ -5,7 +5,7 @@ from typing import Optional, Tuple
 
 from user_agents import parse as parse_user_agent   # Split OS. Browser etc.
 from app.utils.singleton import singleton
-
+from .appconfig import AppConfig
 logger = logging.getLogger(__name__)
 
 
@@ -16,10 +16,12 @@ class Analytics:
     Implements singleton pattern to ensure only one instance exists.
     """
 
-    def __init__(self):
+    def __init__(self, config: AppConfig):
         """Initialize Analytics with Prometheus metrics and start the HTTP server."""
         try:
             logger.info("Initializing Analytics")
+            self.config = config
+
             # Initialize Prometheus metrics
             self._counter_image_creations = Counter(
                 'imggen_image_creations',
@@ -82,6 +84,13 @@ class Analytics:
                 ['user_id']
             )
 
+            self._gauge_timestamps = Gauge(
+                'imggen_last_activities',
+                'Timestamp of the last recorded activity',
+                ['activity']
+            )
+            self._gauge_timestamps.labels(activity="app_started").set_to_current_time()
+
             # Start Prometheus HTTP server on port 9101
             start_http_server(9101)
         except Exception as e:
@@ -89,6 +98,7 @@ class Analytics:
 
     def register_model(self, modelname):
         """start the counter with a 0 value instead of none"""
+        self._gauge_timestamps.labels(activity="model_change").set_to_current_time()
         self._counter_image_creations.labels(
             model=modelname,
             content='',
@@ -103,6 +113,7 @@ class Analytics:
         criticality = warning, error, critical
         """
         try:
+            self._gauge_timestamps.labels(activity="application_error").set_to_current_time()
             self._counter_errors.labels(
                 module=module,
                 criticality=criticality.lower()
@@ -134,6 +145,7 @@ class Analytics:
             content (str): Content type or description (default: "unknown")
         """
         try:
+            self._gauge_timestamps.labels(activity="image_generation").set_to_current_time()
             for i in range(count):
                 nsfw = False
                 if nsfw_count > 0:
@@ -204,6 +216,7 @@ class Analytics:
             reference (str): Reference code for the session (default: "")
         """
         try:
+            self._gauge_timestamps.labels(activity="new_user_session").set_to_current_time()
             if reference is None: reference = ""
             reference = reference.split()
             os, browser, dt, lng = self._parse_user_agent(user_agent, languages)
@@ -230,6 +243,7 @@ class Analytics:
             content (str): Type of content e.g. "ai", "to_small", "sfw", "teasing", explicit based on content detection
         """
         try:
+            self._gauge_timestamps.labels(activity="upload").set_to_current_time()
             os, browser, dt, lng = self._parse_user_agent(user_agent, languages)
             self._counter_uploads.labels(
                 os=os,

@@ -19,8 +19,11 @@ class AppConfig:
     # TODO: make it more reliable
     def refresh(self):
         logger.info("refresh config")
+        self.app_environment = os.getenv("IMGGEN_ENVIRONMENT", "unkown")
+
         self.GRADIO_SHARED = self.getbool("GRADIO_SHARED", False)
         self.modelconfig_json = os.getenv("MODELCONFIG", "./modelconfig.json")
+
         self.selected_model = os.getenv("GENERATION_MODEL", "default")
         self.model_cache_dir = os.getenv("MODEL_DIRECTORY", "./models/")
         self.free_memory_after_minutes_inactivity = int(os.getenv("FREE_MEMORY_AFTER_MINUTES_INACTIVITY", 15))

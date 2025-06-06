@@ -40,7 +40,7 @@ class GradioUI():
                 logger.error("Configured Model and parents does not contain a path or modeltype. Stop execution.")
                 exit(1)
 
-            self.analytics = Analytics()
+            self.analytics = Analytics(config=self.config)
             self.analytics.register_model(selectedmodel)
             self.component_session_manager = SessionManager(config=self.config, analytics=self.analytics)
 
