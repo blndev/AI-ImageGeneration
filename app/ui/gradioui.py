@@ -135,9 +135,9 @@ class GradioUI():
             x15_minutes_ago = datetime.now() - timedelta(minutes=timeout_minutes)
             self.component_session_manager.session_cleanup_and_analytics()
 
-            if self.app_last_image_generation < x15_minutes_ago and self.component_image_generator._cached_generation_pipeline:
+            if self.app_last_image_generation < x15_minutes_ago and self.component_image_generator.generator._cached_generation_pipeline:
                 # no active user for x minutes, we can unload the model to free memory
-                logger.info(f"No active user for {timeout_minutes} minutes. Unloading Generator Models from Memory")
+                logger.debug(f"No active user for {timeout_minutes} minutes. Unloading Generator Models from Memory")
                 self.component_image_generator.generator.unload_model()
         except Exception as e:
             logger.warning(f"Error in cleanup handler: {e}")
