@@ -128,15 +128,19 @@ class GradioUI():
         * refreshes configuration
         * unloading unused models
         """
-        logger.debug("tick - cleanup interval")
-        timeout_minutes = self.config.free_memory_after_minutes_inactivity
-        x15_minutes_ago = datetime.now() - timedelta(minutes=timeout_minutes)
-        self.component_session_manager.session_cleanup_and_analytics()
+        # logger.debug("tick - cleanup interval")
+        try:
+            timeout_minutes = self.config.free_memory_after_minutes_inactivity
+            x15_minutes_ago = datetime.now() - timedelta(minutes=timeout_minutes)
+            self.component_session_manager.session_cleanup_and_analytics()
 
-        if self.app_last_image_generation < x15_minutes_ago:
-            # no active user for 15 minutes, we can unload the model to free memory
-            logger.info(f"No active user for {timeout_minutes} minutes. Unloading Generator Models from Memory")
-            self.component_image_generator.generator.unload_model()
+            if self.app_last_image_generation < x15_minutes_ago:
+                # no active user for 15 minutes, we can unload the model to free memory
+                logger.info(f"No active user for {timeout_minutes} minutes. Unloading Generator Models from Memory")
+                self.component_image_generator.generator.unload_model()
+        except Exception as e:
+            logger.warning(f"Error in cleanup handler: {e}")
+            self.analytics.record_application_error(module="cleanup", criticality="warning")
 
     def action_session_initialized(self, request: gr.Request, session_state: SessionState):
         """Initialize analytics session when app loads.

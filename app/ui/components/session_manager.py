@@ -30,7 +30,7 @@ class SessionManager:
         """is called every 60 secdonds and:
         * updates monitoring information
         * refreshes configuration
-        * unloading unused models
+        * relevant for unloading unused models
         """
         logger.debug("session_cleanup_and_analytics")
         timeout_minutes = 15  # self.config.free_memory_after_minutes_inactivity

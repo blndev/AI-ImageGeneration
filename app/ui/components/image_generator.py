@@ -138,6 +138,7 @@ class ImageGenerationHandler:
         except Exception as e:
             logger.error(f"image generation failed: {e}")
             logger.debug("Exception details:", exc_info=True)
+            self.analytics.record_application_error(module="image generation", criticality="error")
             raise Exception("Error while generating the image")
 
     def _censor_nsfw_images(self, session_state, generated_images):
@@ -186,6 +187,7 @@ class ImageGenerationHandler:
 
         except Exception as e:
             logger.warning(f"Error while NSFW check: {e}")
+            self.analytics.record_application_error(module="NSFW check", criticality="warning")
             result_images = generated_images
         return result_images
 

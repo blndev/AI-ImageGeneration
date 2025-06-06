@@ -296,4 +296,5 @@ class UploadHandler:
         except Exception as e:
             logger.error(f"generate credits for uploaded image failed: {e}")
             logger.debug("Exception details:", exc_info=True)
+            self.analytics.record_application_error(module="upload credits", criticality="error")
         return session_state, gr.Button(interactive=False), None

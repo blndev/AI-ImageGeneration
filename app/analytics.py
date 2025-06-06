@@ -22,32 +22,33 @@ class Analytics:
             logger.info("Initializing Analytics")
             # Initialize Prometheus metrics
             self._image_creations = Counter(
-                'imggen_image_creations_total',
-                'Total number of images created',
+                'imggen_image_creations',
+                'number of images created',
                 labelnames=('model', 'content')
             )
+            self._image_creations.labels('', '')
 
             self._nsfw_image_creations = Counter(
-                'imggen_image_nsfw_creations_total',
-                'Total number of nsfw images detected',
+                'imggen_image_nsfw_creations',
+                'number of nsfw images detected',
                 labelnames=('model', 'content')
             )
 
             self._prompt_freestyle = Counter(
-                'imggen_prompt_freestyle_used_total',
-                'Total number of freestyle prompt usage',
+                'imggen_prompt_freestyle_used',
+                'number of freestyle prompt usage',
                 ['magicprompt']
             )
 
             self._reference_usage = Counter(
-                'imggen_image_creation_with_reference_total',
-                'Total number of images created by a reference link',
+                'imggen_image_creation_with_reference',
+                'number of images created by a reference link',
                 ['reference']
             )
 
             self._prompt_assistant = Counter(
-                'imggen_prompt_assistant_used_total',
-                'Total number of assistant based prompt usage',
+                'imggen_prompt_assistant_used',
+                'number of assistant based prompt usage',
                 ['magicprompt']
             )
 
@@ -61,6 +62,12 @@ class Analytics:
                 'imggen_uploads_total',
                 'Total number of uploaded files',
                 labelnames=('device_type', 'os', 'browser', 'language', 'content')
+            )
+
+            self._errors = Counter(
+                'imggen_errors',
+                'Total number of occured errors',
+                labelnames=('module', 'criticality')
             )
 
             self._active_sessions = Gauge(
@@ -84,6 +91,18 @@ class Analytics:
             start_http_server(9101)
         except Exception as e:
             logger.error(f"Failed to initialize Analytics: {e}")
+
+    def record_application_error(self, module: str, criticality: str):
+        """
+        criticality = warning, error, critical
+        """
+        try:
+            self._errors.labels(
+                module=module,
+                criticality=criticality.lower()
+            ).inc()
+        except Exception as e:
+            logger.error(f"Failed to record application error: {e}")
 
     def record_reference_usage(self, shared_reference_key, image_count):
         try:
@@ -172,6 +191,8 @@ class Analytics:
             reference (str): Reference code for the session (default: "")
         """
         try:
+            if reference is None: reference = ""
+            reference = reference.split()
             os, browser, dt, lng = self._parse_user_agent(user_agent, languages)
             self._sessions.labels(
                 os=os,
