@@ -160,8 +160,8 @@ class GradioUI():
             self.component_session_manager.record_active_session(session_state)
 
         self.analytics.record_new_session(
-            user_agent=request.headers["user-agent"],
-            languages=request.headers["accept-language"],
+            user_agent=request.headers.get("user-agent", "Mozilla/5.0 (compatible; MSIE 7.0; Windows NT 6.0; Win64; x64 Trident/4.0)"),
+            languages=request.headers.get("accept-language", "en"),
             reference=reference_code)
 
     def uiaction_timer_check_token(self, gradio_state: str):
