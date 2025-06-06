@@ -175,7 +175,7 @@ class PromptAssistantHandler:
                         allow_custom_value=True)
                     # used as main input for the prompt and ai suggestions
                     gr_txt_custom_object = gr.Textbox(
-                        value="25 yearl old woman", # based on defaults of the other controls
+                        value="25 yearl old woman",  # based on defaults of the other controls
                         label="Optimized Object description (read only)",
                         placeholder="",
                         visible=False, interactive=False
@@ -203,7 +203,7 @@ class PromptAssistantHandler:
                             "Painting",
                             "Line Art",
                             "Abstract drawing"],
-                        value="Random",
+                        value="Photo",
                         multiselect=False,
                         label="Style",
                         info="You can add a whole style and using'{prompt}' as placeholder",
@@ -240,8 +240,8 @@ class PromptAssistantHandler:
                     gr_button_update_suggestions = gr.Button(
                         value="Update suggestions for Environment and Details",
                         visible=self.image_generator.prompt_refiner is not None,
-                        size="md",
-                    )
+                        size="md")
+
             with gr.Column(scale=1):
                 with gr.Group():
                     gr_token_info = gr.Text(value="", container=True, show_label=False)
@@ -303,7 +303,9 @@ class PromptAssistantHandler:
             gr_button_update_suggestions.click(
                 fn=self.create_suggestions_for_assistant,
                 inputs=[gr_txt_custom_object],
-                outputs=[gr_cloth, gr_location, gr_body_details, gr_stereotype]
+                outputs=[gr_cloth, gr_location, gr_body_details, gr_stereotype],
+                concurrency_id="llm",
+                concurrency_limit=10
             )
 
         ####################################################
@@ -371,7 +373,12 @@ class PromptAssistantHandler:
                 body = f"with {self._list_to_simple_string(gr_body_details)}"
             prompt = f"a {object_description} {location} {body} {humanprompt} {stereotype}"
 
-            # TODO Vx - IDEA place styles in dedicated function, load styles from files or modelconfig 
+            if style == "Random": style = random.choice(
+                ["PopArt", "Photo", "Futurism", "Gothic", "Disco", "Minimalistic",
+                 "Monochrome", "Tribal", "Neon", "Cyberpunk", "Comic", "Line Art"]
+            )
+
+            # TODO Vx - IDEA place styles in dedicated function, load styles from files or modelconfig
             if "PopArt" in style: prompt = f"pop art collage style with red lipstick, comic style speech bubbles style: {prompt}"
             elif "Photo" in style: prompt = f"Professional photo {prompt} . large depth of field, deep depth of field, highly detailed"
             elif "Futurism" in style: prompt = f"futuristic cityscape, futurism: {prompt} . flying cars, dynamic lines and vibrant colors,"
