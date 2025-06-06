@@ -243,7 +243,7 @@ class GradioUI():
             except Exception as e:
                 logger.error("Image generation failed: %s", str(e))
                 logger.debug("Image generation exception details:", exc_info=True)
-                gr.Warning(f"Failed to generate images: {str(e)}", title="Image generation failed", duration=30)
+                # not show warning as this is done below gr.Warning(f"Failed to generate images: {str(e)}", title="Image generation failed", duration=30)
                 raise Exception("AI Pipeline Error.")
 
             # save image hashes to prevent upload
