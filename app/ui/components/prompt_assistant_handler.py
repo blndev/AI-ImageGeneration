@@ -26,7 +26,7 @@ class PromptAssistantHandler:
         self.image_generator = image_generator
 
         # helpers
-        self._human_style_objects = ["Human", "Robot", "Alien", "Fairy", "Woman", "Girl", "Man", "Boy"]
+        self._human_style_objects = ["Clown", "Woman", "Man", "Robot", "Alien", "Fairy", "Woman", "Girl", "Boy"]
         self._suggestions_cache = {}
         self._initialize_database_assistant_suggestions()
 
@@ -67,7 +67,7 @@ class PromptAssistantHandler:
         logger.debug(f"Is the object '{object_description}' a Human? {value}")
         return value
 
-    def _create_better_words_for(self, subject, age, gender):
+    def _create_better_words_for(self, subject, age):
         better = ""
         text_age = ""
         if age > 50: text_age = "old"
@@ -76,22 +76,17 @@ class PromptAssistantHandler:
         if age < 10: text_age = "very young"
 
         if self.image_generator.prompt_refiner:
-            better = self.image_generator.prompt_refiner.create_better_words_for(f"{gender} {subject} age {age}")
+            better = self.image_generator.prompt_refiner.create_better_words_for(f"{subject} age {age}")
             better = better.replace("[", "")
             if not self._is_image_human_style(better):
                 better = f"{text_age} {subject}"
         else:
             # fallback
-            if subject == "Human":
-                if gender.lower() == "female":
-                    subject = "Girl" if age < 18 else "Woman"
-                else:
-                    subject = "Boy" if age < 18 else "Man"
+            if "woman"  in subject.lower():
+                subject = "Girl" if age < 18 else "Woman"
+            elif "man" in subject.lower():
+                subject = "Boy" if age < 18 else "Man"
 
-            elif self._is_image_human_style(subject):
-                subject = f"{gender} {subject}"
-            else:
-                subject = f"{subject}"
             better = f"{text_age} {subject}"
 
         return better
@@ -167,19 +162,12 @@ class PromptAssistantHandler:
                     gr.Markdown("Choose Main Object")
                     # chkFemale = gr.Checkbox(label="Female", value=True)
                     gr_image_object = gr.Dropdown(
-                        choices=["Human", "Fairy", "Alien", "Robot", "Dog", "Bird",
+                        choices=["Clown", "Woman", "Man", "Fairy", "Alien", "Robot", "Dog", "Bird",
                                  "Cow", "Unicorn"],
                         label="Main Object",
-                        info="add anything you Imagine",
+                        info="add anything you can Imagine",
                         interactive=True,
                         allow_custom_value=True)
-                    # used as main input for the prompt and ai suggestions
-                    gr_txt_custom_object = gr.Textbox(
-                        value="25 yearl old woman",  # based on defaults of the other controls
-                        label="Optimized Object description (read only)",
-                        placeholder="",
-                        visible=False, interactive=False
-                    )
 
                     gr_age = gr.Slider(
                         interactive=True,
@@ -189,6 +177,14 @@ class PromptAssistantHandler:
                         step=2,
                         label="Age",
                         info="Choose the Age of that Object")
+
+                    # used as main input for the prompt and ai suggestions
+                    gr_txt_custom_object = gr.Textbox(
+                        value= f" {gr_age.value} year old {gr_image_object.value}",  # based on defaults of the other controls
+                        label="Optimized Object description (read only)",
+                        placeholder="",
+                        visible=False, interactive=False
+                    )
 
                     gr_style = gr.Dropdown(
                         ["Random",
@@ -263,32 +259,33 @@ class PromptAssistantHandler:
                 )
             with gr.Column(scale=2):
                 gr_cloth = gr.Dropdown(
-                    ["Shorts", "Tank Top", "Casual", "Swimwear", "Sunglasses", "no clothes"],
+                    ["Shorts", "Tank Top", "Casual", "Swimwear", "Sunglasses", "Collar", "no clothes"],
                     value=["Casual", "Sunglasses"],
                     multiselect=True, label="Wearing", allow_custom_value=True,
                     interactive=True
                 )
             with gr.Column():
-                gr_gender = gr.Radio(["Female", "Male"], value="Female", label="Gender")
+                gr.Markdown("If you have more Ideas, please use the Feedback function below.")
+                # gr_gender = gr.Radio(["Female", "Male"], value="Female", label="Gender")
 
             ################################################
             # handle recreation of target object description
             ################################################
             gr_age.change(
                 fn=self._create_better_words_for,
-                inputs=[gr_image_object, gr_age, gr_gender],
+                inputs=[gr_image_object, gr_age],
                 outputs=gr_txt_custom_object
             )
             gr_image_object.change(
                 fn=self._create_better_words_for,
-                inputs=[gr_image_object, gr_age, gr_gender],
+                inputs=[gr_image_object, gr_age],
                 outputs=gr_txt_custom_object
             )
-            gr_gender.change(
-                fn=self._create_better_words_for,
-                inputs=[gr_image_object, gr_age, gr_gender],
-                outputs=gr_txt_custom_object
-            )
+            # gr_gender.change(
+            #     fn=self._create_better_words_for,
+            #     inputs=[gr_image_object, gr_age, gr_gender],
+            #     outputs=gr_txt_custom_object
+            # )
 
             ################################################
             # switch visibility of human specific properties
