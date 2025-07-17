@@ -59,9 +59,6 @@ class AnalyticsDataGenerator:
             content = random.choice(self.content_types)
             reference = f"IMG{random.randint(1000, 9999)}"
             
-            # Start timer
-            start_time = self.analytics.start_image_creation_timer()
-            
             # Simulate image creation time
             time.sleep(random.uniform(5, 20))
             
@@ -72,9 +69,8 @@ class AnalyticsDataGenerator:
                 content=content,
                 reference=reference
             )
-            
-            # Stop timer
-            self.analytics.stop_image_creation_timer(start_time)
+            self.analytics.record_prompt_usage(True, True)
+
             
             print(f"[{datetime.now().strftime('%H:%M:%S')}] Image created: {model} | {content} | {reference}")
 
@@ -106,5 +102,8 @@ class AnalyticsDataGenerator:
                 time.sleep(5)
 
 if __name__ == "__main__":
+    #analytics = Analytics()
+    #analytics.record_prompt_usage(True, True)
+    #input("ha")
     generator = AnalyticsDataGenerator()
     generator.run()

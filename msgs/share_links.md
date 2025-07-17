@@ -1,4 +1,4 @@
-# Earn Credits by Sharing Invitation Links
+## Earn Credits by Sharing Invitation Links
 
 You can earn extra credits by sharing our application with others. Simply click the button on the right side to generate an invitation link.
 

@@ -61,11 +61,13 @@ def check_models():
     models_path = os.getenv('MODEL_DIRECTORY', './text2img/models/')
     cache_path = os.getenv('CACHE_DIR')
     output_path = os.getenv('OUTPUT_DIRECTORY', './output')
+    output_path = os.path.join(output_path, datetime.now().strftime("%Y%m%d_%H%M"))
     print(f"use '{models_path}' for scanning")
 
     # Load prompts at startup
     prompts = load_prompts()
     print(f"Loaded {len(prompts)} prompts for testing")
+    # TODO: save prompts to file
     filters = load_filters()
 
     # Ensure output directory exists
@@ -89,8 +91,8 @@ def check_models():
             print(f"\nTesting model: {model_name} from {file}")
 
             # Determine image size based on path
-            height = width = 512 if "1.5" in file else 1024
-            pt = StableDiffusionPipeline if "1.5" in file else StableDiffusionXLPipeline
+            height = width = 512 if "1.5" in file or "15" in file else 1024
+            pt = StableDiffusionPipeline if "1.5" in file or "15" in file else StableDiffusionXLPipeline
             if "flux" in file.lower():
                 pt = FluxPipeline
             print(f"Using resolution: {width}x{height}")

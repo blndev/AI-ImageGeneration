@@ -96,8 +96,8 @@ class TestModelConfig(unittest.TestCase):
         self.assertEqual(len(data), 2)
         self.assertEqual(data[0]["Model"], "TestModel")
         self.assertEqual(data[1]["Model"], "Model2")
-        self.assertEqual(data[0]["Type"], "FLUX")
-        self.assertEqual(data[1]["Type"], "SDXL")
+        self.assertEqual(data[0]["ModelType"], "FLUX")
+        self.assertEqual(data[1]["ModelType"], "SDXL")
         # Zusätzlicher Test um Konsistenz mit to_json zu verifizieren
         single_json = json.loads(configs[0].to_json())
         self.assertEqual(data[0], single_json)
@@ -111,7 +111,7 @@ class TestModelConfig(unittest.TestCase):
                     "Model": "cm",
                     "Description": "--test--",
                     "Aspect_Ratio": {
-                        "Square": "1024x1024"
+                        "Square": "512x512"
                     }
                 }
         )
@@ -123,7 +123,9 @@ class TestModelConfig(unittest.TestCase):
         self.assertEqual(merged.description, child.description)
         self.assertEqual(merged.model_type, parent.model_type)
 
-        self.assertDictEqual(merged.aspect_ratio, child.aspect_ratio)
+        self.assertEqual(merged.aspect_ratio["Square"], child.aspect_ratio["Square"])
+        self.assertEqual(merged.aspect_ratio["Landscape"], parent.aspect_ratio["Landscape"])
+
 
     def test_getconfig(self):
         configs = ModelConfig.create_config_list_from_json(self.sample_json)
@@ -162,7 +164,11 @@ class TestModelConfigMerge(unittest.TestCase):
             "ModelType": "parent_type",
             "Parent": "",
             "Description": "Parent config",
-            "Generation": "v1",
+            "Generation": {
+                    "steps": 40,
+                    "guidance": 4.0,
+                    "negative_prompt": "False"
+            },
             "Aspect_Ratio": {"16:9":"123x456"},
             "Embeddings": {"positive": ["p1"], "negative": ["n1"]},
             "Loras": ["lora1"],
@@ -176,8 +182,6 @@ class TestModelConfigMerge(unittest.TestCase):
             "ModelType": "child_type",
             "Parent": "parent_model",
             "Description": "Child config",
-            "Generation": "v2",
-
             "Embeddings": {"positive": ["p2"], "negative": ["n2"]}
         }]
         '''
@@ -208,7 +212,7 @@ class TestModelConfigMerge(unittest.TestCase):
         self.assertEqual(result.model_type, self.child_config.model_type)
         self.assertEqual(result.parent, self.child_config.parent)
         self.assertEqual(result.description, self.child_config.description)
-        self.assertEqual(result.generation, self.child_config.generation)
+        self.assertDictEqual(result.generation, self.parent_config.generation)
         self.assertDictEqual(result.aspect_ratio, self.parent_config.aspect_ratio)
         self.assertListEqual(result.embeddings["positive"], self.child_config.embeddings["positive"])
         self.assertListEqual(result.embeddings["negative"], self.parent_config.embeddings["negative"])

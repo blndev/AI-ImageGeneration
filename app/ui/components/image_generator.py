@@ -1,4 +1,5 @@
 import os
+import random
 import gradio as gr
 import logging
 from app.generators import FluxGenerator, GenerationParameters, ModelConfig, StabelDiffusionGenerator
@@ -79,17 +80,33 @@ class ImageGenerationHandler:
                         neg_prompt,
                         aspect_ratio: str,
                         user_activated_promptmagic: bool,
-                        image_count):
+                        image_count: int):
         try:
 
             # cleanup input data
             prompt = str(prompt.strip()).replace("'", "-")
             userprompt = prompt
+            style = None
+            try:
+                if self.config.promptmarker in prompt:
+                    parts = prompt.split(self.config.promptmarker)
+                    if len(parts) > 1:
+                        userprompt = parts[1]
+                        style = parts[0] + "{userprompt}"
+                    if len(parts) > 2:
+                        style = style + parts[2]
+                    logger.debug(f"Style '{style}' identified. Style free prompt: '{userprompt}'")
+            except Exception:
+                logger.info("error while extracting style from prompt")
+
             neg_prompt = neg_prompt.strip()
 
             progress(0.1, "analyze prompt")
             # enhance / shrink prompt and remove nsfw
             prompt = self._apply_prompt_magic(session_state, userprompt, user_activated_promptmagic)
+            # reapply style if exists
+            if style:
+                prompt = style.replace("{userprompt}", prompt)
 
             # additional nsfw protection
             if session_state.nsfw <= self.MAX_NSFW_WARNINGS:
@@ -137,21 +154,24 @@ class ImageGenerationHandler:
         except Exception as e:
             logger.error(f"image generation failed: {e}")
             logger.debug("Exception details:", exc_info=True)
+            self.analytics.record_application_error(module="image generation", criticality="error")
             raise Exception("Error while generating the image")
 
     def _censor_nsfw_images(self, session_state, generated_images):
         result_images = []
         try:
             show_nsfw_censor_warning = False
+            nsfw_count = 0
             for image in generated_images:
                 nsfw_check = self.nsfw_detector.detect(image)
                 if not nsfw_check.is_safe:
                     # just for debugging purposes
                     logger.debug(f"Generated NSFW Image detected. Category: {nsfw_check.category}, Confidence: {nsfw_check.confidence}")
-
+                    nsfw_count += 1
                 # we check against nsfw<=0 to apply censorship on the explicit regions, if that happen more often (-2),
                 # the prompt refiner is used in advance to avoid nsfw generation (trigger value is NSFW_WARNINGS)
-                if not nsfw_check.is_safe and nsfw_check.category == NSFWCategory.EXPLICIT and session_state.nsfw <= 0:
+                if not nsfw_check.is_safe and nsfw_check.category == NSFWCategory.EXPLICIT \
+                        and (session_state.nsfw <= 0 or self.config.feature_allow_nsfw is False):
                     result_images.append(
                         self.nsfw_detector.censor_detected_regions(
                             image=image,
@@ -166,25 +186,43 @@ class ImageGenerationHandler:
                     if nsfw_check.category == NSFWCategory.EXPLICIT:
                         # reduce only if output is nsfw
                         session_state.nsfw -= 1
-            if show_nsfw_censor_warning and self.config.feature_use_upload_for_age_check:
+            if show_nsfw_censor_warning and self.config.feature_allow_nsfw:
                 gr.Info("""We censored at least one of your images.
                         You can remove the censorship by uploading images to train our System for better results, or by sharing Links of this app.
                         Thanks for your understanding""", duration=0)
+
+            try:
+                # analytics
+                self.analytics.record_image_creation(
+                    count=len(generated_images),
+                    nsfw_count=nsfw_count,
+                    model=self.selectedmodelconfig.model
+                )
+            except Exception as e:
+                logger.warning(f"error while recording sucessful image generation for stats: {e}")
+                pass
+
         except Exception as e:
             logger.warning(f"Error while NSFW check: {e}")
+            self.analytics.record_application_error(module="NSFW check", criticality="warning")
             result_images = generated_images
         return result_images
 
     def _apply_prompt_magic(self, session_state: SessionState, prompt: str, user_activated_promptmagic: bool) -> str:
         # check if nsfw or preview is allowed, enforce SFW prompt if not
-        if session_state.nsfw <= self.MAX_NSFW_WARNINGS and self.prompt_refiner:
+        nsfw_preview_expired = session_state.nsfw < self.MAX_NSFW_WARNINGS
+        if (not self.config.feature_allow_nsfw or nsfw_preview_expired) and self.prompt_refiner:
             nsfw, _ = self.prompt_refiner.check_contains_nsfw(prompt)
             if nsfw:
-                if self.config.feature_use_upload_for_age_check and session_state.nsfw < self.MAX_NSFW_WARNINGS and not session_state.nsfw <= self.MAX_NSFW_WARNINGS * 2:
-                    gr.Info("""Explicit image generation preview is over and will now be blocked.
+                if self.config.feature_allow_nsfw and self.config.feature_upload_images_for_new_token_enabled and \
+                        not session_state.nsfw <= self.MAX_NSFW_WARNINGS * 2:
+                    # and not session_state.nsfw <= self.MAX_NSFW_WARNINGS * 2: means shows warning only limited amout of time
+                    gr.Info("""Your 'Preview' for explicit image generation is over and explicit content creation will now
+                            be blocked by adapting your prompt.
                             You can get credits for uncensored images by uploading related images for our model training.
-                            What you upload, you can create!""", duration=30)
-                logger.info(f"Convert NSFW prompt to SFW. User Prompt: '{prompt}'")
+                            Or by sharing the Application Link. What you upload, you can create!""", duration=60)
+
+                logger.info(f"Convert NSFW prompt to SFW. Original User-Prompt: '{prompt}'")
                 prompt = self.prompt_refiner.make_prompt_sfw(prompt, True)
             else:
                 logger.debug("prompt is SFW")
@@ -192,10 +230,12 @@ class ImageGenerationHandler:
         if self.prompt_refiner and user_activated_promptmagic:
             logger.debug("Apply Prompt-Magic")
             # refine prompt multiple times for better reults
-            for _ in range(3):
+            userprompt = prompt
+            for _ in range(random.randrange(3)):
                 new_prompt = self.prompt_refiner.magic_enhance(prompt, 200)
-                if len(new_prompt) > len(prompt): prompt = new_prompt
-            if session_state.nsfw <= self.MAX_NSFW_WARNINGS and not self.prompt_refiner.is_safe_for_work(prompt):
+                if len(new_prompt) > len(prompt) or prompt == userprompt: prompt = new_prompt
+            # finally check that we not created nsfw by llm mistakes
+            if session_state.nsfw < self.MAX_NSFW_WARNINGS and not self.prompt_refiner.is_safe_for_work(prompt):
                 prompt = self.prompt_refiner.make_prompt_sfw(prompt)
 
         return prompt
@@ -219,9 +259,14 @@ class ImageGenerationHandler:
             logger.warning(f"error while saving images: {e}")
 
     def _get_image_dimensions(self, aspect_ratio):
-        width, height = 512, 512  # fallback
+        width, height = 512, 512
+        # define fallback (first element)
+        for supported_ratio in self.selectedmodelconfig.aspect_ratio.values():
+            width, height = ModelConfig.split_aspect_ratio(supported_ratio)
+
+        # try to determine teh corect aspect ratio
         for supported_ratio in self.selectedmodelconfig.aspect_ratio.keys():
-            if supported_ratio.lower() in aspect_ratio.lower():
+            if aspect_ratio.lower() in supported_ratio.lower():
                 ratio = self.selectedmodelconfig.aspect_ratio[supported_ratio]
                 width, height = ModelConfig.split_aspect_ratio(ratio)
                 break

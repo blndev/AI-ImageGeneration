@@ -64,13 +64,10 @@ class LinkSharingHandler:
                 reference_counts += 1  # 1 point for a new session
                 self._session_references_database[shared_reference_key] = reference_counts
                 logger.debug(f"session reference saved for reference: {shared_reference_key}")
-
-            self.analytics.record_new_session(
-                user_agent=request.headers["user-agent"],
-                languages=request.headers["accept-language"],
-                reference=shared_reference_key)
+            return shared_reference_key
         except Exception as e:
             logger.debug(f"Error while extracting reference keyfor new session: {e}")
+        return ""
 
     def record_image_generation_for_shared_link(self, request: gr.Request, image_count: int):
         try:
@@ -80,6 +77,7 @@ class LinkSharingHandler:
                 reference_counts += image_count * self.config.feature_sharing_links_new_token_per_image
                 self._session_references_database[shared_reference_key] = reference_counts
                 logger.debug(f"session reference saved for reference: {shared_reference_key}")
+                self.analytics.record_reference_usage(shared_reference_key, image_count)
             return shared_reference_key
         except Exception as e:
             logger.debug(f"Error while extracting reference keyfor new session: {e}")
@@ -107,22 +105,27 @@ class LinkSharingHandler:
         if not self.config.feature_sharing_links_enabled: return
         self._load_ui_dependencies()
         # now start with interface
-        with gr.Row(visible=(self.config.feature_sharing_links_enabled)):
-            nsfw_msg = "(including uncensored credits)" if self.config.feature_use_upload_for_age_check else ""
-            with gr.Accordion(f"Get more generator credits by sharing Links {nsfw_msg}", open=False):
-                with gr.Row():
-                    with gr.Column(scale=2):
-                        gr.Markdown(self.msg_share_links)
-                    with gr.Column(scale=1):
-                        create_refernce_link = gr.Button("Create Link")
-                        reference_code = gr.Text(label="Share following link:", interactive=False)
-
-                create_refernce_link.click(
-                    fn=self._handle_link_creation,
-                    inputs=[user_session_storage],
-                    outputs=[user_session_storage, reference_code],
-                    concurrency_limit=None,
+        if not (self.config.feature_sharing_links_enabled): return
+        nsfw_msg = "(including credits for uncensored images)" if self.config.feature_allow_nsfw else ""
+        with gr.Row():
+            gr.Label(f"Get more image generator credits by sharing Links {nsfw_msg}", container=False)
+        with gr.Row():
+            with gr.Column(scale=2):
+                gr.Markdown(self.msg_share_links)
+            with gr.Column(scale=1):
+                create_refernce_link = gr.Button("Create Link")
+                reference_code = gr.Text(
+                    label="Share the following link:",
+                    interactive=False,
+                    show_copy_button=True
                 )
+
+        create_refernce_link.click(
+            fn=self._handle_link_creation,
+            inputs=[user_session_storage],
+            outputs=[user_session_storage, reference_code],
+            concurrency_limit=None,
+        )
 
     def _handle_link_creation(self, request: gr.Request, gradio_state: str):
         """

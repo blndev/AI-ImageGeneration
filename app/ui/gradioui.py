@@ -11,7 +11,7 @@ from app.utils.singleton import singleton
 from app.generators import ModelConfig
 from ..analytics import Analytics
 import json
-from .components import UploadHandler, SessionManager, LinkSharingHandler, ImageGenerationHandler, FeedbackHandler
+from .components import UploadHandler, SessionManager, LinkSharingHandler, ImageGenerationHandler, FeedbackHandler, PromptAssistantHandler
 
 # Set up module logger
 logger = logging.getLogger(__name__)
@@ -40,7 +40,8 @@ class GradioUI():
                 logger.error("Configured Model and parents does not contain a path or modeltype. Stop execution.")
                 exit(1)
 
-            self.analytics = Analytics()
+            self.analytics = Analytics(config=self.config)
+            self.analytics.register_model(selectedmodel)
             self.component_session_manager = SessionManager(config=self.config, analytics=self.analytics)
 
             self.component_image_generator = ImageGenerationHandler(
@@ -51,7 +52,7 @@ class GradioUI():
             )
 
             self.component_upload_handler = None
-            if self.config.feature_upload_images_for_new_token_enabled or self.config.feature_use_upload_for_age_check:
+            if self.config.feature_upload_images_for_new_token_enabled or self.config.feature_allow_nsfw:
                 self.component_upload_handler = UploadHandler(
                     session_manager=self.component_session_manager,
                     config=self.config,
@@ -70,6 +71,12 @@ class GradioUI():
                 session_manager=self.component_session_manager,
                 config=self.config,
                 analytics=self.analytics
+            )
+
+            self.component_prompt_assistant_handler = PromptAssistantHandler(
+                analytics=self.analytics,
+                config=self.config,
+                image_generator=self.component_image_generator
             )
 
             # used to determine when to unload models etc
@@ -122,15 +129,19 @@ class GradioUI():
         * refreshes configuration
         * unloading unused models
         """
-        logger.debug("tick - cleanup interval")
-        timeout_minutes = self.config.free_memory_after_minutes_inactivity
-        x15_minutes_ago = datetime.now() - timedelta(minutes=timeout_minutes)
-        self.component_session_manager.session_cleanup_and_analytics()
+        # logger.debug("tick - cleanup interval")
+        try:
+            timeout_minutes = self.config.free_memory_after_minutes_inactivity
+            x15_minutes_ago = datetime.now() - timedelta(minutes=timeout_minutes)
+            self.component_session_manager.session_cleanup_and_analytics()
 
-        if self.app_last_image_generation < x15_minutes_ago:
-            # no active user for 15 minutes, we can unload the model to free memory
-            logger.info(f"No active user for {timeout_minutes} minutes. Unloading Generator Models from Memory")
-            self.component_image_generator.generator.unload_model()
+            if self.app_last_image_generation < x15_minutes_ago and self.component_image_generator.generator._cached_generation_pipeline:
+                # no active user for x minutes, we can unload the model to free memory
+                logger.debug(f"No active user for {timeout_minutes} minutes. Unloading Generator Models from Memory")
+                self.component_image_generator.generator.unload_model()
+        except Exception as e:
+            logger.warning(f"Error in cleanup handler: {e}")
+            self.analytics.record_application_error(module="cleanup", criticality="warning")
 
     def action_session_initialized(self, request: gr.Request, session_state: SessionState):
         """Initialize analytics session when app loads.
@@ -142,10 +153,16 @@ class GradioUI():
         logger.info("Session - %s - initialized with %i (%i) credits for: %s",
                     session_state.session, session_state.token, session_state.nsfw, request.client.host)
 
+        reference_code = ""
         if self.component_link_sharing_handler:
-            self.component_link_sharing_handler.initialize_session_references(request=request)
+            reference_code = self.component_link_sharing_handler.initialize_session_references(request=request)
         if self.component_session_manager:
             self.component_session_manager.record_active_session(session_state)
+
+        self.analytics.record_new_session(
+            user_agent=request.headers.get("user-agent", "Mozilla/5.0 (compatible; MSIE 7.0; Windows NT 6.0; Win64; x64 Trident/4.0)"),
+            languages=request.headers.get("accept-language", "en"),
+            reference=reference_code)
 
     def uiaction_timer_check_token(self, gradio_state: str):
         if gradio_state is None:
@@ -159,7 +176,7 @@ class GradioUI():
         if self.config.feature_sharing_links_enabled:
             session_state, new_reference_token = self.component_link_sharing_handler.earn_link_rewards(session_state=session_state)
 
-        if self.config.token_enabled and (new_timer_token + new_reference_token) > 0:
+        if self.config.feature_generation_credits_enabled and (new_timer_token + new_reference_token) > 0:
             msgTimer = f"{new_timer_token} for waiting," if new_timer_token > 0 else ""
             msgReference = f"{new_reference_token} for sharing links" if new_reference_token > 0 else ""
             gr.Info(f"Congratulation, you received new generation credits: {msgTimer} {msgReference}!", duration=0)
@@ -177,7 +194,6 @@ class GradioUI():
             image_count (int): The number of images to generate
         """
         session_state = SessionState.from_gradio_state(gr_state)
-        analytics_image_creation_duration_start_time = None
         try:
             # Record session activity
             progress(0, desc="prepare generation")
@@ -188,24 +204,33 @@ class GradioUI():
                 logger.error("Failed to record session activity: %s", str(e))
                 # Continue execution as this is not critical
 
-            if self.config.token_enabled and session_state.token < image_count:
+            session_state.save_last_generation_activity()
+
+            # reduct image count and inform the User
+            if self.config.feature_generation_credits_enabled and session_state.token > 0 and session_state.token < image_count:
+                image_count = session_state.token
+                msg = "You using your last generations credits!"
+                if self.config.feature_upload_images_for_new_token_enabled:
+                    msg += "You can get more credits by sharing images for training. Please check the section 'Upload image'."
+                if self.config.feature_sharing_links_enabled:
+                    msg += "Or share the application link with your reference code to other users. More details in 'Share Links'."
+                gr.Warning(msg)
+
+            # check for end of token
+            if self.config.feature_generation_credits_enabled and session_state.token < image_count:
                 msg = f"Not enough generation credits available.\n\nPlease wait {self.config.new_token_wait_time} minutes"
                 if self.config.feature_upload_images_for_new_token_enabled:
                     msg += ", or get new credits by sharing images for training"
                 if self.config.feature_sharing_links_enabled:
-                    msg += ", or share the application link to other users"
+                    msg += ", or share the application link to other users via the section 'Sharing' ."
                 logger.info("User %s attempted generation with insufficient credits (%s needed, %s available)",
                             session_state.session, image_count, session_state.token)
                 gr.Warning(msg, title="Image generation failed", duration=30)
                 return [], session_state, ""
 
-            analytics_image_creation_duration_start_time = self.analytics.start_image_creation_timer()
-            session_state.save_last_generation_activity()
-            shared_reference_key = None
-
             if self.component_link_sharing_handler:
                 try:
-                    shared_reference_key = self.component_link_sharing_handler.record_image_generation_for_shared_link(
+                    self.component_link_sharing_handler.record_image_generation_for_shared_link(
                         request=request,
                         image_count=image_count
                     )
@@ -227,8 +252,8 @@ class GradioUI():
             except Exception as e:
                 logger.error("Image generation failed: %s", str(e))
                 logger.debug("Image generation exception details:", exc_info=True)
-                gr.Warning(f"Failed to generate images: {str(e)}", title="Image generation failed", duration=30)
-                return [], session_state, prompt
+                # not show warning as this is done below gr.Warning(f"Failed to generate images: {str(e)}", title="Image generation failed", duration=30)
+                raise Exception("AI Pipeline Error.")
 
             # save image hashes to prevent upload
             if self.component_upload_handler:
@@ -238,20 +263,8 @@ class GradioUI():
                     logger.error("Failed to block created images from upload: %s", str(e))
                     # Continue execution as this is not critical
 
-            if session_state.token <= 1:
-                logger.warning(f"session {session_state.session} running out of credits ({session_state.token}) left")
-
-            try:
-                # TODO: create useful values for "content" eg. main focus (describe the main object create in the image in one word")
-                # use blib or ollama image descibe
-                self.analytics.record_image_creation(
-                    count=image_count,
-                    model=self.selectedmodelconfig.model,
-                    content="",
-                    reference=shared_reference_key)
-            except Exception as e:
-                logger.warning(f"error while recording sucessful image generation for stats: {e}")
-                pass
+            if session_state.token <= 1 and self.config.feature_generation_credits_enabled:
+                logger.warning(f"session {session_state.session} is out of credits ({session_state.token}) left")
 
             progress(1, "image generation finished")
             return generated_images, session_state, prompt
@@ -262,12 +275,6 @@ class GradioUI():
             gr.Warning(f"Error while generating the image: {e}", title="Image generation failed", duration=30)
             return [], session_state, prompt
 
-        finally:
-            try:
-                self.analytics.stop_image_creation_timer(analytics_image_creation_duration_start_time)
-            except Exception as e:
-                logger.error("Failed to stop analytics timer: %s", str(e))
-
     def create_interface(self):
 
         # Create the interface components
@@ -276,103 +283,160 @@ class GradioUI():
             css="""
             footer {visibility: hidden}
             """,
+            # .smalltext {text-align: center; font-size: 8px; !important}
+            # #credits {background-color: #FFCCCB;font-size: 8px; !important}
             analytics_enabled=False
         ) as self.interface:
             user_session_storage = gr.BrowserState()  # do not initialize it with any value!!! this is used as default
-
-            # with gr.Row():
-            #     gr.Markdown(value=self.selectedmodelconfig.description)
+            gr_assistant_prompt = gr.Textbox(value=None, visible=False)
+            with gr.Row():
+                gr.Label(
+                    label="This App is made to test our AI System. It runs maximum of 2 days and as long as we have sponsored Hardware.",
+                    value=f"Generate {self.selectedmodelconfig.description} for free!"
+                )
             # Input Values & Generate row
             with gr.Row():
-                with gr.Column():
-                    # Text prompt input
-                    prompt = gr.Textbox(
-                        label="Your wish",
-                        placeholder="Describe the image you want to generate...",
-                        value="",
-                        scale=4,
-                        lines=4,
-                        max_length=340
-                    )
-
-                    # Text prompt input
-                    neg_prompt = gr.Textbox(
-                        label="Avoid",
-                        placeholder="Describe what you don't want...",
-                        value="",
-                        scale=4,
-                        lines=4,
-                        max_length=340
-                    )
-
-                with gr.Column():
-                    # Aspect ratio selection
-                    ratios = []
-                    for k in self.selectedmodelconfig.aspect_ratio.keys():
-                        ratios.append(k)
-                    if len(ratios) == 0:
-                        ratios.append("default")
-                    aspect_ratio = gr.Radio(
-                        # choices=["□ Square", "▤ Landscape", "▯ Portrait"],
-                        choices=ratios,
-                        value=ratios[0],
-                        label="Aspect Ratio",
-                        scale=1
-                    )
-                    image_count = gr.Slider(
-                        label="Image Count",
-                        minimum=1,
-                        maximum=int(self.selectedmodelconfig.generation.get("max_images", 2)),
-                        value=1,
-                        step=1,
-                        scale=1
-                    )
-                    prompt_magic_checkbox = gr.Checkbox(
-                        label="Enable Prompt Magic",
-                        value=(self.config.feature_prompt_magic_enabled), visible=(self.component_image_generator.promptmagic_enabled))
-                    magic_prompt = gr.Textbox(label="Magic Prompt", interactive=False, visible=prompt_magic_checkbox.value)
-                    prompt_magic_checkbox.change(
-                        inputs=[prompt_magic_checkbox],
-                        outputs=[magic_prompt],
-                        fn=lambda x: gr.Textbox(visible=x)
-                    )
-
-                # generate and token count
-                with gr.Column(visible=True):
-                    with gr.Row(visible=self.config.token_enabled):
-                        # token count is restored from app.load
-                        token_label = gr.Text(
-                            show_label=False,
-                            scale=2,
-                            value="?",
-                            info=f"Amount of images you can generate before a wait time of {self.config.new_token_wait_time} minutes",
+                with gr.Tabs():
+                    with gr.TabItem("Assistant"):
+                        gr_assistant_create_image, gr_assistant_token_info = self.component_prompt_assistant_handler.create_interface_elements(
+                            session_state=user_session_storage,
+                            assistant_prompt=gr_assistant_prompt
                         )
-                        button_check_token = gr.Button(value="🗘", size="sm")
-                    with gr.Row():
-                        # Generate button that's interactive only when prompt has text
-                        generate_btn = gr.Button(
-                            "Generate " + self.selectedmodelconfig.description,
-                            interactive=False
+
+                    # TODO: move to generate Image UI
+                    with gr.TabItem("Free style") as tabText:
+                        with gr.Row():
+
+                            with gr.Column(scale=2):
+                                # Text prompt input
+                                gr_freestyle_prompt = gr.Textbox(
+                                    label="What image you want to see?",
+                                    info="Prompt",
+                                    placeholder="Describe the image you want to generate...",
+                                    value="",
+                                    lines=3,
+                                    max_length=340
+                                )
+                                # with gr.Column():
+
+                            # generate and token count
+                            with gr.Column():
+                                with gr.Group():
+                                    with gr.Row():  # visible=self.config.feature_generation_credits_enabled):
+                                        token_label = gr.Text(value="", container=True, show_label=False)
+                                    with gr.Row():
+
+                                        # Generate button that's interactive only when prompt has text
+                                        gr_freestyle_generate_btn = gr.Button(
+                                            "Start",
+                                            interactive=False,
+                                            variant="primary"
+                                        )
+
+                    with gr.TabItem("Examples", visible=len(self.examples) > 0):
+                        def example_selected(self):
+                            # FIXME generation_tabs.selected = tabText #is not working in any variation
+                            gr.Info(
+                                message=f"Switch now back to the Tab '{tabText.label}' and click 'Start' to generate this image.",
+                                title="Example selected"
+                            )
+
+                        # Examples
+                        gr.Examples(
+                            examples=self.examples,
+                            fn=example_selected,
+                            run_on_click=True,
+                            inputs=[gr_freestyle_prompt],
+                            label="Click an example to load it"
                         )
-                        cancel_btn = gr.Button("Cancel", interactive=False, visible=False)
 
-            # Sharew Links to get credits
-            if self.component_link_sharing_handler:
-                self.component_link_sharing_handler.create_interface_elements(user_session_storage)
+            # Advanced row
+            with gr.Row():
+                with gr.Accordion("Advanced generation Options", open=False):
+                    with gr.Tab("Image"):
+                        with gr.Row():
+                            with gr.Column(visible=True, scale=1):
+                                with gr.Row():
+                                    image_count = gr.Slider(
+                                        label="Amount of Images to create",
+                                        show_reset_button=False,
+                                        minimum=1,
+                                        maximum=int(self.selectedmodelconfig.generation.get("max_images", 2)),
+                                        value=1,
+                                        step=1,
+                                        scale=1
+                                    )
+                                with gr.Row():
+                                    # Aspect ratio selection
+                                    ratios = []
+                                    for k in self.selectedmodelconfig.aspect_ratio.keys():
+                                        ratios.append(k)
+                                    if len(ratios) == 0:
+                                        ratios.append("default")
+                                    aspect_ratio = gr.Radio(
+                                        # choices=["□ Square", "▤ Landscape", "▯ Portrait"],
+                                        choices=ratios,
+                                        value=ratios[0],
+                                        label="Aspect Ratio",
+                                        scale=1
+                                    )
+                            with gr.Column(visible=True, scale=3):
+                                gr.Markdown("Did you miss something here? Let us know!")
 
-            # Upload to get credits
-            if self.component_upload_handler:
-                self.component_upload_handler.create_interface_elements(user_session_storage)
+                    with gr.Tab("Negative Prompt"):
+                        with gr.Row():
+                            with gr.Column(visible=True):
+                                # Text prompt input
+                                gr.Markdown("Write down what our generator should not create in the images:")
+                                neg_prompt = gr.Textbox(
+                                    label="Negative Prompt, avoid the following Elements",
+                                    placeholder="Describe what you don't want...",
+                                    value="",
+                                    scale=3,
+                                    lines=2,
+                                    max_length=340,
+                                    container=False
+                                )
+                    with gr.Tab("Prompt Magic"):
+                        with gr.Row():
+                            prompt_magic_checkbox = gr.Checkbox(
+                                label="Enable Prompt Magic",
+                                info="Optimization",
+                                container=False,
+                                value=(self.config.feature_prompt_magic_enabled), visible=(self.component_image_generator.promptmagic_enabled))
+                        with gr.Row():
+                            magic_prompt = gr.Textbox(
+                                # info="used Magic Prompt",
+                                show_label=True,
+                                show_copy_button=True,
+                                # container=False,
+                                scale=2,
+                                label="Used Magic Prompt",
+                                lines=2,
+                                interactive=False,
+                                visible=prompt_magic_checkbox.value
+                            )
+                            prompt_magic_checkbox.change(
+                                inputs=[prompt_magic_checkbox],
+                                outputs=[magic_prompt],
+                                fn=lambda x: gr.Textbox(visible=x)
+                            )
 
-            # Examples row
-            with gr.Row(visible=len(self.examples) > 0):
-                with gr.Accordion("Examples", open=False):
-                    # Examples
-                    gr.Examples(
-                        examples=self.examples,
-                        inputs=[prompt, neg_prompt],
-                        label="Click an example to load it"
-                    )
+            with gr.Accordion(
+                label=f"Get Credits to generate more {("(uncensored)" if self.config.feature_allow_nsfw else "")} images",
+                open=False
+            ):
+                with gr.Tab("Share Link",
+                            visible=(self.config.feature_sharing_links_enabled)):
+                    # Share Links to get credits
+                    if self.component_link_sharing_handler:
+                        self.component_link_sharing_handler.create_interface_elements(user_session_storage)
+
+                with gr.Tab("Upload Images",
+                            visible=(self.config.output_directory and self.config.feature_upload_images_for_new_token_enabled)):
+                    # Upload to get credits
+                    if self.component_upload_handler:
+                        self.component_upload_handler.create_interface_elements(user_session_storage)
 
             # Gallery row
             with gr.Row(height=800, max_height=1200):
@@ -383,10 +447,16 @@ class GradioUI():
                     show_share_button=False,
                     show_download_button=True,
                     format="jpeg",
-                    columns=4,
-                    rows=None,
+                    columns=1,
+                    rows=None,  # dynamic linked to image count slider
                     height="800px",
-                    object_fit="contain"
+                    object_fit="cover"
+                )
+                # optimize space for displayed images
+                image_count.change(
+                    fn=lambda v: gr.Gallery(columns=v),
+                    inputs=[image_count],
+                    outputs=[gallery]
                 )
 
             # Download Button
@@ -394,25 +464,26 @@ class GradioUI():
                 download_btn = gr.DownloadButton("Download", visible=False)
 
             # Feedback row
-            feedback_txt, feedback_button = None, None
+            feedback_txt = None
             if self.component_feedback_handler:
-                feedback_txt, feedback_button = self.component_feedback_handler.create_interface_elements(user_session_storage)
+                feedback_txt, _ = self.component_feedback_handler.create_interface_elements(user_session_storage)
 
             def update_token_info(gradio_state):
                 # logger.debug("local_storage changed: SessionState: %s", gradio_state)
                 ss = SessionState.from_gradio_state(gradio_state)
                 token = ss.token
-                if self.config.token_enabled is False:
+                if self.config.feature_generation_credits_enabled is False:
                     token = "unlimited"
                 n = ""
-                if self.config.feature_use_upload_for_age_check and ss.nsfw > 0:
+                if self.config.feature_allow_nsfw and ss.nsfw > 0:
                     n = f"(Uncensored: {ss.nsfw})"
-                return f"Generations left: {token} {n}"
+                msg = f"Amount of images you can generate: {token} {n}"
+                return msg, msg
             user_session_storage.change(
                 # update the UI with current token count
                 fn=update_token_info,
                 inputs=[user_session_storage],
-                outputs=[token_label],
+                outputs=[token_label, gr_assistant_token_info],
                 concurrency_limit=None,
                 show_api=False,
                 show_progress=False
@@ -426,41 +497,33 @@ class GradioUI():
                 concurrency_id="check_token",
                 concurrency_limit=30
             )
-            button_check_token.click(
-                fn=self.uiaction_timer_check_token,
-                inputs=[user_session_storage],
-                outputs=[user_session_storage],
-                concurrency_id="check_token",
-            ).then(
-                # enable feedback again
-                fn=lambda: (sleep(2)),
-                inputs=[],
-                outputs=[feedback_txt]
-            )
-
             # Make button interactive only when prompt has text
-            prompt.change(
+            gr_freestyle_prompt.change(
                 fn=lambda x: gr.Button(interactive=len(x.strip()) > 0),
-                inputs=[prompt],
-                outputs=[generate_btn]
+                inputs=[gr_freestyle_prompt],
+                outputs=[gr_freestyle_generate_btn]
             )
 
-            # Connect the generate button to the generate function and disable button and token timer while generation
-            generate_btn.click(
-                fn=lambda: (gr.Timer(active=False), gr.Button(interactive=False), gr.Button(interactive=True), gr.Gallery(preview=False)),
+            # it's an invisiblöe text field used to transport teh assistant prompt
+            gr_assistant_prompt.change(
+                fn=lambda: (gr.Timer(active=False), gr.Button(interactive=False), gr.Button(interactive=False)),
                 inputs=[],
-                outputs=[timer_check_token, generate_btn, cancel_btn, gallery],
+                outputs=[timer_check_token, gr_freestyle_generate_btn, gr_assistant_create_image],
+            ).then(
+                fn=lambda pm, ic: self.analytics.record_prompt_usage(assistant_used=True, promptmagic_used=pm, image_count=ic),
+                inputs=[prompt_magic_checkbox, image_count],
+                outputs=[]
             ).then(
                 fn=self.uiaction_generate_images,
-                inputs=[user_session_storage, prompt, aspect_ratio, neg_prompt, image_count, prompt_magic_checkbox],
+                inputs=[user_session_storage, gr_assistant_prompt, aspect_ratio, neg_prompt, image_count, prompt_magic_checkbox],
                 outputs=[gallery, user_session_storage, magic_prompt],
                 concurrency_id="gpu",
-                show_progress="full"
+                show_progress="full",
+                show_progress_on=[token_label, gr_assistant_token_info]
             ).then(
-                fn=lambda: (gr.Timer(active=True), gr.Button(interactive=True),
-                            gr.Button(interactive=False), gr.Gallery(preview=False)),
+                fn=lambda: (gr.Timer(active=True), gr.Button(interactive=True)),
                 inputs=[],
-                outputs=[timer_check_token, generate_btn, cancel_btn, gallery]
+                outputs=[timer_check_token, gr_assistant_create_image]
             ).then(
                 # enable feedback again
                 fn=lambda: (gr.Textbox(interactive=True)),
@@ -468,16 +531,32 @@ class GradioUI():
                 outputs=[feedback_txt]
             )
 
-            stop_signal = gr.State(False)
-
-            def cancel_generation():
-                gr.close_all()
-                return True, gr.Button(interactive=True), gr.Button(interactive=False)
-
-            cancel_btn.click(
-                fn=cancel_generation,
+            # Connect the generate button to the generate function and disable button and token timer while generation
+            gr_freestyle_generate_btn.click(
+                fn=lambda: (gr.Timer(active=False), gr.Button(interactive=False), gr.Button(interactive=False), gr.Gallery(preview=False)),
                 inputs=[],
-                outputs=[stop_signal, generate_btn, cancel_btn]
+                outputs=[timer_check_token, gr_freestyle_generate_btn, gr_assistant_create_image, gallery],
+            ).then(
+                fn=lambda pm, ic: self.analytics.record_prompt_usage(assistant_used=False, promptmagic_used=pm, image_count=ic),
+                inputs=[prompt_magic_checkbox, image_count],
+                outputs=[]
+            ).then(
+                fn=self.uiaction_generate_images,
+                inputs=[user_session_storage, gr_freestyle_prompt, aspect_ratio, neg_prompt, image_count, prompt_magic_checkbox],
+                outputs=[gallery, user_session_storage, magic_prompt],
+                concurrency_id="gpu",
+                show_progress="full",
+                show_progress_on=token_label
+            ).then(
+                fn=lambda: (gr.Timer(active=True), gr.Button(interactive=True),
+                            gr.Button(interactive=True), gr.Gallery(preview=False)),
+                inputs=[],
+                outputs=[timer_check_token, gr_freestyle_generate_btn, gr_assistant_create_image, gallery]
+            ).then(
+                # enable feedback again
+                fn=lambda: (gr.Textbox(interactive=True)),
+                inputs=[],
+                outputs=[feedback_txt]
             )
 
             def prepare_download(selection: gr.SelectData):

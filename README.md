@@ -1,23 +1,30 @@
 # 🎨 AI Image Generation with FLUX and Stabel Diffusion
 
-Welcome to an exciting world of AI-powered image generation! This project leverages the powerful FLUX model from black-forest-labs to create stunning, high-quality images from text descriptions. Whether you're an artist, developer, or just curious about AI art, this tool provides an intuitive interface for your creative endeavors!
+Welcome to an exciting world of AI-powered image generation! This project leverages the powerful FLUX model from black-forest-labs to create stunning, high-quality images from text descriptions. 
+Also Stable Diffusion 1.5 and XL Models are supported. 
+Whether you're an artist, developer, or just curious about AI art, this tool provides an intuitive interface for your creative endeavors!
 
 ## ✨ Features
 
-- 🖼️ Generate high-quality images from text descriptions
-- 🎯 Multiple aspect ratio support (Square, Landscape, Portrait)
-- 🔄 Auto-update system with version tracking
-- 🎚️ Configurable generation parameters
+- 🖼️ Generate high-quality images from text descriptions and via Assistant
+- 🪄 Smart prompt refinement via LLM
 - 🎮 User-friendly Gradio interface
+- 🎯 Configurable aspect ratio support (Square, Landscape, Portrait)
+- 🎚️ Configurable generation parameters for Admins
 - 📊 Credit-based usage system (optional)
 - 💾 Automatic model management and caching
 - 🛠️ Memory optimization options for different hardware setups
-- 🪄 Smart prompt refinement with Ollama integration
+- 🔄 Auto-update system with version tracking
 
 ----
-Example:
+Generated Image Example:
 
 ![Example](examples/disneystyle.png)
+
+Our Assistant:
+![Image definition](examples/assistant.png)
+
+![Alien](examples/alien.png)
 ----
 
 ## 🚀 Installation
@@ -69,18 +76,22 @@ Customize your experience through environment variables in `.env`:
 ### 🎫 Credit System
 - `INITIAL_GENERATION_TOKEN`: Starting Credits for new users (0=unlimited)
 - `NEW_TOKEN_WAIT_TIME`: Minutes to wait for Credit refreshes
+- `FEATURE_SHARING_LINK_NEW_TOKEN`: allows users to share the application link to receive new Credits
+- `FEATURE_UPLOAD_IMAGE_NEW_TOKEN`: allows users to share upload images to train the system, to receive new Credits
 
 ### 🪄 Prompt Magic
+- `PROMPTMAGIC`: Turn on or off feature which optimize the given prompts
 - `OLLAMA_SERVER`: Custom Ollama server location (default: localhost)
 - `OLLAMA_MODEL`: Model for prompt enhancement (default: llava)
 
 ### 🖼️ Generation Settings
 - `GENERATION_MODEL`: Choose a model specified in modelconfig.json (default: black-forest-labs/FLUX.1-dev)
-- `MODELCONFIG`: optional, teh path and filename of teh modelconfig.json to be used (default: ./modelconfig.json)
+- `MODELCONFIG`: optional, the path and filename of the modelconfig.json to be used (default: ./modelconfig.json)
+- `FEATURE_ALLOW_NSFW`: Default: False, if turned on all our content filtering and censorship will be deactived. Be aware that could be inappropiate for some users depending on the used model
 
 ### 🎯 Output Configuration
 - `MODEL_DIRECTORY`: Location for downloaded models and cache files form HF
-- `OUTPUT_DIRECTORY`: Where to save generation information e.g. hashes of generated images (empty = disabled)
+- `OUTPUT_DIRECTORY`: Where to save generation information e.g. hashes of generated images or user feedback (empty = disabled)
 
 ### 📝 Model Configuration (modelconfig.json)
 
@@ -222,10 +233,15 @@ This configuration shows all available settings that can be defined for a model.
 
 This application provides built-in monitoring capabilities using Prometheus metrics, exposed on port 9101. The following metrics are available:
 
-- `imggen_image_creations_total`: Counter for total number of images created
-- `imggen_sessions_total`: Counter for total number of user sessions
-- `imggen_image_creation_duration_seconds`: Histogram of image creation duration
+- `imggen_image_creations`: Counter for total number of images created
+- `imggen_sessions`: Counter for total number of user sessions
+- `imggen_prompt_usage`: Counter for FreeStyle, Assistant and MagicPrompt usage
 - `imggen_user_Credits`: Gauge showing available Credits per user
+- `imggen_errors`: amount of errors and the source module
+
+Check the Prometheus endpoint to see if there is more.
+
+![Analytics](examples/analytics.png)
 
 ### Prerequisites
 - Podman or Docker installed on your system

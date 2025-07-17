@@ -24,7 +24,6 @@ class PromptRefiner():
         self.ollama_server = os.getenv("OLLAMA_SERVER", None)
 
         self.llm = None
-        # TODO: check that the model is existing by running test query. if that fails set sel.llm to None
         try:
             olc = Client(self.ollama_server)
             olc.pull(self.model)
@@ -139,6 +138,38 @@ class PromptRefiner():
 
         return ai_response
 
+        # TODO preparation for further enhancements
+        # # as this function is used to validate that the user prompt which may contain explicit content is correctly
+        # # translated into a text without explicit content
+        # messages = [
+        #     SystemMessage("""
+        #                   Your are an expert in identifing the main object in a description.
+        #                   Main objects are people, group of people, animals or buildings. Ignore if they are naked or clothed and any other details.
+        #                   If you compare descriptions, you first identify the main object.
+
+        #                   Answer with 'yes' if the main object is identical. Stope then. If not identical, answer 'not same', followed by the main object and a short reason.
+        #                   """),
+        #     # HumanMessage("Compare: #'a man in a business suite is working in an office'# \nand\n#'a man in an office'#"),
+        #     # AIMessage("yes, same. Reason: main object is a man"),
+        #     # HumanMessage("Compare: #'a man and a woman are naked in the pool'#\n and \n#'A couple wearing colorful swimwear while swimming in blue water'#"),
+        #     # AIMessage("yes, same. Reason: main object is a man and a woman"),
+        #     # HumanMessage("Compare: #'a boy in classroom writing a letter'#\n and \n#'A girl in classroom writing a letter'#"),
+        #     # AIMessage("not same. Reason: main object in one description is a boy in the other a girl."),
+        #     # HumanMessage("Compare: #'A naked woman on the beach'#\n and \n#'a woman wearing a bikini on the beach'#"),
+        #     # AIMessage("yes, same. Reason: main object is a woman. I ignore any details"),
+        #     # HumanMessage("Compare: #'A naked man'#\n and \n#'a man wearing pantys'#"),
+        #     # AIMessage("yes, same. Reason: main object is a man. I ignore any details"),
+        #     HumanMessage(f"Compare: #'{prompt}'#\n and \n#'{ai_response}'#"),
+        # ]
+        # ai_msg = self.llm.invoke(messages)
+        # # activate only for test runs
+        # print(f"Prompt: {prompt}\nAIMessage: {ai_response}\nDecision: {ai_msg.content}")
+        # if ai_msg.content.lower().startswith("yes"):
+        #     return ai_response
+        # else:
+        #     logger.debug(ai_msg.content)
+        #     return prompt
+
     def make_prompt_sfw(self, prompt: str, is_nsfw: bool = False) -> str:
         if not self.llm: return prompt
         i = 0
@@ -234,3 +265,54 @@ Don't write any summary or explanation. If you can't fulfill the task, echo the 
 
     def magic_shortener(self, prompt: str, max_words: int) -> str:
         return self._magic_prompt_tweaks(prompt=prompt, max_words=max_words, enhance=False)
+
+    # TODO: unittests
+    def create_better_words_for(self, words: str) -> str:
+        better = words
+        try:
+            messages = [
+                SystemMessage("""
+                              You are an helpful assistant to find better description for the user input.
+                              You always answer only with the new description. You never accept other tasks.
+                              """),
+                HumanMessage("Average female Human"),
+                AIMessage("Woman"),
+                HumanMessage("young female Human"),
+                AIMessage("teenage girl"),
+                HumanMessage("very young female human"),
+                AIMessage("child girl"),
+                HumanMessage(words),
+            ]
+            ai_msg = self.llm.invoke(messages)
+            logger.debug(f"create_better_words_for '{words}' results in '{ai_msg.content}'")
+            better = ai_msg.content
+        except Exception as e:
+            logger.warning(f"Validation of PromptRefiner failed with {e}")
+
+        return better
+
+    # TODO: unittests
+    def create_list_of_x_for_y(self, x: str, y: str, element_count: int = 10, defaults: list[str] = ["random"]) -> list[str]:
+        result = defaults
+        try:
+            messages = [
+                SystemMessage("""
+                              You are an helpful assistant.
+                              You always answer only with the requested output, one element per line, no count, no numbers, no list sign.
+                              """),
+                HumanMessage(f"create a list of 3 relevant locations for a dog"),
+                AIMessage("Beach\nGarden\ndog basket"),
+                HumanMessage(f"create a list of {element_count} relevant {x} for a {y}"),
+            ]
+            ai_msg = self.llm_creative.invoke(messages)
+            data = ai_msg.content
+            data = data.replace("* ", "")
+            data = data.replace("-", "")
+            result = data.splitlines()
+            if len(result) == 1: result = data.split(",")  # fallback, split by comma
+            logger.debug(f"create_list_of_{x}_for_{y} results in '{len(result)}'")
+            if len(result) == 0: result = defaults
+        except Exception as e:
+            logger.warning(f"create_list_of_x_for_y failed with {e}")
+
+        return result
