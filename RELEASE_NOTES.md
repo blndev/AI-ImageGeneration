@@ -10,9 +10,13 @@
 - Advanced NSFW detection system for generated outputs
   - Automatic content screening
   - Configurable blocking/censorship options
-  - Real-time content validation
 
-### ⚙️ Technical Improvements
+### Analytics
+- Prometheus based metrics for the usage of the system 
+  - amount of generations or errors
+  - amount of connected users
+
+## ⚙️ Technical Improvements
 - Enhanced Model Configuration system with inheritance support
   - Hierarchical model configurations
   - Flexible parameter inheritance
