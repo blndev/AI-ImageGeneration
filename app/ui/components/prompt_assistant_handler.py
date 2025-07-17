@@ -96,14 +96,14 @@ class PromptAssistantHandler:
 
         return better
 
-    def create_suggestions_for_assistant(self, main_object_of_image) -> tuple:
-        logger.debug(f"get suggestions for '{main_object_of_image}'")
+    def create_suggestions_for_assistant(self, main_object_of_image, style) -> tuple:
+        logger.debug(f"get suggestions for '{style}' - '{main_object_of_image}'")
         cloths = []
         locations = []
         body_details = []
         stereotypes = []
         retVal = self.__create_suggestions_ui_retval(cloths, locations, body_details, stereotypes)
-
+        main_object_of_image = f"{style} {main_object_of_image}"
         if main_object_of_image in self._suggestions_cache:
             logger.debug("cache used for suggestions")
             o = self._suggestions_cache[main_object_of_image]
@@ -298,7 +298,7 @@ class PromptAssistantHandler:
             # reload or regenerate all suggestions for location, body details etc.
             gr_button_update_suggestions.click(
                 fn=self.create_suggestions_for_assistant,
-                inputs=[gr_txt_custom_object],
+                inputs=[gr_txt_custom_object, gr_style],
                 outputs=[gr_cloth, gr_location, gr_body_details, gr_stereotype],
                 concurrency_id="llm",
                 concurrency_limit=10
