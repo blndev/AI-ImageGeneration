@@ -106,7 +106,7 @@ class LinkSharingHandler:
         self._load_ui_dependencies()
         # now start with interface
         if not (self.config.feature_sharing_links_enabled): return
-        nsfw_msg = "(including credits for uncensored images)" if self.config.feature_use_upload_for_age_check else ""
+        nsfw_msg = "(including credits for uncensored images)" if self.config.feature_allow_nsfw else ""
         with gr.Row():
             gr.Label(f"Get more image generator credits by sharing Links {nsfw_msg}", container=False)
         with gr.Row():

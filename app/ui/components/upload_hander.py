@@ -100,7 +100,7 @@ class UploadHandler:
         # now start with interface
         # with gr.Row(visible=(self.config.output_directory and self.config.feature_upload_images_for_new_token_enabled)):
         if not (self.config.output_directory and self.config.feature_upload_images_for_new_token_enabled): return
-        nsfw_msg = " and remove censorship by uploading explicit images!" if self.config.feature_use_upload_for_age_check else ""
+        nsfw_msg = " and remove censorship by uploading explicit images!" if self.config.feature_allow_nsfw else ""
         with gr.Row():
             gr.Label("Get more image generation credits" + nsfw_msg, container=False)
         with gr.Row():
@@ -254,7 +254,7 @@ class UploadHandler:
 
                             # token += nsfwtoken
                             session_state.nsfw += nsfwtoken
-                            if self.config.feature_use_upload_for_age_check: msg += f"NSFW enabled for {nsfwtoken} generations."
+                            if self.config.feature_allow_nsfw: msg += f"NSFW enabled for {nsfwtoken} generations."
 
                 except Exception as e:
                     logger.error(f"Error while analyzing uploaded image: {e}")

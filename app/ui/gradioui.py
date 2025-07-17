@@ -52,7 +52,7 @@ class GradioUI():
             )
 
             self.component_upload_handler = None
-            if self.config.feature_upload_images_for_new_token_enabled or self.config.feature_use_upload_for_age_check:
+            if self.config.feature_upload_images_for_new_token_enabled or self.config.feature_allow_nsfw:
                 self.component_upload_handler = UploadHandler(
                     session_manager=self.component_session_manager,
                     config=self.config,
@@ -381,7 +381,7 @@ class GradioUI():
                                         scale=1
                                     )
                             with gr.Column(visible=True, scale=3):
-                                gr.Markdown("more options will be added here soon.")
+                                gr.Markdown("Did you miss something here? Let us know!")
 
                     with gr.Tab("Negative Prompt"):
                         with gr.Row():
@@ -423,7 +423,7 @@ class GradioUI():
                             )
 
             with gr.Accordion(
-                label=f"Get Credits to generate more {("(uncensored)" if self.config.feature_use_upload_for_age_check else "")} images",
+                label=f"Get Credits to generate more {("(uncensored)" if self.config.feature_allow_nsfw else "")} images",
                 open=False
             ):
                 with gr.Tab("Share Link",
@@ -475,7 +475,7 @@ class GradioUI():
                 if self.config.feature_generation_credits_enabled is False:
                     token = "unlimited"
                 n = ""
-                if self.config.feature_use_upload_for_age_check and ss.nsfw > 0:
+                if self.config.feature_allow_nsfw and ss.nsfw > 0:
                     n = f"(Uncensored: {ss.nsfw})"
                 msg = f"Amount of images you can generate: {token} {n}"
                 return msg, msg

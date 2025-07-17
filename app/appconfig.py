@@ -15,8 +15,6 @@ class AppConfig:
     def getbool(self, key, default=False):
         return bool(strtobool(os.getenv(key, str(default))))
 
-    # TODO: load from file instead of env for most keys
-    # TODO: make it more reliable
     def refresh(self):
         logger.info("refresh config")
         self.app_environment = os.getenv("IMGGEN_ENVIRONMENT", "unkown")
@@ -38,7 +36,7 @@ class AppConfig:
 
         self.feature_upload_images_token_reward = int(os.getenv("FEATURE_UPLOAD_IMAGE_NEW_TOKEN", 0))
         self.feature_upload_images_for_new_token_enabled = self.feature_upload_images_token_reward > 0
-        self.feature_use_upload_for_age_check = self.getbool("FEATURE_USE_UPLOAD_FOR_AGE_CHECK", False)
+        self.feature_allow_nsfw = self.getbool("FEATURE_ALLOW_NSFW", False)
 
         self.save_generated_output = (os.getenv("OUTPUT_DIRECTORY", None) is not None)
         self.output_directory = os.getenv("OUTPUT_DIRECTORY", "./output/")

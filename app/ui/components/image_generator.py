@@ -154,7 +154,8 @@ class ImageGenerationHandler:
                     nsfw_count += 1
                 # we check against nsfw<=0 to apply censorship on the explicit regions, if that happen more often (-2),
                 # the prompt refiner is used in advance to avoid nsfw generation (trigger value is NSFW_WARNINGS)
-                if not nsfw_check.is_safe and nsfw_check.category == NSFWCategory.EXPLICIT and session_state.nsfw <= 0:
+                if not nsfw_check.is_safe and nsfw_check.category == NSFWCategory.EXPLICIT \
+                        and (session_state.nsfw <= 0 or self.config.feature_allow_nsfw is False):
                     result_images.append(
                         self.nsfw_detector.censor_detected_regions(
                             image=image,
@@ -169,7 +170,7 @@ class ImageGenerationHandler:
                     if nsfw_check.category == NSFWCategory.EXPLICIT:
                         # reduce only if output is nsfw
                         session_state.nsfw -= 1
-            if show_nsfw_censor_warning and self.config.feature_use_upload_for_age_check:
+            if show_nsfw_censor_warning and self.config.feature_allow_nsfw:
                 gr.Info("""We censored at least one of your images.
                         You can remove the censorship by uploading images to train our System for better results, or by sharing Links of this app.
                         Thanks for your understanding""", duration=0)
@@ -193,10 +194,12 @@ class ImageGenerationHandler:
 
     def _apply_prompt_magic(self, session_state: SessionState, prompt: str, user_activated_promptmagic: bool) -> str:
         # check if nsfw or preview is allowed, enforce SFW prompt if not
-        if session_state.nsfw < self.MAX_NSFW_WARNINGS and self.prompt_refiner:
+        nsfw_preview_expired = session_state.nsfw < self.MAX_NSFW_WARNINGS
+        if (not self.config.feature_allow_nsfw or nsfw_preview_expired) and self.prompt_refiner:
             nsfw, _ = self.prompt_refiner.check_contains_nsfw(prompt)
             if nsfw:
-                if self.config.feature_use_upload_for_age_check and not session_state.nsfw <= self.MAX_NSFW_WARNINGS * 2:
+                if self.config.feature_allow_nsfw and self.config.feature_upload_images_for_new_token_enabled and \
+                        not session_state.nsfw <= self.MAX_NSFW_WARNINGS * 2:
                     # and not session_state.nsfw <= self.MAX_NSFW_WARNINGS * 2: means shows warning only limited amout of time
                     gr.Info("""Your 'Preview' for explicit image generation is over and explicit content creation will now
                             be blocked by adapting your prompt.
