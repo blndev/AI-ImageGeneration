@@ -198,7 +198,7 @@ class PromptAssistantHandler:
                             "Minimalistic",
                             "Monochrome",
                             "Tribal",
-                            "Futurism", "Cyperpunk", "Cybernetic Human", "Cybernetic Robot",
+                            "Futurism", "Cyberpunk", "Cybernetic Human", "Cybernetic Robot",
                             "PopArt", "Comic",
                             "Gothic", "Neon",
                             "Painting",
@@ -375,6 +375,10 @@ class PromptAssistantHandler:
             # compose prompt
             prompt = f"{location} a {object_description} {body} {cloth} {humanprompt} {stereotype}"
 
+            # before apply the style, the prompt must run trough prompt magic
+            # this marker is later used to extract the prompt
+            prompt = f"{self.config.promptmarker}{prompt}{self.config.promptmarker}"
+
             if style == "Random": style = random.choice(
                 ["PopArt", "Photo", "Futurism", "Gothic", "Disco", "Minimalistic",
                  "Monochrome", "Tribal", "Neon", "Cyberpunk", "Comic", "Line Art"]
@@ -402,7 +406,7 @@ class PromptAssistantHandler:
 
             logger.debug(f"Assistant Prompt: {prompt}")
 
-            # trick to create a change event on the textbox, as the prompt is always struiped, we can add a random amount of spaces
+            # trick to create a change event on the textbox, as the prompt is always striped, we can add a random amount of spaces
             spaces = ""
             for _ in range(random.randint(1, 55)):
                 spaces += " "

@@ -86,11 +86,27 @@ class ImageGenerationHandler:
             # cleanup input data
             prompt = str(prompt.strip()).replace("'", "-")
             userprompt = prompt
+            style = None
+            try:
+                if self.config.promptmarker in prompt:
+                    parts = prompt.split(self.config.promptmarker)
+                    if len(parts) > 1:
+                        userprompt = parts[1]
+                        style = parts[0] + "{userprompt}"
+                    if len(parts) > 2:
+                        style = style + parts[2]
+                    logger.debug(f"Style '{style}' identified. Style free prompt: '{userprompt}'")
+            except Exception:
+                logger.info("error while extracting style from prompt")
+
             neg_prompt = neg_prompt.strip()
 
             progress(0.1, "analyze prompt")
             # enhance / shrink prompt and remove nsfw
             prompt = self._apply_prompt_magic(session_state, userprompt, user_activated_promptmagic)
+            # reapply style if exists
+            if style:
+                prompt = style.replace("{userprompt}", prompt)
 
             # additional nsfw protection
             if session_state.nsfw <= self.MAX_NSFW_WARNINGS:
