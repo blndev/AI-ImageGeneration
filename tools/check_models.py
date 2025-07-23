@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import os
+import time
 import torch
 from diffusers import StableDiffusionPipeline, StableDiffusionXLPipeline, FluxPipeline
 from datetime import datetime
@@ -95,6 +96,9 @@ def check_models():
     images = int(os.getenv("IMAGES", 1))
     modelcount = 0
     for file in safetensors_files:
+        if modelcount > 0:
+            print("cooldown GPU")
+            time.sleep(30)  # rest between the generations to cool down
         try:
             modelcount += 1
             model_name = os.path.basename(file)
@@ -139,7 +143,7 @@ def check_models():
 
                     print(f"Prompt: '{prompt}', \nNeg Prompt: '{neg_prompt}'")
                     for imagecount in range(images):
-                        output_filename = f"{modelcount:02}_prompt_{i}-{imagecount + 1}_{model_name}--{timestamp}.jpg"
+                        output_filename = f"M{modelcount:02}-P{i}-V{imagecount + 1}_{model_name}--{timestamp}.jpg"
                         output_path_full = os.path.join(output_path, output_filename)
                         print(f"Generating image {imagecount + 1}/{images} of prompt {i}/{len(prompts)}...")
 
