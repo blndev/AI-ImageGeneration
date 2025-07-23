@@ -23,7 +23,7 @@ def load_prompts():
     try:
         with open(prompt_file, 'r') as f:
             # prompts = [line.strip() for line in f if line.strip()]
-            prompts = [line.strip() for line in f if not line.strip().startswith('#') or len(line.strip()) == 0]
+            prompts = [line.strip() for line in f if not (line.strip().startswith('#') or len(line.strip()) == 0)]
 
     except FileNotFoundError:
         print(f"Warning: {prompt_file} not found, using default prompts")
@@ -69,7 +69,6 @@ def check_models():
     # Load prompts at startup
     prompts = load_prompts()
     print(f"Loaded {len(prompts)} prompts for testing")
-    # TODO: save prompts to file
     filters = load_filters()
 
     # Ensure output directory exists
@@ -94,10 +93,12 @@ def check_models():
 
     print(f"Found {len(safetensors_files)} model directories")
     images = int(os.getenv("IMAGES", 1))
+    modelcount = 0
     for file in safetensors_files:
         try:
+            modelcount += 1
             model_name = os.path.basename(file)
-            print(f"\nTesting model: {model_name} from {file}")
+            print(f"\nTesting model {modelcount}/{len(safetensors_files)}: {model_name} from {file}")
 
             # Determine image size based on path
             height = width = 512 if "1.5" in file or "15" in file else 1024
@@ -130,26 +131,34 @@ def check_models():
                 timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
                 # Generate test images for each prompt
                 for i, prompt in enumerate(prompts, 1):
-                    for count in range(images):
-                        output_filename = f"{model_name}_prompt{i}-{count}_{timestamp}.jpg"
+                    neg_prompt = ""
+                    if "||" in prompt:
+                        p = prompt.split("||")
+                        prompt = p[0]
+                        neg_prompt = p[1]
+
+                    print(f"Prompt: '{prompt}', \nNeg Prompt: '{neg_prompt}'")
+                    for imagecount in range(images):
+                        output_filename = f"{modelcount:02}_prompt_{i}-{imagecount + 1}_{model_name}--{timestamp}.jpg"
                         output_path_full = os.path.join(output_path, output_filename)
+                        print(f"Generating image {imagecount + 1}/{images} of prompt {i}/{len(prompts)}...")
 
-                        print(f"Generating test image {count + 1} of prompt {i}/{len(prompts)}...")
-                        print(f"Prompt: {prompt}")
-                        image = pipeline(
-                            prompt=prompt,
-                            height=height,
-                            width=width,
-                            num_inference_steps=steps,
-                            device_map="auto",
-                            # num_inference_steps=40,
-                            # strength=1,
-                            # guidance_scale=7.5
-                        ).images[0]
+                        if len(prompt.split()) > 0:
+                            image = pipeline(
+                                prompt=prompt,
+                                negative_prompt=neg_prompt,
+                                height=height,
+                                width=width,
+                                num_inference_steps=steps,
+                                device_map="auto",
+                                # num_inference_steps=40,
+                                # strength=1,
+                                # guidance_scale=7.5
+                            ).images[0]
 
-                        # Save the image
-                        image.save(output_path_full)
-                        print(f"Generated image saved as: {output_filename}")
+                            # Save the image
+                            image.save(output_path_full)
+                            print(f"Generated image saved as: {output_filename}")
 
             finally:
                 # Cleanup
