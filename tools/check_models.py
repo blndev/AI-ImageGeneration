@@ -22,7 +22,9 @@ def load_prompts():
     prompts = None
     try:
         with open(prompt_file, 'r') as f:
-            prompts = [line.strip() for line in f if line.strip()]
+            # prompts = [line.strip() for line in f if line.strip()]
+            prompts = [line.strip() for line in f if not line.strip().startswith('#') or len(line.strip()) == 0]
+
     except FileNotFoundError:
         print(f"Warning: {prompt_file} not found, using default prompts")
 
@@ -37,7 +39,7 @@ def load_prompts():
 
 
 def load_filters():
-    """Load prompts from prompts.txt file"""
+    """Load models filter if existing"""
     filters = []
     if os.getenv("MODEL_FILTER", None):
         filter_file = os.path.join(os.path.dirname(__file__), os.getenv("MODEL_FILTER", None))
@@ -72,6 +74,13 @@ def check_models():
 
     # Ensure output directory exists
     os.makedirs(output_path, exist_ok=True)
+
+    # Open the file for appending and write all prompts
+    with open(os.path.join(output_path, 'prompts.txt'), 'a') as f:
+        c = 1
+        for prompt in prompts:
+            f.write(f"{c} - {prompt}\n")
+            c += 1
 
     # Find all safetensors files
     safetensors_files = []
