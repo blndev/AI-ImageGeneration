@@ -58,7 +58,6 @@ def load_filters():
 
 
 def check_models():
-    load_dotenv(override=True)
     setup_environment()
 
     models_path = os.getenv('MODEL_DIRECTORY', './text2img/models/')
@@ -70,7 +69,14 @@ def check_models():
     # Load prompts at startup
     prompts = load_prompts()
     print(f"Loaded {len(prompts)} prompts for testing")
-    filters = load_filters()
+
+    # Find all safetensors files
+    safetensors_files = find_safetensor_models(models_path, cache_path)
+
+    if len(safetensors_files) == 0:
+        print("no model found")
+        exit()
+    print(f"Found {len(safetensors_files)} model directories")
 
     # Ensure output directory exists
     os.makedirs(output_path, exist_ok=True)
@@ -82,23 +88,14 @@ def check_models():
             f.write(f"{c} - {prompt}\n")
             c += 1
 
-    # Find all safetensors files
-    safetensors_files = []
-    for root, dirs, files in os.walk(models_path):
-        if not os.path.abspath(cache_path) in os.path.abspath(root):
-            for file in files:
-                if file.endswith('.safetensors') and (file in filters or len(filters) == 0):
-                    model_path = os.path.join(root, file)
-                    if model_path not in safetensors_files:  # Only add unique model directories
-                        safetensors_files.append(model_path)
-
-    print(f"Found {len(safetensors_files)} model directories")
     images = int(os.getenv("IMAGES", 1))
     modelcount = 0
     for file in safetensors_files:
         if modelcount > 0:
-            print("cooldown GPU")
-            time.sleep(30)  # rest between the generations to cool down
+            # pause between the generations to cool down, more model = longer
+            rest_time = 15 + modelcount * 4
+            print(f"cooldown GPU for {rest_time}s")
+            time.sleep(rest_time)
         try:
             modelcount += 1
             model_name = os.path.basename(file)
@@ -135,19 +132,20 @@ def check_models():
                 timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
                 # Generate test images for each prompt
                 for i, prompt in enumerate(prompts, 1):
-                    neg_prompt = ""
+                    neg_prompt = None
                     if "||" in prompt:
                         p = prompt.split("||")
                         prompt = p[0]
                         neg_prompt = p[1]
 
-                    print(f"Prompt: '{prompt}', \nNeg Prompt: '{neg_prompt}'")
+                    print(f"Prompt: '{prompt}'")
+                    if neg_prompt: print(f"Neg Prompt: '{neg_prompt}'")
                     for imagecount in range(images):
                         output_filename = f"M{modelcount:02}-P{i}-V{imagecount + 1}_{model_name}--{timestamp}.jpg"
                         output_path_full = os.path.join(output_path, output_filename)
                         print(f"Generating image {imagecount + 1}/{images} of prompt {i}/{len(prompts)}...")
 
-                        if len(prompt.split()) > 0:
+                        if len(prompt.strip()) > 0:
                             image = pipeline(
                                 prompt=prompt,
                                 negative_prompt=neg_prompt,
@@ -176,5 +174,24 @@ def check_models():
             continue
 
 
+def find_safetensor_models(models_path, cache_path):
+    filters = load_filters()
+    safetensors_files = []
+    for root, dirs, files in os.walk(models_path):
+        if not os.path.abspath(cache_path) in os.path.abspath(root):
+            for file in files:
+                if file.endswith('.safetensors') and (file in filters or len(filters) == 0):
+                    model_path = os.path.join(root, file)
+                    if model_path not in safetensors_files:  # Only add unique model directories
+                        safetensors_files.append(model_path)
+    safetensors_files = sorted(safetensors_files)
+    return safetensors_files
+
+
 if __name__ == "__main__":
-    check_models()
+    try:
+        load_dotenv(override=True)
+        check_models()
+    except KeyboardInterrupt:
+        print("Shutdown")
+        exit()
