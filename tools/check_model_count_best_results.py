@@ -4,6 +4,7 @@ from dotenv import load_dotenv
 
 # after review and moving accepted images into a eval folder, the amount of images per model will be counted and the top 20 listed
 
+
 def count_file_parts(directory):
     model_count = {}
     model_pattern = re.compile(r'_(?!prompt)([a-z][\w-]*\.safetensors)\b')
@@ -13,7 +14,7 @@ def count_file_parts(directory):
         for file in files:
             # Split the filename into parts
             models = model_pattern.findall(file)  # file.split('_')
-            #if len(models) > 0: print(models)
+            # if len(models) > 0: print(models)
             for model in models:
                 # Increment the count for the part
                 if model in model_count:
@@ -36,8 +37,10 @@ if __name__ == "__main__":
         print(f"Start scanning {directory_to_scan}")
         sorted_parts_count = count_file_parts(directory_to_scan)
 
+        count = 0
         for model, value in sorted_parts_count:
-            print(f"{model}: {value}")
+            count += 1
+            print(f"{count}: {model} ({value})")
     except KeyboardInterrupt:
         print("Shutdown")
         exit()

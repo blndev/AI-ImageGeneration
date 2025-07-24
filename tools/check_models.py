@@ -24,7 +24,8 @@ def load_prompts():
     try:
         with open(prompt_file, 'r') as f:
             # prompts = [line.strip() for line in f if line.strip()]
-            prompts = [line.strip() for line in f if not (line.strip().startswith('#') or len(line.strip()) == 0)]
+            prompts = [line.strip() for line in f if not (line.strip().startswith(
+                '#') or line.strip().startswith(';') or len(line.strip()) == 0)]
 
     except FileNotFoundError:
         print(f"Warning: {prompt_file} not found, using default prompts")
@@ -93,7 +94,7 @@ def check_models():
     for file in safetensors_files:
         if modelcount > 0:
             # pause between the generations to cool down, more model = longer
-            rest_time = 15 + modelcount * 4
+            rest_time = 30 + modelcount * 5
             print(f"cooldown GPU for {rest_time}s")
             time.sleep(rest_time)
         try:
@@ -131,7 +132,9 @@ def check_models():
 
                 timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
                 # Generate test images for each prompt
+                rest_image_count = 0
                 for i, prompt in enumerate(prompts, 1):
+
                     neg_prompt = None
                     if "||" in prompt:
                         p = prompt.split("||")
@@ -141,6 +144,13 @@ def check_models():
                     print(f"Prompt: '{prompt}'")
                     if neg_prompt: print(f"Neg Prompt: '{neg_prompt}'")
                     for imagecount in range(images):
+                        rest_image_count += 1
+                        if rest_image_count > 15:
+                            rest_image_count = 0
+                            rest_time = 30
+                            print(f"cooldown GPU for {rest_time}s")
+                            time.sleep(rest_time)
+
                         output_filename = f"M{modelcount:02}-P{i}-V{imagecount + 1}_{model_name}--{timestamp}.jpg"
                         output_path_full = os.path.join(output_path, output_filename)
                         print(f"Generating image {imagecount + 1}/{images} of prompt {i}/{len(prompts)}...")
