@@ -123,6 +123,8 @@ class GradioUI():
                 ]
             ]
 
+    configupdatecount = 0
+
     def interval_cleanup_and_analytics(self):
         """is called every 60 secdonds and:
         * updates monitoring information
@@ -134,6 +136,10 @@ class GradioUI():
             timeout_minutes = self.config.free_memory_after_minutes_inactivity
             x15_minutes_ago = datetime.now() - timedelta(minutes=timeout_minutes)
             self.component_session_manager.session_cleanup_and_analytics()
+            self.configupdatecount += 1
+            if self.configupdatecount > 10:
+                self.config.refresh()
+                self.configupdatecount = 0
 
             if self.app_last_image_generation < x15_minutes_ago and self.component_image_generator.generator._cached_generation_pipeline:
                 # no active user for x minutes, we can unload the model to free memory
