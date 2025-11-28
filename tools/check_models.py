@@ -103,11 +103,26 @@ def check_models():
             print(f"\nTesting model {modelcount}/{len(safetensors_files)}: {model_name} from {file}")
 
             # Determine image size based on path
-            height = width = 512 if "1.5" in file or "15" in file else 1024
+            aspect_ratio = []
+            if "1.5" in file or "15" in file:
+                aspect_ratio = [
+                    (512, 512),
+                    (912, 512), # 16:9
+                    (512, 768), # 2:3 (hochformat)
+                    (768, 512), # 2:3 Standard Quer
+                ]
+
+            else:               
+                aspect_ratio = [
+                    (1024, 1024),
+                    (1664, 928), # 16:9
+                    (1344, 768), (768, 1344)   # 7:4 
+                ]
+
             pt = StableDiffusionPipeline if "1.5" in file or "15" in file else StableDiffusionXLPipeline
             if "flux" in file.lower():
                 pt = FluxPipeline
-            print(f"Using resolution: {width}x{height}")
+            #print(f"Using resolution: {width}x{height}")
 
             # Load and test the model
             pipeline = None
@@ -130,7 +145,6 @@ def check_models():
                 if os.getenv('GPU_ALLOW_ATTENTION_SLICING', '0') == '1':
                     pipeline.enable_attention_slicing()
 
-                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
                 # Generate test images for each prompt
                 rest_image_count = 0
                 for i, prompt in enumerate(prompts, 1):
@@ -151,26 +165,28 @@ def check_models():
                             print(f"cooldown GPU for {rest_time}s")
                             time.sleep(rest_time)
 
-                        output_filename = f"M{modelcount:02}-P{i}-V{imagecount + 1}_{model_name}--{timestamp}.jpg"
-                        output_path_full = os.path.join(output_path, output_filename)
-                        print(f"Generating image {imagecount + 1}/{images} of prompt {i}/{len(prompts)}...")
+                        for width, height in aspect_ratio:
+                            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                            output_filename = f"M{modelcount:02}-P{i}-I{imagecount + 1}_{model_name}-{width}x{height}-{timestamp}.jpg"
+                            output_path_full = os.path.join(output_path, output_filename)
+                            print(f"Generating image {imagecount + 1}/{images} of prompt {i}/{len(prompts)} in ratio {width}x{height}...")
 
-                        if len(prompt.strip()) > 0:
-                            image = pipeline(
-                                prompt=prompt,
-                                negative_prompt=neg_prompt,
-                                height=height,
-                                width=width,
-                                num_inference_steps=steps,
-                                device_map="auto",
-                                # num_inference_steps=40,
-                                # strength=1,
-                                # guidance_scale=7.5
-                            ).images[0]
+                            if len(prompt.strip()) > 0:
+                                image = pipeline(
+                                    prompt=prompt,
+                                    negative_prompt=neg_prompt,
+                                    height=height,
+                                    width=width,
+                                    num_inference_steps=steps,
+                                    device_map="auto",
+                                    # num_inference_steps=40,
+                                    # strength=1,
+                                    # guidance_scale=7.5
+                                ).images[0]
 
-                            # Save the image
-                            image.save(output_path_full)
-                            print(f"Generated image saved as: {output_filename}")
+                                # Save the image
+                                image.save(output_path_full)
+                                print(f"Generated image saved as: {output_filename}")
 
             finally:
                 # Cleanup
