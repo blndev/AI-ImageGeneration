@@ -14,6 +14,7 @@ This tool automatically tests and evaluates different AI image generation models
 - Automatically detects model type (SD 1.5, SDXL, Flux) and adjusts parameters accordingly
 - Supports different model configurations including Flux, Hyper, and Flux-schnell variants
 - Configurable number of images per prompt
+- **Fixed Seed Management**: Ensures reproducible results by using the same seed for all models with a single prompt, while generating different seeds for multiple image iterations
 
 **Usage:**
 ```bash
@@ -32,6 +33,33 @@ python check_models.py
 - `OUTPUT_DIRECTORY`: Where generated test images will be saved
 - `IMAGES`: Number of images to generate per prompt
 - `PROMPTS`: Path to the prompts file (default: prompts.txt)
+- `FIXED_SEED`: Enable/disable fixed seed mode (default: True). Set to `False` for random seeds
+- `SEED_JSON`: Path to save/load seeds from (default: `{OUTPUT_DIRECTORY}/seeds.json`)
+
+**Fixed Seed Management:**
+
+When `FIXED_SEED=True`, the tool ensures that:
+- All models generate images with the **same seed for each prompt**
+- Multiple image iterations (IMAGES > 1) each get a **unique seed**
+- All aspect ratios for a single image use the **same seed**
+- Seeds are persisted in a JSON file for reproducibility
+
+**Seed File Structure:**
+```json
+{
+  "prompt_1": {
+    "image_1": 1234567890,
+    "image_2": 2345678901,
+    "image_3": 3456789012
+  },
+  "prompt_2": {
+    "image_1": 4567890123,
+    "image_2": 5678901234
+  }
+}
+```
+
+This enables direct comparison of model outputs for the same prompts, allowing you to evaluate differences in quality and style without seed variations affecting the results.
 
 ### 2. convert_images.py
 

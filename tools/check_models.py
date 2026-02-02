@@ -2,6 +2,8 @@
 import os
 import time
 import torch
+import json
+import random
 from diffusers import StableDiffusionPipeline, StableDiffusionXLPipeline, FluxPipeline
 from datetime import datetime
 from dotenv import load_dotenv
@@ -58,6 +60,55 @@ def load_filters():
     return filters
 
 
+def should_use_fixed_seeds():
+    """Check if fixed seed mode is enabled via .env"""
+    fixed_seed = os.getenv('FIXED_SEED', 'True').lower()
+    return fixed_seed == 'true'
+
+
+def initialize_seeds(seed_file_path):
+    """Load or initialize seed dictionary"""
+    seeds = {}
+    if os.path.exists(seed_file_path):
+        if os.path.getsize(seed_file_path) == 0:
+            return seeds
+        try:
+            with open(seed_file_path, 'r') as f:
+                seeds = json.load(f)
+                print(f"Loaded existing seeds from {seed_file_path}")
+        except (json.JSONDecodeError, IOError) as e:
+            print(f"Warning: Could not load seed file {seed_file_path}: {e}. Starting fresh.")
+    return seeds
+
+
+def save_seeds(seeds, seed_file_path):
+    """Save seeds to JSON file"""
+    try:
+        seed_dir = os.path.dirname(seed_file_path)
+        if seed_dir:
+            os.makedirs(seed_dir, exist_ok=True)
+        with open(seed_file_path, 'w') as f:
+            json.dump(seeds, f, indent=2)
+        print(f"Seeds saved to {seed_file_path}")
+    except IOError as e:
+        print(f"Error saving seeds to {seed_file_path}: {e}")
+
+
+def get_or_generate_seed(seeds, prompt_index, image_index):
+    """Get existing seed or generate a new one using torch's RNG"""
+    prompt_key = f"prompt_{prompt_index}"
+    
+    if prompt_key not in seeds:
+        seeds[prompt_key] = {}
+    
+    image_key = f"image_{image_index}"
+    
+    if image_key not in seeds[prompt_key]:
+        seeds[prompt_key][image_key] = torch.seed()
+    
+    return seeds[prompt_key][image_key]
+
+
 def check_models():
     setup_environment()
 
@@ -88,6 +139,17 @@ def check_models():
         for prompt in prompts:
             f.write(f"{c} - {prompt}\n")
             c += 1
+
+    # Initialize seed management
+    use_fixed_seeds = should_use_fixed_seeds()
+    seeds = {}
+    seed_file_path = None
+    if use_fixed_seeds:
+        seed_file_path = os.getenv('SEED_JSON', os.path.join(output_path, 'seeds.json'))
+        seeds = initialize_seeds(seed_file_path)
+        print(f"Fixed seed mode: ENABLED (seeds will be saved to {seed_file_path})")
+    else:
+        print("Fixed seed mode: DISABLED (random seeds for each generation)")
 
     images = int(os.getenv("IMAGES", 1))
     modelcount = 0
@@ -165,6 +227,13 @@ def check_models():
                             print(f"cooldown GPU for {rest_time}s")
                             time.sleep(rest_time)
 
+                        # Get or generate seed for this prompt and image count
+                        if use_fixed_seeds:
+                            current_seed = get_or_generate_seed(seeds, i, imagecount + 1)
+                            print(f"Using seed: {current_seed}")
+                        else:
+                            current_seed = None
+
                         for width, height in aspect_ratio:
                             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
                             output_filename = f"M{modelcount:02}-P{i}-I{imagecount + 1}_{model_name}-{width}x{height}-{timestamp}.jpg"
@@ -172,17 +241,18 @@ def check_models():
                             print(f"Generating image {imagecount + 1}/{images} of prompt {i}/{len(prompts)} in ratio {width}x{height}...")
 
                             if len(prompt.strip()) > 0:
-                                image = pipeline(
-                                    prompt=prompt,
-                                    negative_prompt=neg_prompt,
-                                    height=height,
-                                    width=width,
-                                    num_inference_steps=steps,
-                                    device_map="auto",
-                                    # num_inference_steps=40,
-                                    # strength=1,
-                                    # guidance_scale=7.5
-                                ).images[0]
+                                gen_kwargs = {
+                                    "prompt": prompt,
+                                    "negative_prompt": neg_prompt,
+                                    "height": height,
+                                    "width": width,
+                                    "num_inference_steps": steps,
+                                    "device_map": "auto",
+                                }
+                                if use_fixed_seeds and current_seed is not None:
+                                    gen_kwargs["generator"] = torch.Generator(device="cuda").manual_seed(current_seed)
+                                
+                                image = pipeline(**gen_kwargs).images[0]
 
                                 # Save the image
                                 image.save(output_path_full)
@@ -198,6 +268,10 @@ def check_models():
         except Exception as e:
             print(f"Error processing model {model_name}: {str(e)}")
             continue
+    
+    # Save seeds to file if fixed seed mode was enabled
+    if use_fixed_seeds and seed_file_path:
+        save_seeds(seeds, seed_file_path)
 
 
 def find_safetensor_models(models_path, cache_path):
