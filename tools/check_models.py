@@ -97,15 +97,15 @@ def save_seeds(seeds, seed_file_path):
 def get_or_generate_seed(seeds, prompt_index, image_index):
     """Get existing seed or generate a new one using torch's RNG"""
     prompt_key = f"prompt_{prompt_index}"
-    
+
     if prompt_key not in seeds:
         seeds[prompt_key] = {}
-    
+
     image_key = f"image_{image_index}"
-    
+
     if image_key not in seeds[prompt_key]:
         seeds[prompt_key][image_key] = torch.seed()
-    
+
     return seeds[prompt_key][image_key]
 
 
@@ -169,22 +169,22 @@ def check_models():
             if "1.5" in file or "15" in file:
                 aspect_ratio = [
                     (512, 512),
-                    (912, 512), # 16:9
-                    (512, 768), # 2:3 (hochformat)
-                    (768, 512), # 2:3 Standard Quer
+                    (912, 512),  # 16:9
+                    (512, 768),  # 2:3 (hochformat)
+                    (768, 512),  # 2:3 Standard Quer
                 ]
 
-            else:               
+            else:
                 aspect_ratio = [
                     (1024, 1024),
-                    (1664, 928), # 16:9
-                    (1344, 768), (768, 1344)   # 7:4 
+                    (1664, 928),  # 16:9
+                    (1344, 768), (768, 1344)   # 7:4
                 ]
 
             pt = StableDiffusionPipeline if "1.5" in file or "15" in file else StableDiffusionXLPipeline
             if "flux" in file.lower():
                 pt = FluxPipeline
-            #print(f"Using resolution: {width}x{height}")
+            # print(f"Using resolution: {width}x{height}")
 
             # Load and test the model
             pipeline = None
@@ -255,7 +255,7 @@ def check_models():
                                 }
                                 if use_fixed_seeds and current_seed is not None:
                                     gen_kwargs["generator"] = torch.Generator(device="cuda").manual_seed(current_seed)
-                                
+
                                 image = pipeline(**gen_kwargs).images[0]
 
                                 # Save the image
