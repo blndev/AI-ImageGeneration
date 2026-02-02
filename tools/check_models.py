@@ -231,6 +231,10 @@ def check_models():
                         if use_fixed_seeds:
                             current_seed = get_or_generate_seed(seeds, i, imagecount + 1)
                             print(f"Using seed: {current_seed}")
+                            # Save seeds to file if fixed seed mode was enabled
+                            if use_fixed_seeds and seed_file_path:
+                                save_seeds(seeds, seed_file_path)
+
                         else:
                             current_seed = None
 
@@ -268,10 +272,6 @@ def check_models():
         except Exception as e:
             print(f"Error processing model {model_name}: {str(e)}")
             continue
-    
-    # Save seeds to file if fixed seed mode was enabled
-    if use_fixed_seeds and seed_file_path:
-        save_seeds(seeds, seed_file_path)
 
 
 def find_safetensor_models(models_path, cache_path):
