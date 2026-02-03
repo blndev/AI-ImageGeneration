@@ -66,18 +66,39 @@ def should_use_fixed_seeds():
     return fixed_seed == 'true'
 
 
-def initialize_seeds(seed_file_path):
-    """Load or initialize seed dictionary"""
+def initialize_seeds(seed_file_path, prompts):
+    """Load or initialize seed dictionary in prompt-level format"""
     seeds = {}
     if os.path.exists(seed_file_path):
         if os.path.getsize(seed_file_path) == 0:
-            return seeds
-        try:
-            with open(seed_file_path, 'r') as f:
-                seeds = json.load(f)
-                print(f"Loaded existing seeds from {seed_file_path}")
-        except (json.JSONDecodeError, IOError) as e:
-            print(f"Warning: Could not load seed file {seed_file_path}: {e}. Starting fresh.")
+            seeds = {}
+        else:
+            try:
+                with open(seed_file_path, 'r') as f:
+                    seeds = json.load(f)
+                    print(f"Loaded existing seeds from {seed_file_path}")
+            except (json.JSONDecodeError, IOError) as e:
+                print(f"Warning: Could not load seed file {seed_file_path}: {e}. Starting fresh.")
+
+    updated = False
+    for index, prompt in enumerate(prompts, 1):
+        prompt_key = f"prompt_{index}"
+        if prompt_key not in seeds:
+            seeds[prompt_key] = {
+                "seed": int(torch.seed()),
+                "prompt_text": prompt,
+            }
+            updated = True
+        else:
+            if "seed" not in seeds[prompt_key]:
+                seeds[prompt_key]["seed"] = int(torch.seed())
+                updated = True
+            if seeds[prompt_key].get("prompt_text") != prompt:
+                seeds[prompt_key]["prompt_text"] = prompt
+                updated = True
+
+    if updated and seed_file_path:
+        save_seeds(seeds, seed_file_path)
     return seeds
 
 
@@ -94,19 +115,21 @@ def save_seeds(seeds, seed_file_path):
         print(f"Error saving seeds to {seed_file_path}: {e}")
 
 
-def get_or_generate_seed(seeds, prompt_index, image_index):
-    """Get existing seed or generate a new one using torch's RNG"""
+def get_or_generate_seed(seeds, prompt_index, prompt_text):
+    """Get existing seed or generate a new one using prompt-level format"""
     prompt_key = f"prompt_{prompt_index}"
-
     if prompt_key not in seeds:
-        seeds[prompt_key] = {}
+        seeds[prompt_key] = {
+            "seed": int(torch.seed()),
+            "prompt_text": prompt_text,
+        }
+    else:
+        if "seed" not in seeds[prompt_key]:
+            seeds[prompt_key]["seed"] = int(torch.seed())
+        if seeds[prompt_key].get("prompt_text") != prompt_text:
+            seeds[prompt_key]["prompt_text"] = prompt_text
 
-    image_key = f"image_{image_index}"
-
-    if image_key not in seeds[prompt_key]:
-        seeds[prompt_key][image_key] = torch.seed()
-
-    return seeds[prompt_key][image_key]
+    return seeds[prompt_key]["seed"]
 
 
 def check_models():
@@ -146,7 +169,7 @@ def check_models():
     seed_file_path = None
     if use_fixed_seeds:
         seed_file_path = os.getenv('SEED_JSON', os.path.join(output_path, 'seeds.json'))
-        seeds = initialize_seeds(seed_file_path)
+        seeds = initialize_seeds(seed_file_path, prompts)
         print(f"Fixed seed mode: ENABLED (seeds will be saved to {seed_file_path})")
     else:
         print("Fixed seed mode: DISABLED (random seeds for each generation)")
@@ -234,7 +257,7 @@ def check_models():
 
                         # Get or generate seed for this prompt and image count
                         if use_fixed_seeds:
-                            current_seed = get_or_generate_seed(seeds, i, imagecount + 1)
+                            current_seed = get_or_generate_seed(seeds, i, prompt)
                             print(f"Using seed: {current_seed}")
                             # Save seeds to file if fixed seed mode was enabled
                             if use_fixed_seeds and seed_file_path:
