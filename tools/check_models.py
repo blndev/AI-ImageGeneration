@@ -189,10 +189,15 @@ def check_models():
             # Load and test the model
             pipeline = None
             steps = 30
+            guidance_scale = 7.5
+            if "1.5" in file or "15" in file:
+                steps = 50
+                guidance_scale = 7.5
             if "hyper" in file.lower():
                 steps = 5
             if "flux-schnell" in file.lower():
                 steps = 5
+                guidance_scale = 0
             try:
                 pipeline = pt.from_single_file(
                     file,
@@ -245,22 +250,39 @@ def check_models():
                             print(f"Generating image {imagecount + 1}/{images} of prompt {i}/{len(prompts)} in ratio {width}x{height}...")
 
                             if len(prompt.strip()) > 0:
-                                gen_kwargs = {
-                                    "prompt": prompt,
-                                    "negative_prompt": neg_prompt,
-                                    "height": height,
-                                    "width": width,
-                                    "num_inference_steps": steps,
-                                    "device_map": "auto",
-                                }
-                                if use_fixed_seeds and current_seed is not None:
-                                    gen_kwargs["generator"] = torch.Generator(device="cuda").manual_seed(current_seed)
+                                try:
+                                    gen_kwargs = {
+                                        "prompt": prompt,
+                                        "negative_prompt": neg_prompt,
+                                        "height": height,
+                                        "width": width,
+                                        "num_inference_steps": steps,
+                                        "device_map": "auto",
+                                    }
+                                    # Add guidance_scale for SD1.5 and SDXL models (not for FLUX)
+                                    if "flux" not in file.lower():
+                                        gen_kwargs["guidance_scale"] = guidance_scale
 
-                                image = pipeline(**gen_kwargs).images[0]
+                                    # Add clip_skip for SD1.5 models
+                                    if "1.5" in file or "15" in file:
+                                        gen_kwargs["clip_skip"] = 2
 
-                                # Save the image
-                                image.save(output_path_full)
-                                print(f"Generated image saved as: {output_filename}")
+                                    if use_fixed_seeds and current_seed is not None:
+                                        gen_kwargs["generator"] = torch.Generator(device="cuda").manual_seed(current_seed)
+
+                                    # Generate image
+                                    image = pipeline(**gen_kwargs).images[0]
+
+                                    # Save the image with quality settings
+                                    image.save(output_path_full, quality=95, optimize=True)
+                                    print(f"Generated image saved as: {output_filename}")
+
+                                    # Free memory
+                                    del image
+
+                                except Exception as img_error:
+                                    print(f"Error generating/saving image: {img_error}")
+                                    continue
 
             finally:
                 # Cleanup
