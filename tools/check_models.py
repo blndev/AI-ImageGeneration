@@ -176,17 +176,19 @@ def check_models():
 
     images = int(os.getenv("IMAGES", 1))
     modelcount = 0
+    # if you need to continue from a certain stage, put the model count here
+    continue_from = int(os.getenv("CONTINUE_FROM", 0))
     for file in safetensors_files:
-        if modelcount > 0:
+        if modelcount > 0 and modelcount > continue_from:
             # pause between the generations to cool down, more model = longer
-            rest_time = 30 + modelcount * 5
+            rest_time = 60 + modelcount
             print(f"cooldown GPU for {rest_time}s")
             time.sleep(rest_time)
         try:
             modelcount += 1
             model_name = os.path.basename(file)
             print(f"\nTesting model {modelcount}/{len(safetensors_files)}: {model_name} from {file}")
-
+            if modelcount <= continue_from: continue
             # Determine image size based on path
             aspect_ratio = []
             if "1.5" in file or "15" in file:
