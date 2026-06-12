@@ -187,9 +187,13 @@ class ImageGenerationHandler:
                         # reduce only if output is nsfw
                         session_state.nsfw -= 1
             if show_nsfw_censor_warning and self.config.feature_allow_nsfw and (self.config.feature_sharing_links_enabled or self.config.feature_upload_images_for_new_token_enabled):
-                gr.Info("""We censored at least one of your images.
-                        You can remove the censorship by uploading images to train our System for better results, or by sharing Links of this app.
-                        Thanks for your understanding""", duration=0)
+                msg = "We censored at least one of your images."
+                if self.config.feature_sharing_links_enabled:
+                    msg += "You can remove the censorship by sharing Links of this app."
+                if self.config.feature_upload_images_for_new_token_enabled:
+                    msg += "You can remove the censorship by uploading photos of teh same category to train our System for better results."
+                msg += "\n\nThanks for your understanding"""
+                gr.Info(msg, duration=0)
 
             try:
                 # analytics
@@ -210,11 +214,17 @@ class ImageGenerationHandler:
 
     def _apply_prompt_magic(self, session_state: SessionState, prompt: str, user_activated_promptmagic: bool) -> str:
         # check if nsfw or preview is allowed, enforce SFW prompt if not
-        nsfw_preview_expired = session_state.nsfw < self.MAX_NSFW_WARNINGS
+
+        # preview can only expire if user has the chance to gain nsfw token
+        nsfw_preview_expired = session_state.nsfw < self.MAX_NSFW_WARNINGS \
+            and (self.config.feature_sharing_links_enabled or self.config.feature_upload_images_for_new_token_enabled)
+
+        logger.debug(f"NSFW Preview Expired: {nsfw_preview_expired}, feature_sharing_links_enabled {self.config.feature_sharing_links_enabled}, self.config.feature_upload_images_for_new_token_enabled {self.config.feature_upload_images_for_new_token_enabled}")
         if (not self.config.feature_allow_nsfw or nsfw_preview_expired) and self.prompt_refiner:
             nsfw, _ = self.prompt_refiner.check_contains_nsfw(prompt)
             if nsfw:
-                if self.config.feature_allow_nsfw and self.config.feature_upload_images_for_new_token_enabled and \
+                if self.config.feature_allow_nsfw and \
+                        (self.config.feature_sharing_links_enabled or self.config.feature_upload_images_for_new_token_enabled) and \
                         not session_state.nsfw <= self.MAX_NSFW_WARNINGS * 2:
                     # and not session_state.nsfw <= self.MAX_NSFW_WARNINGS * 2: means shows warning only limited amout of time
                     gr.Info("""Your 'Preview' for explicit image generation is over and explicit content creation will now
