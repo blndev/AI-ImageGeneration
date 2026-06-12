@@ -186,7 +186,7 @@ class ImageGenerationHandler:
                     if nsfw_check.category == NSFWCategory.EXPLICIT:
                         # reduce only if output is nsfw
                         session_state.nsfw -= 1
-            if show_nsfw_censor_warning and self.config.feature_allow_nsfw:
+            if show_nsfw_censor_warning and self.config.feature_allow_nsfw and (self.config.feature_sharing_links_enabled or self.config.feature_upload_images_for_new_token_enabled):
                 gr.Info("""We censored at least one of your images.
                         You can remove the censorship by uploading images to train our System for better results, or by sharing Links of this app.
                         Thanks for your understanding""", duration=0)
