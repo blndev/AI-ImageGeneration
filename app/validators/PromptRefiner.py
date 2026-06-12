@@ -67,7 +67,7 @@ class PromptRefiner():
         return not nsfw
 
     # def contains_nsfw(self, prompt: str, include_rule_violations: bool=False) -> bool:
-    def check_contains_nsfw(self, prompt: str) -> bool:
+    def check_contains_nsfw(self, prompt: str) -> tuple[bool, str]:
         """Validates if the prompt contains NSFW"""
         if not self.llm: return False, "no llm available"
 
