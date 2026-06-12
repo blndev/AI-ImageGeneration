@@ -430,7 +430,8 @@ class GradioUI():
 
             with gr.Accordion(
                 label=f"Get Credits to generate more {("(uncensored)" if self.config.feature_allow_nsfw else "")} images",
-                open=False
+                open=False,
+                visible=self.config.feature_sharing_links_enabled or self.config.feature_upload_images_for_new_token_enabled
             ):
                 with gr.Tab("Share Link",
                             visible=(self.config.feature_sharing_links_enabled)):
