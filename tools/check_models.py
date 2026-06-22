@@ -2,6 +2,8 @@
 import os
 import time
 import torch
+import json
+import random
 from diffusers import StableDiffusionPipeline, StableDiffusionXLPipeline, FluxPipeline
 from datetime import datetime
 from dotenv import load_dotenv
@@ -58,6 +60,78 @@ def load_filters():
     return filters
 
 
+def should_use_fixed_seeds():
+    """Check if fixed seed mode is enabled via .env"""
+    fixed_seed = os.getenv('FIXED_SEED', 'True').lower()
+    return fixed_seed == 'true'
+
+
+def initialize_seeds(seed_file_path, prompts):
+    """Load or initialize seed dictionary in prompt-level format"""
+    seeds = {}
+    if os.path.exists(seed_file_path):
+        if os.path.getsize(seed_file_path) == 0:
+            seeds = {}
+        else:
+            try:
+                with open(seed_file_path, 'r') as f:
+                    seeds = json.load(f)
+                    print(f"Loaded existing seeds from {seed_file_path}")
+            except (json.JSONDecodeError, IOError) as e:
+                print(f"Warning: Could not load seed file {seed_file_path}: {e}. Starting fresh.")
+
+    updated = False
+    for index, prompt in enumerate(prompts, 1):
+        prompt_key = f"prompt_{index}"
+        if prompt_key not in seeds:
+            seeds[prompt_key] = {
+                "seed": int(torch.seed()),
+                "prompt_text": prompt,
+            }
+            updated = True
+        else:
+            if "seed" not in seeds[prompt_key]:
+                seeds[prompt_key]["seed"] = int(torch.seed())
+                updated = True
+            if seeds[prompt_key].get("prompt_text") != prompt:
+                seeds[prompt_key]["prompt_text"] = prompt
+                updated = True
+
+    if updated and seed_file_path:
+        save_seeds(seeds, seed_file_path)
+    return seeds
+
+
+def save_seeds(seeds, seed_file_path):
+    """Save seeds to JSON file"""
+    try:
+        seed_dir = os.path.dirname(seed_file_path)
+        if seed_dir:
+            os.makedirs(seed_dir, exist_ok=True)
+        with open(seed_file_path, 'w') as f:
+            json.dump(seeds, f, indent=2)
+        print(f"Seeds saved to {seed_file_path}")
+    except IOError as e:
+        print(f"Error saving seeds to {seed_file_path}: {e}")
+
+
+def get_or_generate_seed(seeds, prompt_index, prompt_text):
+    """Get existing seed or generate a new one using prompt-level format"""
+    prompt_key = f"prompt_{prompt_index}"
+    if prompt_key not in seeds:
+        seeds[prompt_key] = {
+            "seed": int(torch.seed()),
+            "prompt_text": prompt_text,
+        }
+    else:
+        if "seed" not in seeds[prompt_key]:
+            seeds[prompt_key]["seed"] = int(torch.seed())
+        if seeds[prompt_key].get("prompt_text") != prompt_text:
+            seeds[prompt_key]["prompt_text"] = prompt_text
+
+    return seeds[prompt_key]["seed"]
+
+
 def check_models():
     setup_environment()
 
@@ -89,6 +163,17 @@ def check_models():
             f.write(f"{c} - {prompt}\n")
             c += 1
 
+    # Initialize seed management
+    use_fixed_seeds = should_use_fixed_seeds()
+    seeds = {}
+    seed_file_path = None
+    if use_fixed_seeds:
+        seed_file_path = os.getenv('SEED_JSON', os.path.join(output_path, 'seeds.json'))
+        seeds = initialize_seeds(seed_file_path, prompts)
+        print(f"Fixed seed mode: ENABLED (seeds will be saved to {seed_file_path})")
+    else:
+        print("Fixed seed mode: DISABLED (random seeds for each generation)")
+
     images = int(os.getenv("IMAGES", 1))
     modelcount = 0
     for file in safetensors_files:
@@ -107,30 +192,35 @@ def check_models():
             if "1.5" in file or "15" in file:
                 aspect_ratio = [
                     (512, 512),
-                    (912, 512), # 16:9
-                    (512, 768), # 2:3 (hochformat)
-                    (768, 512), # 2:3 Standard Quer
+                    (912, 512),  # 16:9
+                    (512, 768),  # 2:3 (hochformat)
+                    (768, 512),  # 2:3 Standard Quer
                 ]
 
-            else:               
+            else:
                 aspect_ratio = [
                     (1024, 1024),
-                    (1664, 928), # 16:9
-                    (1344, 768), (768, 1344)   # 7:4 
+                    (1664, 928),  # 16:9
+                    (1344, 768), (768, 1344)   # 7:4
                 ]
 
             pt = StableDiffusionPipeline if "1.5" in file or "15" in file else StableDiffusionXLPipeline
             if "flux" in file.lower():
                 pt = FluxPipeline
-            #print(f"Using resolution: {width}x{height}")
+            # print(f"Using resolution: {width}x{height}")
 
             # Load and test the model
             pipeline = None
             steps = 30
+            guidance_scale = 7.5
+            if "1.5" in file or "15" in file:
+                steps = 50
+                guidance_scale = 7.5
             if "hyper" in file.lower():
                 steps = 5
             if "flux-schnell" in file.lower():
                 steps = 5
+                guidance_scale = 0
             try:
                 pipeline = pt.from_single_file(
                     file,
@@ -165,6 +255,17 @@ def check_models():
                             print(f"cooldown GPU for {rest_time}s")
                             time.sleep(rest_time)
 
+                        # Get or generate seed for this prompt and image count
+                        if use_fixed_seeds:
+                            current_seed = get_or_generate_seed(seeds, i, prompt)
+                            print(f"Using seed: {current_seed}")
+                            # Save seeds to file if fixed seed mode was enabled
+                            if use_fixed_seeds and seed_file_path:
+                                save_seeds(seeds, seed_file_path)
+
+                        else:
+                            current_seed = None
+
                         for width, height in aspect_ratio:
                             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
                             output_filename = f"M{modelcount:02}-P{i}-I{imagecount + 1}_{model_name}-{width}x{height}-{timestamp}.jpg"
@@ -172,21 +273,39 @@ def check_models():
                             print(f"Generating image {imagecount + 1}/{images} of prompt {i}/{len(prompts)} in ratio {width}x{height}...")
 
                             if len(prompt.strip()) > 0:
-                                image = pipeline(
-                                    prompt=prompt,
-                                    negative_prompt=neg_prompt,
-                                    height=height,
-                                    width=width,
-                                    num_inference_steps=steps,
-                                    device_map="auto",
-                                    # num_inference_steps=40,
-                                    # strength=1,
-                                    # guidance_scale=7.5
-                                ).images[0]
+                                try:
+                                    gen_kwargs = {
+                                        "prompt": prompt,
+                                        "negative_prompt": neg_prompt,
+                                        "height": height,
+                                        "width": width,
+                                        "num_inference_steps": steps,
+                                        "device_map": "auto",
+                                    }
+                                    # Add guidance_scale for SD1.5 and SDXL models (not for FLUX)
+                                    if "flux" not in file.lower():
+                                        gen_kwargs["guidance_scale"] = guidance_scale
 
-                                # Save the image
-                                image.save(output_path_full)
-                                print(f"Generated image saved as: {output_filename}")
+                                    # Add clip_skip for SD1.5 models
+                                    if "1.5" in file or "15" in file:
+                                        gen_kwargs["clip_skip"] = 2
+
+                                    if use_fixed_seeds and current_seed is not None:
+                                        gen_kwargs["generator"] = torch.Generator(device="cuda").manual_seed(current_seed)
+
+                                    # Generate image
+                                    image = pipeline(**gen_kwargs).images[0]
+
+                                    # Save the image with quality settings
+                                    image.save(output_path_full, quality=95, optimize=True)
+                                    print(f"Generated image saved as: {output_filename}")
+
+                                    # Free memory
+                                    del image
+
+                                except Exception as img_error:
+                                    print(f"Error generating/saving image: {img_error}")
+                                    continue
 
             finally:
                 # Cleanup
